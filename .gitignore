@@ -10,8 +10,8 @@ vite.config.ts.*
 .env.local
 .env.production
 
-# Data files (keep this - data will be empty on first deploy)
-data/streamvault-data.json
+# Data files - COMMENTED OUT to include in deployment
+# data/streamvault-data.json
 
 # Logs
 *.log
