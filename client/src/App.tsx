@@ -14,6 +14,9 @@ import Category from "@/pages/category";
 import Watchlist from "@/pages/watchlist";
 import Admin from "@/pages/admin";
 import AdminLogin from "@/pages/admin-login";
+import Privacy from "@/pages/privacy";
+import About from "@/pages/about";
+import Contact from "@/pages/contact";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -30,6 +33,9 @@ function Router() {
           <Route path="/watchlist" component={Watchlist} />
           <Route path="/admin/login" component={AdminLogin} />
           <Route path="/admin" component={Admin} />
+          <Route path="/privacy" component={Privacy} />
+          <Route path="/about" component={About} />
+          <Route path="/contact" component={Contact} />
           <Route path="/series" component={Home} />
           <Route path="/movies" component={Home} />
           <Route path="/trending" component={Home} />
