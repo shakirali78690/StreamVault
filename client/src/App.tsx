@@ -17,6 +17,12 @@ import AdminLogin from "@/pages/admin-login";
 import Privacy from "@/pages/privacy";
 import About from "@/pages/about";
 import Contact from "@/pages/contact";
+import Terms from "@/pages/terms";
+import DMCA from "@/pages/dmca";
+import Help from "@/pages/help";
+import FAQ from "@/pages/faq";
+import Report from "@/pages/report";
+import Request from "@/pages/request";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -36,6 +42,12 @@ function Router() {
           <Route path="/privacy" component={Privacy} />
           <Route path="/about" component={About} />
           <Route path="/contact" component={Contact} />
+          <Route path="/terms" component={Terms} />
+          <Route path="/dmca" component={DMCA} />
+          <Route path="/help" component={Help} />
+          <Route path="/faq" component={FAQ} />
+          <Route path="/report" component={Report} />
+          <Route path="/request" component={Request} />
           <Route path="/series" component={Home} />
           <Route path="/movies" component={Home} />
           <Route path="/trending" component={Home} />

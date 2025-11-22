@@ -654,6 +654,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Handle issue reports
+  app.post("/api/report-issue", async (req, res) => {
+    try {
+      const { issueType, title, description, url, email } = req.body;
+      
+      // Log the report (in production, save to database or send email)
+      console.log('📝 Issue Report Received:');
+      console.log('Type:', issueType);
+      console.log('Title:', title);
+      console.log('Description:', description);
+      console.log('URL:', url);
+      console.log('Email:', email);
+      console.log('---');
+      
+      // In production, you would:
+      // 1. Save to database
+      // 2. Send email notification to admin
+      // 3. Create a ticket in support system
+      
+      res.json({ 
+        success: true, 
+        message: 'Report submitted successfully' 
+      });
+    } catch (error: any) {
+      console.error('Error submitting report:', error);
+      res.status(500).json({ 
+        success: false, 
+        message: 'Failed to submit report' 
+      });
+    }
+  });
+
+  // Handle content requests
+  app.post("/api/request-content", async (req, res) => {
+    try {
+      const { contentType, title, year, genre, description, reason, email } = req.body;
+      
+      // Log the request (in production, save to database)
+      console.log('🎬 Content Request Received:');
+      console.log('Type:', contentType);
+      console.log('Title:', title);
+      console.log('Year:', year);
+      console.log('Genre:', genre);
+      console.log('Description:', description);
+      console.log('Reason:', reason);
+      console.log('Email:', email);
+      console.log('---');
+      
+      // In production, you would:
+      // 1. Save to database with request counter
+      // 2. Send confirmation email to user
+      // 3. Notify content team
+      
+      res.json({ 
+        success: true, 
+        message: 'Content request submitted successfully' 
+      });
+    } catch (error: any) {
+      console.error('Error submitting content request:', error);
+      res.status(500).json({ 
+        success: false, 
+        message: 'Failed to submit content request' 
+      });
+    }
+  });
+
   // SEO: Generate sitemap.xml
   app.get("/sitemap.xml", async (_req, res) => {
     try {
