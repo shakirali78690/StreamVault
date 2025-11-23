@@ -1898,29 +1898,50 @@
       "id": "cefe9303-658c-47fe-bc29-631579c9fcda"
     },
     {
+      "id": "3c9b3531-2179-44d9-b61f-054115a252e5",
       "title": "The Ba***ds of Bollywood",
-      "slug": "the-bads-of-bollywood-tv-series-online-english",
-      "description": "The Ba***ds of Bollywood - Hindi Dubbed Series",
-      "posterUrl": "https://images.unsplash.com/photo-1574267432644-f65e2d32b5c1?w=600&h=900&fit=crop",
-      "backdropUrl": "https://images.unsplash.com/photo-1574267432644-f65e2d32b5c1?w=1920&h=800&fit=crop",
-      "year": 2024,
-      "rating": "TV-14",
-      "imdbRating": "7.5",
+      "slug": "the-bads-of-bollywood",
+      "description": "An entertaining ride through the adventures of an ambitious outsider navigating the glitzy yet tricky world of Bollywood. Aasmaan Singh, a Delhi newcomer, tries to rise in Mumbai's film industry alongside his best friend Parvaiz and manager Sanya. He faces betrayals, power plays, and scandals while clashing with superstar Ajay Talvar when romantically paired with his daughter Karishma. This bold satirical series explores nepotism, scandals, and the dark underbelly of Bollywood with self-aware humor, celebrity cameos, and larger-than-life characters.",
+      "posterUrl": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQjNEuigNIUQHfWVPw35kY_gXDJ2RE40OFx2G2vX-TifyUyzHlvvjDtLLkLWZxwavvzVd-T&s=10",
+      "backdropUrl": "https://cdn.123telugu.com/content/wp-content/uploads/2025/09/The-Bads-of-Bollywood-1.webp",
+      "year": 2025,
+      "rating": "TV-MA",
+      "imdbRating": "7.6",
       "genres": [
-        "Drama"
+        "Comedy",
+        "Drama",
+        "Thriller"
       ],
       "language": "Hindi",
       "totalSeasons": 1,
-      "cast": [],
+      "cast": [
+        "Bobby Deol",
+        "Lakshya Lalwani",
+        "Raghav Juyal",
+        "Sahher Bambba",
+        "Mona Singh",
+        "Anya Singh",
+        "Manish Chaudhari",
+        "Rajat Bedi",
+        "Manoj Pahwa",
+        "Karan Johar",
+        "Shah Rukh Khan",
+        "Salman Khan",
+        "Aamir Khan",
+        "Ranbir Kapoor",
+        "Emraan Hashmi",
+        "Arshad Warsi",
+        "Armaan Khera"
+      ],
       "creators": [],
       "featured": false,
       "trending": false,
-      "category": "drama",
-      "id": "3c9b3531-2179-44d9-b61f-054115a252e5"
+      "category": "drama"
     },
     {
+      "id": "a342b4ae-b439-4f99-a280-f5428a9d22a0",
       "title": "Mandala Murders",
-      "slug": "mandala-murders-tv-series-online-hindi",
+      "slug": "mandala-murders",
       "description": "Mandala Murders - Hindi Dubbed Series",
       "posterUrl": "https://images.unsplash.com/photo-1574267432644-f65e2d32b5c1?w=600&h=900&fit=crop",
       "backdropUrl": "https://images.unsplash.com/photo-1574267432644-f65e2d32b5c1?w=1920&h=800&fit=crop",
@@ -1936,12 +1957,12 @@
       "creators": [],
       "featured": false,
       "trending": false,
-      "category": "drama",
-      "id": "a342b4ae-b439-4f99-a280-f5428a9d22a0"
+      "category": "drama"
     },
     {
+      "id": "13901940-711b-4d3a-b907-34d59be51f37",
       "title": "Citadel: Honey Bunny",
-      "slug": "citadel-honey-bunny-tv-series-online-hindi",
+      "slug": "citadel-honey-bunny",
       "description": "Citadel: Honey Bunny - Hindi Dubbed Series",
       "posterUrl": "https://images.unsplash.com/photo-1574267432644-f65e2d32b5c1?w=600&h=900&fit=crop",
       "backdropUrl": "https://images.unsplash.com/photo-1574267432644-f65e2d32b5c1?w=1920&h=800&fit=crop",
@@ -1957,8 +1978,7 @@
       "creators": [],
       "featured": false,
       "trending": false,
-      "category": "drama",
-      "id": "13901940-711b-4d3a-b907-34d59be51f37"
+      "category": "drama"
     },
     {
       "title": "Dabba Cartel",
@@ -4338,7 +4358,7 @@
     {
       "id": "5165d50b-b2aa-43b8-984a-f90f65912711",
       "title": "Criminal Code",
-      "slug": "criminal-code-tv-series-online-english",
+      "slug": "criminal-code",
       "description": "Follows the complex work of federal police officers in an unprecedented investigation. After a massive heist in Ciudad del Este, Paraguay, federal agents pursue the Phantom Gang in a high-stakes game of cat and mouse across South America. Based on real events.",
       "posterUrl": "https://images.unsplash.com/photo-1574267432644-f65e2d32b5c1?w=600&h=900&fit=crop",
       "backdropUrl": "https://images.unsplash.com/photo-1574267432644-f65e2d32b5c1?w=1920&h=800&fit=crop",
@@ -4368,7 +4388,7 @@
     {
       "id": "6118d8ca-5834-43a6-9efe-d7c3bb0dba81",
       "title": "Dept. Q",
-      "slug": "dept-q-tv-series-online-english",
+      "slug": "dept",
       "description": "A brash but brilliant cop becomes head of a new police department. DCI Carl Morck, wracked with guilt following an attack that left his partner paralyzed, finds himself exiled to the basement as the sole member of Department Q, a newly formed cold case unit solving Edinburgh's most challenging mysteries.",
       "posterUrl": "https://images.unsplash.com/photo-1574267432644-f65e2d32b5c1?w=600&h=900&fit=crop",
       "backdropUrl": "https://images.unsplash.com/photo-1574267432644-f65e2d32b5c1?w=1920&h=800&fit=crop",
@@ -4396,7 +4416,7 @@
     {
       "id": "0afa10a9-bac3-4ea8-ba4d-36a05ce74712",
       "title": "Sirens",
-      "slug": "sirens-tv-series-online-english",
+      "slug": "sirens",
       "description": "Set over the course of a single weekend at a luxurious beach estate, Devon seeks out her sister Simone only to discover she's deeply embedded in a controlling environment as a billionaire's personal assistant. The series explores themes of gender, power, and social class as family secrets unravel.",
       "posterUrl": "https://images.unsplash.com/photo-1574267432644-f65e2d32b5c1?w=600&h=900&fit=crop",
       "backdropUrl": "https://images.unsplash.com/photo-1574267432644-f65e2d32b5c1?w=1920&h=800&fit=crop",
@@ -4424,7 +4444,7 @@
     {
       "id": "0f600c25-34ca-4282-92db-114e56bd3e0a",
       "title": "Bet",
-      "slug": "bet-tv-series-online-english",
+      "slug": "bet",
       "description": "At an elite private academy, students bet their futures in risky gambling competitions that determine their social hierarchy. When new transfer student Yumeko arrives, she turns the school upside down with her fearless attitude and compulsive gambling habits, challenging the established order.",
       "posterUrl": "https://image.tmdb.org/t/p/w500/bet_poster.jpg",
       "backdropUrl": "https://image.tmdb.org/t/p/original/bet_backdrop.jpg",
@@ -4451,7 +4471,7 @@
     {
       "id": "644aada7-adf9-4a87-965a-88e8062e9c5b",
       "title": "Secrets We Keep",
-      "slug": "secrets-we-keep-tv-series-online-english",
+      "slug": "secrets-we-keep",
       "description": "When a neighbor's au pair vanishes after asking to talk with her, Cecilie feels responsible and compelled to personally investigate. As she uncovers the truth about the missing young woman, her perfect world begins to fall apart and dangerous secrets are revealed.",
       "posterUrl": "https://image.tmdb.org/t/p/w500/secrets_we_keep_poster.jpg",
       "backdropUrl": "https://image.tmdb.org/t/p/original/secrets_we_keep_backdrop.jpg",
@@ -4480,7 +4500,7 @@
     {
       "id": "31574f7a-3fd3-4da0-a79e-fc2919858a7b",
       "title": "Gangs of Galicia",
-      "slug": "gangs-of-galicia-tv-series-online-english-dubbed",
+      "slug": "gangs-of-galicia",
       "description": "A new lawyer arrives to settle in the small town of Cambados. After her father's murder, Ana relocates to Galicia to investigate his past, crossing paths with Daniel, heir to a powerful drug cartel. She infiltrates the cartel to find the truth and avenge her father.",
       "posterUrl": "https://image.tmdb.org/t/p/w500/gangs_galicia_poster.jpg",
       "backdropUrl": "https://image.tmdb.org/t/p/original/gangs_galicia_backdrop.jpg",
@@ -4508,7 +4528,7 @@
     {
       "id": "3ef91484-c0e6-4302-a74e-ea4953e22f30",
       "title": "Public Disorder",
-      "slug": "public-disorder-tv-series-online-english",
+      "slug": "public-disorder",
       "description": "An incident sparks internal conflict as members of a riot squad juggle personal worries with the daily tension of police work on the streets. A team of riot police officers in Rome navigates societal turmoil and personal conflicts after a violent demonstration causes irreversible consequences.",
       "posterUrl": "https://image.tmdb.org/t/p/w500/public_disorder_poster.jpg",
       "backdropUrl": "https://image.tmdb.org/t/p/original/public_disorder_backdrop.jpg",
@@ -4535,7 +4555,7 @@
     {
       "id": "be35ac53-4de7-4953-9430-687993233990",
       "title": "The Four Seasons",
-      "slug": "the-four-seasons-tv-series-online-english",
+      "slug": "the-four-seasons",
       "description": "The decades-long friendship between three married couples is tested when one divorces, complicating their tradition of quarterly weekend getaways. Three suburban couples vacation together each season, but tensions arise when one couple splits up and the husband brings a much younger woman on subsequent trips.",
       "posterUrl": "https://image.tmdb.org/t/p/w500/placeholder_four_seasons.jpg",
       "backdropUrl": "https://image.tmdb.org/t/p/original/placeholder_four_seasons_backdrop.jpg",
@@ -4565,7 +4585,7 @@
     {
       "id": "8ae84c95-5053-4d23-9bfd-6ec222ffd268",
       "title": "Adoration",
-      "slug": "adoration-tv-series-online-english-dubbed",
+      "slug": "adoration",
       "description": "When a 16-year-old girl vanishes in a small Italian town, secrets come to light and disrupt the community as her friends and family try to recreate her last movements. A group of teenage girls and boys in Latina navigate a summer that will change their lives forever.",
       "posterUrl": "https://image.tmdb.org/t/p/w500/tnDn4v4jJoKJQzWgxuWpUxLlxPV.jpg",
       "backdropUrl": "https://image.tmdb.org/t/p/original/4MG4UMnPCUY55lPf2tT1iB4MHEE.jpg",
@@ -34740,5 +34760,5 @@
       "id": "b3b9ee83-5336-4bfc-9f90-342b363beedc"
     }
   ],
-  "lastUpdated": "2025-11-23T11:51:31.399Z"
+  "lastUpdated": "2025-11-23T15:54:47.172Z"
 }

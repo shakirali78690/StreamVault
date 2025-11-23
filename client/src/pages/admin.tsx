@@ -358,6 +358,7 @@ function EditShowForm({ show, onSave, onCancel, isLoading }: {
 }) {
   const [formData, setFormData] = useState({
     title: show.title,
+    slug: show.slug,
     description: show.description,
     posterUrl: show.posterUrl,
     backdropUrl: show.backdropUrl,
@@ -397,6 +398,22 @@ function EditShowForm({ show, onSave, onCancel, isLoading }: {
           />
         </div>
         <div className="space-y-2">
+          <Label htmlFor="edit-slug">Slug (URL)</Label>
+          <Input
+            id="edit-slug"
+            value={formData.slug}
+            onChange={(e) => setFormData({ ...formData, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-') })}
+            placeholder="e.g., money-heist"
+            required
+          />
+          <p className="text-xs text-muted-foreground">
+            URL: /show/{formData.slug}
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
           <Label htmlFor="edit-year">Year</Label>
           <Input
             id="edit-year"
@@ -405,6 +422,26 @@ function EditShowForm({ show, onSave, onCancel, isLoading }: {
             onChange={(e) => setFormData({ ...formData, year: parseInt(e.target.value) })}
             required
           />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="edit-category">Category</Label>
+          <select
+            id="edit-category"
+            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            value={formData.category}
+            onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+          >
+            <option value="action">Action</option>
+            <option value="drama">Drama</option>
+            <option value="comedy">Comedy</option>
+            <option value="horror">Horror</option>
+            <option value="romance">Romance</option>
+            <option value="thriller">Thriller</option>
+            <option value="sci-fi">Sci-Fi</option>
+            <option value="fantasy">Fantasy</option>
+            <option value="documentary">Documentary</option>
+            <option value="animation">Animation</option>
+          </select>
         </div>
       </div>
 
