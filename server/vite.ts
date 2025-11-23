@@ -105,6 +105,7 @@ export function serveStatic(app: Express) {
   // fall through to index.html if the file doesn't exist
   app.use("*", (req, res, next) => {
     console.log(`[Catch-all] Handling request: ${req.method} ${req.path}`);
+    console.log(`[Catch-all] User-Agent: ${req.headers['user-agent']}`);
     
     // If this is an asset request that reached here, it means the file doesn't exist
     // Return 404 instead of serving index.html
@@ -114,26 +115,33 @@ export function serveStatic(app: Express) {
     }
     
     // Check if request is from a social media crawler
-    const userAgent = req.headers['user-agent'] || '';
+    const userAgent = (req.headers['user-agent'] || '').toLowerCase();
     const isSocialCrawler = 
       userAgent.includes('facebookexternalhit') ||
-      userAgent.includes('Facebot') ||
-      userAgent.includes('Twitterbot') ||
-      userAgent.includes('LinkedInBot') ||
-      userAgent.includes('WhatsApp') ||
-      userAgent.includes('TelegramBot') ||
-      userAgent.includes('Slackbot') ||
-      userAgent.includes('Discordbot');
+      userAgent.includes('facebot') ||
+      userAgent.includes('facebook') ||
+      userAgent.includes('twitterbot') ||
+      userAgent.includes('linkedinbot') ||
+      userAgent.includes('whatsapp') ||
+      userAgent.includes('telegrambot') ||
+      userAgent.includes('slackbot') ||
+      userAgent.includes('discordbot') ||
+      userAgent.includes('bot') ||
+      userAgent.includes('crawler') ||
+      userAgent.includes('spider');
 
     // Only inject meta tags for social crawlers on show pages
     if (isSocialCrawler && req.path.startsWith('/show/')) {
+      console.log(`[Catch-all] Social crawler detected on show page!`);
       const showMatch = req.path.match(/^\/show\/([^\/]+)/);
       
       if (showMatch) {
         const slug = showMatch[1];
+        console.log(`[Catch-all] Extracting slug: ${slug}`);
         
         // Import storage dynamically to avoid circular dependency
         import('./storage.js').then(({ storage }) => {
+          console.log(`[Catch-all] Storage imported, fetching show...`);
           storage.getShowBySlug(slug).then(show => {
             if (show) {
               const indexPath = path.resolve(distPath, "index.html");
