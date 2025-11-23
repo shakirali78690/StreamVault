@@ -1,5 +1,5 @@
 import express, { type Request, Response, NextFunction } from "express";
-import { registerRoutes, setupHTMLHandler } from "./routes";
+import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 
 const app = express();
@@ -75,11 +75,8 @@ app.use((req, res, next) => {
   // doesn't interfere with the other routes
   if (app.get("env") === "development") {
     await setupVite(app, server);
-    // In development, Vite handles HTML serving
   } else {
     serveStatic(app);
-    // In production, setup HTML handler with meta tag injection
-    setupHTMLHandler(app);
   }
 
   // ALWAYS serve the app on the port specified in the environment variable PORT

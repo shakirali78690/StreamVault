@@ -78,6 +78,8 @@ export function serveStatic(app: Express) {
 
   app.use(express.static(distPath));
 
-  // Note: The catch-all HTML route with meta tag injection
-  // is added separately via setupHTMLHandler() in routes.ts
+  // fall through to index.html if the file doesn't exist
+  app.use("*", (_req, res) => {
+    res.sendFile(path.resolve(distPath, "index.html"));
+  });
 }
