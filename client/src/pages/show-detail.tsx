@@ -1,15 +1,16 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRoute, Link, useLocation } from "wouter";
-import { Play, Plus, Check, Star } from "lucide-react";
+import { Play, Plus, Check, Star, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Show, Episode } from "@shared/schema";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ContentRow } from "@/components/content-row";
 import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 // Extract Google Drive ID from URL and generate thumbnail
 const getEpisodeThumbnail = (episode: Episode, showBackdrop?: string) => {
@@ -49,6 +50,7 @@ export default function ShowDetail() {
 
   const [selectedSeason, setSelectedSeason] = useState(1);
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   const { data: watchlist = [] } = useQuery<any[]>({
     queryKey: ["/api/watchlist"],
@@ -83,6 +85,90 @@ export default function ShowDetail() {
       addToWatchlistMutation.mutate();
     }
   };
+
+  const handleShare = async () => {
+    if (!show) return;
+
+    const shareData = {
+      title: `${show.title} - StreamVault`,
+      text: `Watch ${show.title} online free in HD! ${show.description.slice(0, 100)}...`,
+      url: `https://streamvault.live/show/${show.slug}`,
+    };
+
+    // Try native share API first (mobile devices)
+    if (navigator.share) {
+      try {
+        await navigator.share(shareData);
+        toast({
+          title: "Shared successfully!",
+          description: "Thanks for sharing StreamVault!",
+        });
+      } catch (err: any) {
+        if (err.name !== 'AbortError') {
+          console.error('Error sharing:', err);
+        }
+      }
+    } else {
+      // Fallback: Copy to clipboard
+      try {
+        await navigator.clipboard.writeText(shareData.url);
+        toast({
+          title: "Link copied!",
+          description: "Share link copied to clipboard",
+        });
+      } catch (err) {
+        console.error('Error copying to clipboard:', err);
+        toast({
+          title: "Share link",
+          description: shareData.url,
+          variant: "default",
+        });
+      }
+    }
+  };
+
+  // Update meta tags dynamically for social sharing
+  useEffect(() => {
+    if (!show) return;
+
+    // Update page title
+    document.title = `${show.title} - Watch Online Free | StreamVault`;
+
+    // Update or create meta tags
+    const updateMetaTag = (property: string, content: string, isProperty = true) => {
+      const attribute = isProperty ? 'property' : 'name';
+      let meta = document.querySelector(`meta[${attribute}="${property}"]`);
+      
+      if (!meta) {
+        meta = document.createElement('meta');
+        meta.setAttribute(attribute, property);
+        document.head.appendChild(meta);
+      }
+      
+      meta.setAttribute('content', content);
+    };
+
+    // Update Open Graph tags
+    updateMetaTag('og:title', `${show.title} - Watch Online Free | StreamVault`);
+    updateMetaTag('og:description', show.description);
+    updateMetaTag('og:image', show.backdropUrl);
+    updateMetaTag('og:url', `https://streamvault.live/show/${show.slug}`);
+    updateMetaTag('og:type', 'video.tv_show');
+
+    // Update Twitter Card tags
+    updateMetaTag('twitter:title', `${show.title} - Watch Online Free`, false);
+    updateMetaTag('twitter:description', show.description, false);
+    updateMetaTag('twitter:image', show.backdropUrl, false);
+    updateMetaTag('twitter:card', 'summary_large_image', false);
+
+    // Update description meta tag
+    updateMetaTag('description', show.description, false);
+
+    // Cleanup function to reset to default on unmount
+    return () => {
+      document.title = 'StreamVault - Online Movie Streaming | Watch TV Shows Free | Stream Movies HD';
+    };
+  }, [show]);
 
   if (showLoading) {
     return (
@@ -206,6 +292,16 @@ export default function ShowDetail() {
                       Add to Watchlist
                     </>
                   )}
+                </Button>
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className="gap-2"
+                  onClick={handleShare}
+                  data-testid="button-share-show"
+                >
+                  <Share2 className="w-5 h-5" />
+                  Share
                 </Button>
               </div>
             </div>

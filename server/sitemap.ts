@@ -94,96 +94,131 @@ export function setupSitemaps(app: Express, storage: IStorage) {
 
   // Shows sitemap with images and metadata
   app.get("/sitemap-shows.xml", async (_req, res) => {
-    const lastmod = new Date().toISOString().split("T")[0];
-    const shows = await storage.getAllShows();
+    try {
+      const lastmod = new Date().toISOString().split("T")[0];
+      const shows = await storage.getAllShows();
 
-    const urls = shows
-      .map((show: Show) => {
-        const title = show.title
-          .replace(/&/g, "&amp;")
-          .replace(/</g, "&lt;")
-          .replace(/>/g, "&gt;")
-          .replace(/"/g, "&quot;")
-          .replace(/'/g, "&apos;");
+      if (!shows || shows.length === 0) {
+        const emptyXml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+</urlset>`;
+        res.header("Content-Type", "application/xml");
+        return res.send(emptyXml);
+      }
 
-        const description = show.description
-          .replace(/&/g, "&amp;")
-          .replace(/</g, "&lt;")
-          .replace(/>/g, "&gt;")
-          .replace(/"/g, "&quot;")
-          .replace(/'/g, "&apos;");
+      const urls = shows
+        .map((show: Show) => {
+          const title = (show.title || "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&apos;");
 
-        return `
+          const description = (show.description || "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&apos;");
+
+          return `
   <url>
     <loc>${baseUrl}/show/${show.slug}</loc>
     <lastmod>${lastmod}</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
     <image:image>
-      <image:loc>${show.posterUrl}</image:loc>
+      <image:loc>${show.posterUrl || ""}</image:loc>
       <image:title>${title}</image:title>
       <image:caption>${description}</image:caption>
     </image:image>
     <image:image>
-      <image:loc>${show.backdropUrl}</image:loc>
+      <image:loc>${show.backdropUrl || ""}</image:loc>
       <image:title>${title} - Backdrop</image:title>
     </image:image>
   </url>`;
-      })
-      .join("");
+        })
+        .join("");
 
-    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+      const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
         xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">${urls}
 </urlset>`;
 
-    res.header("Content-Type", "application/xml");
-    res.send(xml);
+      res.header("Content-Type", "application/xml");
+      res.send(xml);
+    } catch (error) {
+      console.error("Error generating shows sitemap:", error);
+      res.status(500).send("Error generating sitemap");
+    }
   });
 
   // Episodes sitemap - all individual episode watch pages
   app.get("/sitemap-episodes.xml", async (_req, res) => {
-    const lastmod = new Date().toISOString().split("T")[0];
-    const shows = await storage.getAllShows();
-    
-    let allEpisodeUrls: string[] = [];
-
-    // Get all episodes for all shows
-    for (const show of shows) {
-      const episodes = await storage.getEpisodesByShowId(show.id);
+    try {
+      const lastmod = new Date().toISOString().split("T")[0];
+      const shows = await storage.getAllShows();
       
-      const episodeUrls = episodes.map((episode) => {
-        const episodeTitle = `${show.title} - S${episode.season}E${episode.episodeNumber}`;
-        const escapedTitle = episodeTitle
-          .replace(/&/g, "&amp;")
-          .replace(/</g, "&lt;")
-          .replace(/>/g, "&gt;")
-          .replace(/"/g, "&quot;")
-          .replace(/'/g, "&apos;");
+      if (!shows || shows.length === 0) {
+        const emptyXml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+</urlset>`;
+        res.header("Content-Type", "application/xml");
+        return res.send(emptyXml);
+      }
+      
+      let allEpisodeUrls: string[] = [];
 
-        return `
+      // Get all episodes for all shows
+      for (const show of shows) {
+        try {
+          const episodes = await storage.getEpisodesByShowId(show.id);
+          
+          if (!episodes || episodes.length === 0) continue;
+          
+          const episodeUrls = episodes.map((episode) => {
+            const episodeTitle = `${show.title || ""} - S${episode.season}E${episode.episodeNumber}`;
+            const escapedTitle = episodeTitle
+              .replace(/&/g, "&amp;")
+              .replace(/</g, "&lt;")
+              .replace(/>/g, "&gt;")
+              .replace(/"/g, "&quot;")
+              .replace(/'/g, "&apos;");
+
+            return `
   <url>
     <loc>${baseUrl}/watch/${show.slug}/${episode.season}/${episode.episodeNumber}</loc>
     <lastmod>${lastmod}</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
     <image:image>
-      <image:loc>${episode.thumbnailUrl}</image:loc>
+      <image:loc>${episode.thumbnailUrl || ""}</image:loc>
       <image:title>${escapedTitle}</image:title>
     </image:image>
   </url>`;
-      });
+          });
 
-      allEpisodeUrls = allEpisodeUrls.concat(episodeUrls);
-    }
+          allEpisodeUrls = allEpisodeUrls.concat(episodeUrls);
+        } catch (err) {
+          console.error(`Error getting episodes for show ${show.id}:`, err);
+          continue;
+        }
+      }
 
-    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+      const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
         xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">${allEpisodeUrls.join("")}
 </urlset>`;
 
-    res.header("Content-Type", "application/xml");
-    res.send(xml);
+      res.header("Content-Type", "application/xml");
+      res.send(xml);
+    } catch (error) {
+      console.error("Error generating episodes sitemap:", error);
+      res.status(500).send("Error generating sitemap");
+    }
   });
 
   console.log("✅ Sitemaps configured with episodes");
