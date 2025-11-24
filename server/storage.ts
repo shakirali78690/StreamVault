@@ -1,4 +1,4 @@
-import type { Show, Episode, InsertShow, InsertEpisode, WatchlistItem, ViewingProgress, Category } from "@shared/schema";
+import type { Show, Episode, Movie, InsertShow, InsertEpisode, InsertMovie, WatchlistItem, ViewingProgress, Category } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
 import { join } from "path";
@@ -52,13 +52,22 @@ export interface IStorage {
   updateEpisode(id: string, updates: Partial<Episode>): Promise<Episode>;
   deleteEpisode(id: string): Promise<void>;
 
+  // Movies
+  getAllMovies(): Promise<Movie[]>;
+  getMovieById(id: string): Promise<Movie | undefined>;
+  getMovieBySlug(slug: string): Promise<Movie | undefined>;
+  createMovie(movie: InsertMovie): Promise<Movie>;
+  updateMovie(id: string, updates: Partial<Movie>): Promise<Movie>;
+  deleteMovie(id: string): Promise<void>;
+  searchMovies(query: string): Promise<Movie[]>;
+
   // Categories
   getAllCategories(): Promise<Category[]>;
 
   // Watchlist (simulated per-session storage)
   getWatchlist(sessionId: string): Promise<WatchlistEntry[]>;
   addToWatchlist(sessionId: string, item: WatchlistItem): Promise<WatchlistEntry>;
-  removeFromWatchlist(sessionId: string, showId: string): Promise<void>;
+  removeFromWatchlist(sessionId: string, id: string, isMovie?: boolean): Promise<void>;
 
   // Viewing Progress (simulated per-session storage)
   getViewingProgress(sessionId: string): Promise<ProgressEntry[]>;
@@ -77,6 +86,7 @@ export interface IStorage {
 export class MemStorage implements IStorage {
   private shows: Map<string, Show>;
   private episodes: Map<string, Episode>;
+  private movies: Map<string, Movie>;
   private watchlists: Map<string, Map<string, WatchlistEntry>>;
   private viewingProgress: Map<string, Map<string, ProgressEntry>>;
   private categories: Category[];
@@ -88,6 +98,7 @@ export class MemStorage implements IStorage {
     this.dataFile = join(process.cwd(), "data", "streamvault-data.json");
     this.shows = new Map();
     this.episodes = new Map();
+    this.movies = new Map();
     this.watchlists = new Map();
     this.viewingProgress = new Map();
     this.contentRequests = new Map();
@@ -124,6 +135,12 @@ export class MemStorage implements IStorage {
           data.episodes.forEach((episode: Episode) => this.episodes.set(episode.id, episode));
           console.log(`✅ Loaded ${data.episodes.length} episodes`);
         }
+        
+        // Restore movies
+        if (data.movies) {
+          data.movies.forEach((movie: Movie) => this.movies.set(movie.id, movie));
+          console.log(`✅ Loaded ${data.movies.length} movies`);
+        }
       } else {
         console.log("📦 No data file found, seeding initial data...");
         this.seedData();
@@ -142,6 +159,7 @@ export class MemStorage implements IStorage {
       const data = {
         shows: Array.from(this.shows.values()),
         episodes: Array.from(this.episodes.values()),
+        movies: Array.from(this.movies.values()),
         lastUpdated: new Date().toISOString(),
       };
 
@@ -286,6 +304,72 @@ export class MemStorage implements IStorage {
     this.saveData(); // Persist to file
   }
 
+  // Movie methods
+  async getAllMovies(): Promise<Movie[]> {
+    return Array.from(this.movies.values());
+  }
+
+  async getMovieById(id: string): Promise<Movie | undefined> {
+    return this.movies.get(id);
+  }
+
+  async getMovieBySlug(slug: string): Promise<Movie | undefined> {
+    return Array.from(this.movies.values()).find((movie) => movie.slug === slug);
+  }
+
+  async createMovie(insertMovie: InsertMovie): Promise<Movie> {
+    const id = randomUUID();
+    const movie: Movie = { 
+      id,
+      title: insertMovie.title,
+      slug: insertMovie.slug,
+      description: insertMovie.description,
+      posterUrl: insertMovie.posterUrl,
+      backdropUrl: insertMovie.backdropUrl,
+      year: insertMovie.year,
+      rating: insertMovie.rating,
+      imdbRating: insertMovie.imdbRating || null,
+      genres: insertMovie.genres,
+      language: insertMovie.language,
+      duration: insertMovie.duration,
+      cast: insertMovie.cast || null,
+      directors: insertMovie.directors || null,
+      googleDriveUrl: insertMovie.googleDriveUrl,
+      featured: insertMovie.featured ?? false,
+      trending: insertMovie.trending ?? false,
+      category: insertMovie.category || null,
+    };
+    this.movies.set(id, movie);
+    this.saveData(); // Persist to file
+    return movie;
+  }
+
+  async updateMovie(id: string, updates: Partial<Movie>): Promise<Movie> {
+    const movie = this.movies.get(id);
+    if (!movie) {
+      throw new Error(`Movie with id ${id} not found`);
+    }
+    const updatedMovie = { ...movie, ...updates, id };
+    this.movies.set(id, updatedMovie);
+    this.saveData(); // Persist to file
+    return updatedMovie;
+  }
+
+  async deleteMovie(id: string): Promise<void> {
+    this.movies.delete(id);
+    this.saveData(); // Persist to file
+  }
+
+  async searchMovies(query: string): Promise<Movie[]> {
+    const lowerQuery = query.toLowerCase();
+    return Array.from(this.movies.values()).filter(
+      (movie) =>
+        movie.title.toLowerCase().includes(lowerQuery) ||
+        movie.description.toLowerCase().includes(lowerQuery) ||
+        movie.genres?.toLowerCase().includes(lowerQuery)
+    );
+  }
+
   // Categories methods
   async getAllCategories(): Promise<Category[]> {
     return this.categories;
@@ -305,15 +389,16 @@ export class MemStorage implements IStorage {
     const userWatchlist = this.watchlists.get(sessionId)!;
     const id = randomUUID();
     const entry: WatchlistEntry = { ...item, id };
-    userWatchlist.set(item.showId, entry);
+    const key = item.showId || item.movieId || id;
+    userWatchlist.set(key, entry);
 
     return entry;
   }
 
-  async removeFromWatchlist(sessionId: string, showId: string): Promise<void> {
+  async removeFromWatchlist(sessionId: string, id: string, isMovie?: boolean): Promise<void> {
     const userWatchlist = this.watchlists.get(sessionId);
     if (userWatchlist) {
-      userWatchlist.delete(showId);
+      userWatchlist.delete(id);
     }
   }
 

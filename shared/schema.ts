@@ -38,10 +38,35 @@ export const episodes = pgTable("episodes", {
   airDate: text("air_date"),
 });
 
+// Movies table
+export const movies = pgTable("movies", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull(),
+  slug: text("slug").notNull().unique(),
+  description: text("description").notNull(),
+  posterUrl: text("poster_url").notNull(),
+  backdropUrl: text("backdrop_url").notNull(),
+  year: integer("year").notNull(),
+  rating: text("rating").notNull(), // e.g., "PG-13", "R"
+  imdbRating: text("imdb_rating"), // e.g., "8.5"
+  genres: text("genres").notNull(), // comma-separated string
+  language: text("language").notNull(),
+  duration: integer("duration").notNull(), // in minutes
+  cast: text("cast"), // comma-separated string
+  directors: text("directors"), // comma-separated string
+  googleDriveUrl: text("google_drive_url").notNull(),
+  featured: boolean("featured").default(false),
+  trending: boolean("trending").default(false),
+  category: text("category"), // "action", "drama", "comedy", etc.
+});
+
 // Watchlist table (localStorage for MVP)
 export const watchlistSchema = z.object({
-  showId: z.string(),
+  showId: z.string().optional(),
+  movieId: z.string().optional(),
   addedAt: z.string(),
+}).refine(data => data.showId || data.movieId, {
+  message: "Either showId or movieId must be provided"
 });
 
 // Viewing progress (localStorage for MVP)
@@ -57,12 +82,15 @@ export const viewingProgressSchema = z.object({
 // Insert schemas
 export const insertShowSchema = createInsertSchema(shows).omit({ id: true });
 export const insertEpisodeSchema = createInsertSchema(episodes).omit({ id: true });
+export const insertMovieSchema = createInsertSchema(movies).omit({ id: true });
 
 // Select types
 export type Show = typeof shows.$inferSelect;
 export type Episode = typeof episodes.$inferSelect;
+export type Movie = typeof movies.$inferSelect;
 export type InsertShow = z.infer<typeof insertShowSchema>;
 export type InsertEpisode = z.infer<typeof insertEpisodeSchema>;
+export type InsertMovie = z.infer<typeof insertMovieSchema>;
 export type WatchlistItem = z.infer<typeof watchlistSchema>;
 export type ViewingProgress = z.infer<typeof viewingProgressSchema>;
 

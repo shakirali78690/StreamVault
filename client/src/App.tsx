@@ -10,6 +10,8 @@ import { Chatbot } from "@/components/chatbot";
 import Home from "@/pages/home";
 import ShowDetail from "@/pages/show-detail";
 import Watch from "@/pages/watch";
+import MovieDetail from "@/pages/movie-detail";
+import WatchMovie from "@/pages/watch-movie";
 import Search from "@/pages/search";
 import Category from "@/pages/category";
 import Watchlist from "@/pages/watchlist";
@@ -25,6 +27,8 @@ import FAQ from "@/pages/faq";
 import Report from "@/pages/report";
 import Request from "@/pages/request";
 import Movies from "@/pages/movies";
+import BrowseShows from "@/pages/browse-shows";
+import BrowseMovies from "@/pages/browse-movies";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -36,6 +40,8 @@ function Router() {
           <Route path="/" component={Home} />
           <Route path="/show/:slug" component={ShowDetail} />
           <Route path="/watch/:slug" component={Watch} />
+          <Route path="/movie/:slug" component={MovieDetail} />
+          <Route path="/watch-movie/:slug" component={WatchMovie} />
           <Route path="/search" component={Search} />
           <Route path="/category/:slug" component={Category} />
           <Route path="/watchlist" component={Watchlist} />
@@ -52,6 +58,8 @@ function Router() {
           <Route path="/request" component={Request} />
           <Route path="/series" component={Home} />
           <Route path="/movies" component={Movies} />
+          <Route path="/browse/shows" component={BrowseShows} />
+          <Route path="/browse/movies" component={BrowseMovies} />
           <Route path="/trending" component={Home} />
           <Route component={NotFound} />
         </Switch>

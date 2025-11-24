@@ -6,7 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ShowCard } from "@/components/show-card";
+import { MovieCard } from "@/components/movie-card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Sheet,
@@ -15,7 +17,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import type { Show } from "@shared/schema";
+import type { Show, Movie } from "@shared/schema";
 
 export default function Search() {
   const [location] = useLocation();
@@ -24,21 +26,33 @@ export default function Search() {
 
   const [searchQuery, setSearchQuery] = useState(initialQuery);
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
-  const [yearRange, setYearRange] = useState<[number, number]>([1990, 2024]);
+  const [yearRange, setYearRange] = useState<[number, number]>([1900, 2030]);
 
-  const { data: shows, isLoading } = useQuery<Show[]>({
+  const { data: shows, isLoading: showsLoading } = useQuery<Show[]>({
     queryKey: ["/api/shows"],
   });
 
+  const { data: movies, isLoading: moviesLoading } = useQuery<Movie[]>({
+    queryKey: ["/api/movies"],
+  });
+
+  const isLoading = showsLoading || moviesLoading;
+
   const allGenres = useMemo(() => {
-    if (!shows) return [];
     const genres = new Set<string>();
-    shows.forEach((show) => {
-      const showGenres = show.genres?.split(',').map(g => g.trim()) || [];
+    
+    shows?.forEach((show) => {
+      const showGenres = show.genres?.split(',').map(g => g.trim()).filter(g => g.length > 0) || [];
       showGenres.forEach((g) => genres.add(g));
     });
-    return Array.from(genres).sort();
-  }, [shows]);
+    
+    movies?.forEach((movie) => {
+      const movieGenres = movie.genres?.split(',').map(g => g.trim()).filter(g => g.length > 0) || [];
+      movieGenres.forEach((g) => genres.add(g));
+    });
+    
+    return Array.from(genres).filter(g => g.length > 0).sort();
+  }, [shows, movies]);
 
   const filteredShows = useMemo(() => {
     if (!shows) return [];
@@ -64,6 +78,31 @@ export default function Search() {
       return matchesQuery && matchesGenre && matchesYear;
     });
   }, [shows, searchQuery, selectedGenres, yearRange]);
+
+  const filteredMovies = useMemo(() => {
+    if (!movies) return [];
+
+    return movies.filter((movie) => {
+      const genres = movie.genres?.split(',').map(g => g.trim()) || [];
+      
+      const matchesQuery =
+        !searchQuery ||
+        movie.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        movie.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        genres.some((g) =>
+          g.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+
+      const matchesGenre =
+        selectedGenres.length === 0 ||
+        genres.some((g) => selectedGenres.includes(g));
+
+      const matchesYear =
+        movie.year >= yearRange[0] && movie.year <= yearRange[1];
+
+      return matchesQuery && matchesGenre && matchesYear;
+    });
+  }, [movies, searchQuery, selectedGenres, yearRange]);
 
   const toggleGenre = (genre: string) => {
     setSelectedGenres((prev) =>
@@ -109,11 +148,11 @@ export default function Search() {
           <div className="flex gap-2">
             <Input
               type="number"
-              min="1990"
-              max="2024"
+              min="1900"
+              max="2030"
               value={yearRange[0]}
               onChange={(e) =>
-                setYearRange([parseInt(e.target.value) || 1990, yearRange[1]])
+                setYearRange([parseInt(e.target.value) || 1900, yearRange[1]])
               }
               className="w-24"
               data-testid="input-year-from"
@@ -121,11 +160,11 @@ export default function Search() {
             <span className="flex items-center">to</span>
             <Input
               type="number"
-              min="1990"
-              max="2024"
+              min="1900"
+              max="2030"
               value={yearRange[1]}
               onChange={(e) =>
-                setYearRange([yearRange[0], parseInt(e.target.value) || 2024])
+                setYearRange([yearRange[0], parseInt(e.target.value) || 2030])
               }
               className="w-24"
               data-testid="input-year-to"
@@ -140,7 +179,7 @@ export default function Search() {
         className="w-full"
         onClick={() => {
           setSelectedGenres([]);
-          setYearRange([1990, 2024]);
+          setYearRange([1900, 2030]);
         }}
         data-testid="button-clear-filters"
       >
@@ -154,13 +193,13 @@ export default function Search() {
       <div className="container mx-auto px-4 py-8">
         {/* Search Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-4">Search Shows</h1>
+          <h1 className="text-3xl font-bold mb-4">Search</h1>
           <form onSubmit={handleSearch} className="flex gap-2">
             <div className="relative flex-1 max-w-2xl">
               <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
               <Input
                 type="search"
-                placeholder="Search for shows, genres, actors..."
+                placeholder="Search for shows, movies, genres, actors..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
@@ -195,7 +234,7 @@ export default function Search() {
         <div className="flex gap-8">
           {/* Desktop Sidebar Filters */}
           <aside className="hidden lg:block w-64 flex-shrink-0">
-            <div className="sticky top-20">
+            <div className="sticky top-20 max-h-[calc(100vh-6rem)] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent">
               <h2 className="font-semibold mb-4">Filters</h2>
               <FilterContent />
             </div>
@@ -203,33 +242,97 @@ export default function Search() {
 
           {/* Results */}
           <div className="flex-1">
-            {isLoading ? (
-              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
-                {[...Array(12)].map((_, i) => (
-                  <Skeleton key={i} className="aspect-[2/3]" />
-                ))}
-              </div>
-            ) : filteredShows.length > 0 ? (
-              <>
-                <p className="text-sm text-muted-foreground mb-4">
-                  {filteredShows.length} result{filteredShows.length !== 1 ? "s" : ""}{" "}
-                  found
-                </p>
-                <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
-                  {filteredShows.map((show) => (
-                    <ShowCard key={show.id} show={show} />
-                  ))}
-                </div>
-              </>
-            ) : (
-              <div className="text-center py-12">
-                <SearchIcon className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-                <h3 className="text-lg font-semibold mb-2">No results found</h3>
-                <p className="text-muted-foreground">
-                  Try adjusting your search or filters
-                </p>
-              </div>
-            )}
+            <Tabs defaultValue="all" className="w-full">
+              <TabsList className="mb-6">
+                <TabsTrigger value="all">
+                  All ({filteredShows.length + filteredMovies.length})
+                </TabsTrigger>
+                <TabsTrigger value="shows">
+                  Shows ({filteredShows.length})
+                </TabsTrigger>
+                <TabsTrigger value="movies">
+                  Movies ({filteredMovies.length})
+                </TabsTrigger>
+              </TabsList>
+
+              {/* All Tab */}
+              <TabsContent value="all">
+                {isLoading ? (
+                  <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+                    {[...Array(12)].map((_, i) => (
+                      <Skeleton key={i} className="aspect-[2/3]" />
+                    ))}
+                  </div>
+                ) : filteredShows.length + filteredMovies.length > 0 ? (
+                  <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+                    {filteredShows.map((show) => (
+                      <ShowCard key={`show-${show.id}`} show={show} />
+                    ))}
+                    {filteredMovies.map((movie) => (
+                      <MovieCard key={`movie-${movie.id}`} movie={movie} />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-12">
+                    <SearchIcon className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+                    <h3 className="text-lg font-semibold mb-2">No results found</h3>
+                    <p className="text-muted-foreground">
+                      Try adjusting your search or filters
+                    </p>
+                  </div>
+                )}
+              </TabsContent>
+
+              {/* Shows Tab */}
+              <TabsContent value="shows">
+                {isLoading ? (
+                  <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+                    {[...Array(12)].map((_, i) => (
+                      <Skeleton key={i} className="aspect-[2/3]" />
+                    ))}
+                  </div>
+                ) : filteredShows.length > 0 ? (
+                  <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+                    {filteredShows.map((show) => (
+                      <ShowCard key={show.id} show={show} />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-12">
+                    <SearchIcon className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+                    <h3 className="text-lg font-semibold mb-2">No shows found</h3>
+                    <p className="text-muted-foreground">
+                      Try adjusting your search or filters
+                    </p>
+                  </div>
+                )}
+              </TabsContent>
+
+              {/* Movies Tab */}
+              <TabsContent value="movies">
+                {isLoading ? (
+                  <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+                    {[...Array(12)].map((_, i) => (
+                      <Skeleton key={i} className="aspect-[2/3]" />
+                    ))}
+                  </div>
+                ) : filteredMovies.length > 0 ? (
+                  <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+                    {filteredMovies.map((movie) => (
+                      <MovieCard key={movie.id} movie={movie} />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-12">
+                    <SearchIcon className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+                    <h3 className="text-lg font-semibold mb-2">No movies found</h3>
+                    <p className="text-muted-foreground">
+                      Try adjusting your search or filters
+                    </p>
+                  </div>
+                )}
+              </TabsContent>
+            </Tabs>
           </div>
         </div>
       </div>

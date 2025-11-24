@@ -86,6 +86,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Movie routes
+  // Get all movies
+  app.get("/api/movies", async (_req, res) => {
+    try {
+      const movies = await storage.getAllMovies();
+      res.json(movies);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch movies" });
+    }
+  });
+
+  // Search movies
+  app.get("/api/movies/search", async (req, res) => {
+    try {
+      const query = req.query.q as string;
+      if (!query) {
+        return res.status(400).json({ error: "Query parameter required" });
+      }
+      const movies = await storage.searchMovies(query);
+      res.json(movies);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to search movies" });
+    }
+  });
+
+  // Get movie by slug
+  app.get("/api/movies/:slug", async (req, res) => {
+    try {
+      const movie = await storage.getMovieBySlug(req.params.slug);
+      if (!movie) {
+        return res.status(404).json({ error: "Movie not found" });
+      }
+      res.json(movie);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch movie" });
+    }
+  });
+
   // Get all categories
   app.get("/api/categories", async (_req, res) => {
     try {
@@ -126,6 +164,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const sessionId = getSessionId(req);
       const { showId } = req.params;
       await storage.removeFromWatchlist(sessionId, showId);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to remove from watchlist" });
+    }
+  });
+
+  app.delete("/api/watchlist/movie/:movieId", async (req, res) => {
+    try {
+      const sessionId = getSessionId(req);
+      const { movieId } = req.params;
+      await storage.removeFromWatchlist(sessionId, movieId, true);
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "Failed to remove from watchlist" });
@@ -251,6 +300,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ success: true, deleted });
     } catch (error) {
       res.status(500).json({ error: "Failed to delete all shows" });
+    }
+  });
+
+  // Admin movie routes
+  // Add new movie
+  app.post("/api/admin/movies", requireAdmin, async (req, res) => {
+    try {
+      const movie = await storage.createMovie(req.body);
+      res.json(movie);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create movie" });
+    }
+  });
+
+  // Update movie
+  app.put("/api/admin/movies/:movieId", requireAdmin, async (req, res) => {
+    try {
+      const { movieId } = req.params;
+      const movie = await storage.updateMovie(movieId, req.body);
+      res.json(movie);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to update movie", details: error.message });
+    }
+  });
+
+  // Delete movie
+  app.delete("/api/admin/movies/:movieId", requireAdmin, async (req, res) => {
+    try {
+      const { movieId } = req.params;
+      await storage.deleteMovie(movieId);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete movie" });
     }
   });
 

@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { useTheme } from "./theme-provider";
 import { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
-import type { Show } from "@shared/schema";
+import type { Show, Movie } from "@shared/schema";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,6 +26,10 @@ export function Header() {
     queryKey: ["/api/shows"],
   });
 
+  const { data: movies } = useQuery<Movie[]>({
+    queryKey: ["/api/movies"],
+  });
+
   const navigation = [
     { name: "Home", path: "/" },
     { name: "Web Series", path: "/series" },
@@ -40,11 +44,16 @@ export function Header() {
     { name: "Horror & Mystery", path: "/category/horror" },
   ];
 
-  // Filter shows based on search query
+  // Filter shows and movies based on search query
   const searchResults = searchQuery.trim()
-    ? shows?.filter((show) =>
-        show.title.toLowerCase().includes(searchQuery.toLowerCase())
-      ).slice(0, 5) || []
+    ? [
+        ...(shows?.filter((show) =>
+          show.title.toLowerCase().includes(searchQuery.toLowerCase())
+        ).map(show => ({ ...show, type: 'show' as const })) || []),
+        ...(movies?.filter((movie) =>
+          movie.title.toLowerCase().includes(searchQuery.toLowerCase())
+        ).map(movie => ({ ...movie, type: 'movie' as const })) || [])
+      ].slice(0, 8)
     : [];
 
   // Close dropdown when clicking outside
@@ -182,8 +191,8 @@ export function Header() {
               {/* Live Search Results Dropdown */}
               {showResults && searchResults.length > 0 && (
                 <div className="absolute top-full mt-2 w-96 bg-background border border-border rounded-lg shadow-lg overflow-hidden z-50">
-                  {searchResults.map((show) => (
-                    <Link key={show.id} href={`/show/${show.slug}`}>
+                  {searchResults.map((item) => (
+                    <Link key={item.id} href={item.type === 'show' ? `/show/${item.slug}` : `/movie/${item.slug}`}>
                       <div
                         className="flex items-center gap-3 p-3 hover:bg-accent cursor-pointer transition-colors"
                         onClick={() => {
@@ -192,14 +201,14 @@ export function Header() {
                         }}
                       >
                         <img
-                          src={show.posterUrl}
-                          alt={show.title}
+                          src={item.posterUrl}
+                          alt={item.title}
                           className="w-12 h-16 object-cover rounded"
                         />
                         <div className="flex-1 min-w-0">
-                          <p className="font-medium truncate">{show.title}</p>
+                          <p className="font-medium truncate">{item.title}</p>
                           <p className="text-sm text-muted-foreground truncate">
-                            {show.year} • {show.category}
+                            {item.year} • {item.type === 'show' ? 'TV Series' : 'Movie'}
                           </p>
                         </div>
                       </div>
@@ -283,8 +292,8 @@ export function Header() {
               {/* Mobile Live Search Results */}
               {showResults && searchResults.length > 0 && (
                 <div className="absolute top-full mt-2 w-full bg-background border border-border rounded-lg shadow-lg overflow-hidden z-50">
-                  {searchResults.map((show) => (
-                    <Link key={show.id} href={`/show/${show.slug}`}>
+                  {searchResults.map((item) => (
+                    <Link key={item.id} href={item.type === 'show' ? `/show/${item.slug}` : `/movie/${item.slug}`}>
                       <div
                         className="flex items-center gap-3 p-3 hover:bg-accent cursor-pointer transition-colors"
                         onClick={() => {
@@ -294,14 +303,14 @@ export function Header() {
                         }}
                       >
                         <img
-                          src={show.posterUrl}
-                          alt={show.title}
+                          src={item.posterUrl}
+                          alt={item.title}
                           className="w-12 h-16 object-cover rounded"
                         />
                         <div className="flex-1 min-w-0">
-                          <p className="font-medium truncate">{show.title}</p>
+                          <p className="font-medium truncate">{item.title}</p>
                           <p className="text-sm text-muted-foreground truncate">
-                            {show.year} • {show.category}
+                            {item.year} • {item.type === 'show' ? 'TV Series' : 'Movie'}
                           </p>
                         </div>
                       </div>

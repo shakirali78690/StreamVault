@@ -112,7 +112,6 @@ export default function Watch() {
                   key={`${currentSeason}-${currentEpisode}`}
                   src={`https://drive.google.com/file/d/${driveId}/preview`}
                   className="w-full h-full border-0"
-                  allow="autoplay; fullscreen; picture-in-picture"
                   allowFullScreen
                   data-testid="iframe-video-player"
                   style={{ border: 'none' }}

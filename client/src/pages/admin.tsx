@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Trash2, Edit, Plus, Save, X, Upload, FileJson, LogOut } from "lucide-react";
-import type { Show, Episode } from "@shared/schema";
+import type { Show, Episode, Movie } from "@shared/schema";
 import { getAuthHeaders, logout as authLogout } from "@/lib/auth";
 
 export default function AdminPage() {
@@ -69,6 +69,11 @@ export default function AdminPage() {
     queryKey: ["/api/shows"],
   });
 
+  // Fetch all movies
+  const { data: movies = [] } = useQuery<Movie[]>({
+    queryKey: ["/api/movies"],
+  });
+
   if (isChecking) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -96,8 +101,9 @@ export default function AdminPage() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-4 mb-8">
+          <TabsList className="grid w-full grid-cols-5 mb-8">
             <TabsTrigger value="shows">Shows</TabsTrigger>
+            <TabsTrigger value="movies">Movies</TabsTrigger>
             <TabsTrigger value="add-show">Add Show</TabsTrigger>
             <TabsTrigger value="add-episode">Add Episode</TabsTrigger>
             <TabsTrigger value="import">Import Episodes</TabsTrigger>
@@ -106,6 +112,11 @@ export default function AdminPage() {
           {/* Manage Shows Tab */}
           <TabsContent value="shows">
             <ManageShows shows={shows} />
+          </TabsContent>
+
+          {/* Manage Movies Tab */}
+          <TabsContent value="movies">
+            <ManageMovies movies={movies} />
           </TabsContent>
 
           {/* Add Show Tab */}
@@ -1320,5 +1331,564 @@ function ImportEpisodesForm() {
         )}
       </CardContent>
     </Card>
+  );
+}
+
+// Manage Movies Component
+function ManageMovies({ movies }: { movies: Movie[] }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [editingMovie, setEditingMovie] = useState<Movie | null>(null);
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+
+  const deleteMovieMutation = useMutation({
+    mutationFn: async (movieId: string) => {
+      const res = await fetch(`/api/admin/movies/${movieId}`, {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      });
+      if (!res.ok) throw new Error("Failed to delete movie");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/movies"] });
+      toast({
+        title: "Success",
+        description: "Movie deleted successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to delete movie",
+        variant: "destructive",
+      });
+    },
+  });
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle>Manage Movies</CardTitle>
+            <CardDescription>View, edit, and delete movies</CardDescription>
+          </div>
+          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="w-4 h-4 mr-2" />
+                Add Movie
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Add New Movie</DialogTitle>
+                <DialogDescription>
+                  Add a new movie to your collection
+                </DialogDescription>
+              </DialogHeader>
+              <AddMovieForm onSuccess={() => setIsAddDialogOpen(false)} />
+            </DialogContent>
+          </Dialog>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          {movies.length === 0 ? (
+            <p className="text-center text-muted-foreground py-8">
+              No movies found. Add your first movie!
+            </p>
+          ) : (
+            movies.map((movie) => (
+              <div
+                key={movie.id}
+                className="flex items-center gap-4 p-4 border rounded-lg"
+              >
+                <img
+                  src={movie.posterUrl}
+                  alt={movie.title}
+                  className="w-16 h-24 object-cover rounded"
+                />
+                <div className="flex-1">
+                  <h3 className="font-semibold text-lg">{movie.title}</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {movie.year} • {movie.duration}min • {movie.rating}
+                  </p>
+                  <div className="flex gap-2 mt-2">
+                    {movie.genres?.split(',').slice(0, 3).map((genre) => (
+                      <Badge key={genre.trim()} variant="secondary">
+                        {genre.trim()}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setEditingMovie(movie)}
+                      >
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                      <DialogHeader>
+                        <DialogTitle>Edit Movie</DialogTitle>
+                        <DialogDescription>
+                          Update movie information
+                        </DialogDescription>
+                      </DialogHeader>
+                      {editingMovie && (
+                        <EditMovieForm
+                          movie={editingMovie}
+                          onSave={() => setEditingMovie(null)}
+                        />
+                      )}
+                    </DialogContent>
+                  </Dialog>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => {
+                      if (confirm(`Delete "${movie.title}"?`)) {
+                        deleteMovieMutation.mutate(movie.id);
+                      }
+                    }}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// Add Movie Form Component
+function AddMovieForm({ onSuccess }: { onSuccess: () => void }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [formData, setFormData] = useState({
+    title: "",
+    slug: "",
+    description: "",
+    posterUrl: "",
+    backdropUrl: "",
+    year: new Date().getFullYear(),
+    rating: "PG-13",
+    imdbRating: "",
+    genres: "",
+    language: "English",
+    duration: 120,
+    cast: "",
+    directors: "",
+    googleDriveUrl: "",
+    featured: false,
+    trending: false,
+    category: "action",
+  });
+
+  const createMovieMutation = useMutation({
+    mutationFn: async (data: typeof formData) => {
+      const res = await fetch("/api/admin/movies", {
+        method: "POST",
+        headers: {
+          ...getAuthHeaders(),
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error("Failed to create movie");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/movies"] });
+      toast({
+        title: "Success",
+        description: "Movie added successfully",
+      });
+      onSuccess();
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to add movie",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    createMovieMutation.mutate(formData);
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="title">Title *</Label>
+          <Input
+            id="title"
+            value={formData.title}
+            onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+            required
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="slug">Slug *</Label>
+          <Input
+            id="slug"
+            value={formData.slug}
+            onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
+            required
+          />
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="description">Description *</Label>
+        <Textarea
+          id="description"
+          value={formData.description}
+          onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+          required
+        />
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="posterUrl">Poster URL *</Label>
+          <Input
+            id="posterUrl"
+            value={formData.posterUrl}
+            onChange={(e) => setFormData({ ...formData, posterUrl: e.target.value })}
+            required
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="backdropUrl">Backdrop URL *</Label>
+          <Input
+            id="backdropUrl"
+            value={formData.backdropUrl}
+            onChange={(e) => setFormData({ ...formData, backdropUrl: e.target.value })}
+            required
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-3 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="year">Year *</Label>
+          <Input
+            id="year"
+            type="number"
+            value={formData.year}
+            onChange={(e) => setFormData({ ...formData, year: parseInt(e.target.value) })}
+            required
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="duration">Duration (min) *</Label>
+          <Input
+            id="duration"
+            type="number"
+            value={formData.duration}
+            onChange={(e) => setFormData({ ...formData, duration: parseInt(e.target.value) })}
+            required
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="rating">Rating *</Label>
+          <Input
+            id="rating"
+            value={formData.rating}
+            onChange={(e) => setFormData({ ...formData, rating: e.target.value })}
+            required
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="imdbRating">IMDb Rating</Label>
+          <Input
+            id="imdbRating"
+            value={formData.imdbRating}
+            onChange={(e) => setFormData({ ...formData, imdbRating: e.target.value })}
+            placeholder="8.5"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="language">Language *</Label>
+          <Input
+            id="language"
+            value={formData.language}
+            onChange={(e) => setFormData({ ...formData, language: e.target.value })}
+            required
+          />
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="genres">Genres (comma-separated) *</Label>
+        <Input
+          id="genres"
+          value={formData.genres}
+          onChange={(e) => setFormData({ ...formData, genres: e.target.value })}
+          placeholder="Action, Thriller, Drama"
+          required
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="cast">Cast (comma-separated)</Label>
+        <Input
+          id="cast"
+          value={formData.cast}
+          onChange={(e) => setFormData({ ...formData, cast: e.target.value })}
+          placeholder="Actor 1, Actor 2, Actor 3"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="directors">Directors (comma-separated)</Label>
+        <Input
+          id="directors"
+          value={formData.directors}
+          onChange={(e) => setFormData({ ...formData, directors: e.target.value })}
+          placeholder="Director 1, Director 2"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="googleDriveUrl">Google Drive URL *</Label>
+        <Input
+          id="googleDriveUrl"
+          value={formData.googleDriveUrl}
+          onChange={(e) => setFormData({ ...formData, googleDriveUrl: e.target.value })}
+          placeholder="https://drive.google.com/file/d/..."
+          required
+        />
+      </div>
+
+      <div className="flex gap-4">
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={formData.featured}
+            onChange={(e) => setFormData({ ...formData, featured: e.target.checked })}
+          />
+          <span className="text-sm">Featured</span>
+        </label>
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={formData.trending}
+            onChange={(e) => setFormData({ ...formData, trending: e.target.checked })}
+          />
+          <span className="text-sm">Trending</span>
+        </label>
+      </div>
+
+      <Button type="submit" className="w-full">
+        <Save className="w-4 h-4 mr-2" />
+        Add Movie
+      </Button>
+    </form>
+  );
+}
+
+// Edit Movie Form Component
+function EditMovieForm({
+  movie,
+  onSave,
+}: {
+  movie: Movie;
+  onSave: () => void;
+}) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [formData, setFormData] = useState({
+    title: movie.title,
+    slug: movie.slug,
+    description: movie.description,
+    posterUrl: movie.posterUrl,
+    backdropUrl: movie.backdropUrl,
+    year: movie.year,
+    rating: movie.rating,
+    imdbRating: movie.imdbRating || "",
+    genres: movie.genres || "",
+    language: movie.language,
+    duration: movie.duration,
+    cast: movie.cast || "",
+    directors: movie.directors || "",
+    googleDriveUrl: movie.googleDriveUrl,
+    featured: movie.featured || false,
+    trending: movie.trending || false,
+    category: movie.category || "action",
+  });
+
+  const updateMovieMutation = useMutation({
+    mutationFn: async (data: typeof formData) => {
+      const res = await fetch(`/api/admin/movies/${movie.id}`, {
+        method: "PUT",
+        headers: {
+          ...getAuthHeaders(),
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error("Failed to update movie");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/movies"] });
+      toast({
+        title: "Success",
+        description: "Movie updated successfully",
+      });
+      onSave();
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update movie",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    updateMovieMutation.mutate(formData);
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="edit-title">Title</Label>
+          <Input
+            id="edit-title"
+            value={formData.title}
+            onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="edit-slug">Slug</Label>
+          <Input
+            id="edit-slug"
+            value={formData.slug}
+            onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
+          />
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="edit-description">Description</Label>
+        <Textarea
+          id="edit-description"
+          value={formData.description}
+          onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+        />
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="edit-posterUrl">Poster URL</Label>
+          <Input
+            id="edit-posterUrl"
+            value={formData.posterUrl}
+            onChange={(e) => setFormData({ ...formData, posterUrl: e.target.value })}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="edit-backdropUrl">Backdrop URL</Label>
+          <Input
+            id="edit-backdropUrl"
+            value={formData.backdropUrl}
+            onChange={(e) => setFormData({ ...formData, backdropUrl: e.target.value })}
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-3 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="edit-year">Year</Label>
+          <Input
+            id="edit-year"
+            type="number"
+            value={formData.year}
+            onChange={(e) => setFormData({ ...formData, year: parseInt(e.target.value) })}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="edit-duration">Duration (min)</Label>
+          <Input
+            id="edit-duration"
+            type="number"
+            value={formData.duration}
+            onChange={(e) => setFormData({ ...formData, duration: parseInt(e.target.value) })}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="edit-rating">Rating</Label>
+          <Input
+            id="edit-rating"
+            value={formData.rating}
+            onChange={(e) => setFormData({ ...formData, rating: e.target.value })}
+          />
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="edit-genres">Genres (comma-separated)</Label>
+        <Input
+          id="edit-genres"
+          value={formData.genres}
+          onChange={(e) => setFormData({ ...formData, genres: e.target.value })}
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="edit-googleDriveUrl">Google Drive URL</Label>
+        <Input
+          id="edit-googleDriveUrl"
+          value={formData.googleDriveUrl}
+          onChange={(e) => setFormData({ ...formData, googleDriveUrl: e.target.value })}
+        />
+      </div>
+
+      <div className="flex gap-4">
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={formData.featured}
+            onChange={(e) => setFormData({ ...formData, featured: e.target.checked })}
+          />
+          <span className="text-sm">Featured</span>
+        </label>
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={formData.trending}
+            onChange={(e) => setFormData({ ...formData, trending: e.target.checked })}
+          />
+          <span className="text-sm">Trending</span>
+        </label>
+      </div>
+
+      <Button type="submit" className="w-full">
+        <Save className="w-4 h-4 mr-2" />
+        Save Changes
+      </Button>
+    </form>
   );
 }

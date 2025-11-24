@@ -3,12 +3,15 @@ import { Link } from "wouter";
 import { Bookmark, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ShowCard } from "@/components/show-card";
-import type { Show } from "@shared/schema";
+import { MovieCard } from "@/components/movie-card";
+import type { Show, Movie } from "@shared/schema";
 
 interface WatchlistItem {
   id: string;
-  showId: string;
+  showId?: string;
+  movieId?: string;
   addedAt: string;
 }
 
@@ -21,12 +24,25 @@ export default function Watchlist() {
     queryKey: ["/api/shows"],
   });
 
-  const isLoading = watchlistLoading || showsLoading;
+  const { data: allMovies = [], isLoading: moviesLoading } = useQuery<Movie[]>({
+    queryKey: ["/api/movies"],
+  });
+
+  const isLoading = watchlistLoading || showsLoading || moviesLoading;
 
   // Get the actual show objects from watchlist IDs
   const watchlistShows = watchlistItems
+    .filter(item => item.showId)
     .map((item) => allShows.find((show) => show.id === item.showId))
     .filter((show): show is Show => show !== undefined);
+
+  // Get the actual movie objects from watchlist IDs
+  const watchlistMovies = watchlistItems
+    .filter(item => item.movieId)
+    .map((item) => allMovies.find((movie) => movie.id === item.movieId))
+    .filter((movie): movie is Movie => movie !== undefined);
+
+  const totalItems = watchlistShows.length + watchlistMovies.length;
 
   return (
     <div className="min-h-screen bg-background">
@@ -47,7 +63,7 @@ export default function Watchlist() {
             <div>
               <h1 className="text-3xl md:text-4xl font-bold">My Watchlist</h1>
               <p className="text-muted-foreground mt-1">
-                {watchlistShows.length} {watchlistShows.length === 1 ? 'show' : 'shows'} saved
+                {totalItems} {totalItems === 1 ? 'item' : 'items'} saved
               </p>
             </div>
           </div>
@@ -60,12 +76,62 @@ export default function Watchlist() {
               <Skeleton key={i} className="aspect-[2/3] rounded-md" />
             ))}
           </div>
-        ) : watchlistShows.length > 0 ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-            {watchlistShows.map((show) => (
-              <ShowCard key={show.id} show={show} />
-            ))}
-          </div>
+        ) : totalItems > 0 ? (
+          <Tabs defaultValue="all" className="w-full">
+            <TabsList className="mb-6">
+              <TabsTrigger value="all">
+                All ({totalItems})
+              </TabsTrigger>
+              <TabsTrigger value="shows">
+                Shows ({watchlistShows.length})
+              </TabsTrigger>
+              <TabsTrigger value="movies">
+                Movies ({watchlistMovies.length})
+              </TabsTrigger>
+            </TabsList>
+
+            {/* All Tab */}
+            <TabsContent value="all">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                {watchlistShows.map((show) => (
+                  <ShowCard key={`show-${show.id}`} show={show} />
+                ))}
+                {watchlistMovies.map((movie) => (
+                  <MovieCard key={`movie-${movie.id}`} movie={movie} />
+                ))}
+              </div>
+            </TabsContent>
+
+            {/* Shows Tab */}
+            <TabsContent value="shows">
+              {watchlistShows.length > 0 ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                  {watchlistShows.map((show) => (
+                    <ShowCard key={show.id} show={show} />
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-16">
+                  <p className="text-muted-foreground">No shows in your watchlist</p>
+                </div>
+              )}
+            </TabsContent>
+
+            {/* Movies Tab */}
+            <TabsContent value="movies">
+              {watchlistMovies.length > 0 ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                  {watchlistMovies.map((movie) => (
+                    <MovieCard key={movie.id} movie={movie} />
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-16">
+                  <p className="text-muted-foreground">No movies in your watchlist</p>
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
         ) : (
           <div className="text-center py-16">
             <div className="inline-flex p-4 bg-muted rounded-full mb-4">
@@ -73,10 +139,10 @@ export default function Watchlist() {
             </div>
             <h2 className="text-2xl font-semibold mb-2">Your watchlist is empty</h2>
             <p className="text-muted-foreground mb-6">
-              Add shows to your watchlist to watch them later
+              Add shows and movies to your watchlist to watch them later
             </p>
             <Link href="/">
-              <Button>Browse Shows</Button>
+              <Button>Browse Content</Button>
             </Link>
           </div>
         )}

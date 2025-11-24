@@ -1,30 +1,71 @@
-import { Card, CardContent } from "@/components/ui/card";
-import { Film } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { MovieHeroCarousel } from "@/components/movie-hero-carousel";
+import { MovieContentRow } from "@/components/movie-content-row";
+import { Skeleton } from "@/components/ui/skeleton";
+import type { Movie } from "@shared/schema";
 
 export default function MoviesPage() {
-  return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-900 to-black text-white">
-      <div className="container mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold mb-2">Movies</h1>
-          <p className="text-gray-400">Browse our collection of movies</p>
-        </div>
+  const { data: movies, isLoading } = useQuery<Movie[]>({
+    queryKey: ["/api/movies"],
+  });
 
-        {/* Empty State */}
-        <Card className="bg-gray-800/50 border-gray-700">
-          <CardContent className="flex flex-col items-center justify-center py-16">
-            <div className="rounded-full bg-gray-700/50 p-6 mb-6">
-              <Film className="w-16 h-16 text-gray-400" />
-            </div>
-            <h2 className="text-2xl font-semibold mb-2 text-gray-200">
-              No Movies Available Yet
-            </h2>
-            <p className="text-gray-400 text-center max-w-md">
-              We're working on adding movies to our collection. Check back soon for exciting new content!
-            </p>
-          </CardContent>
-        </Card>
+  if (isLoading) {
+    return (
+      <div className="min-h-screen">
+        <Skeleton className="w-full h-[70vh]" />
+        <div className="container mx-auto px-4 py-8 space-y-8">
+          <Skeleton className="h-8 w-48" />
+          <div className="flex gap-4 overflow-hidden">
+            {[...Array(6)].map((_, i) => (
+              <Skeleton key={i} className="w-48 aspect-[2/3] flex-shrink-0" />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const featured = movies?.filter((movie) => movie.featured) || [];
+  const trending = movies?.filter((movie) => movie.trending) || [];
+  const action = movies?.filter((movie) => movie.genres?.toLowerCase().includes("action")) || [];
+  const drama = movies?.filter((movie) => movie.genres?.toLowerCase().includes("drama")) || [];
+  const comedy = movies?.filter((movie) => movie.genres?.toLowerCase().includes("comedy")) || [];
+  const horror = movies?.filter((movie) => movie.genres?.toLowerCase().includes("horror")) || [];
+
+  return (
+    <div className="min-h-screen">
+      {/* Hero Carousel */}
+      {featured.length > 0 && <MovieHeroCarousel movies={featured} />}
+
+      {/* Content Rows */}
+      <div className="container mx-auto py-8 space-y-12">
+        {trending.length > 0 && (
+          <MovieContentRow
+            title="Trending Now"
+            movies={trending}
+            orientation="landscape"
+          />
+        )}
+
+        {action.length > 0 && (
+          <MovieContentRow title="Action & Thriller" movies={action} />
+        )}
+
+        {drama.length > 0 && <MovieContentRow title="Drama & Romance" movies={drama} />}
+
+        {comedy.length > 0 && <MovieContentRow title="Comedy" movies={comedy} />}
+
+        {horror.length > 0 && (
+          <MovieContentRow title="Horror & Mystery" movies={horror} />
+        )}
+
+        {movies && movies.length > 0 && (
+          <MovieContentRow
+            title="Recently Added"
+            movies={movies.slice(0, 12)}
+            orientation="landscape"
+          />
+        )}
       </div>
     </div>
   );

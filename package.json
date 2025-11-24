@@ -20,6 +20,9 @@
     "update-images": "tsx scripts/update-images-from-tmdb.ts",
     "update-episodes": "tsx scripts/update-episode-thumbnails.ts",
     "add-show": "tsx scripts/add-show-from-tmdb.ts",
+    "add-movie": "tsx scripts/add-movie-from-tmdb.ts",
+    "add-john-wick": "tsx scripts/add-john-wick.ts",
+    "add-top-movies": "tsx scripts/add-top-200-movies.ts",
     "migrate-genres": "tsx scripts/migrate-genres-to-string.ts",
     "update-st-s1": "tsx scripts/update-stranger-things-s1.ts",
     "check-failed": "tsx scripts/check-failed-shows.ts"
