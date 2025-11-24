@@ -35,9 +35,13 @@ export default function Watch() {
   const upNextEpisodes = episodes
     ?.filter(
       (ep) =>
-        ep.season === currentSeason && ep.episodeNumber > currentEpisode ||
-        ep.season > currentSeason
+        (ep.season === currentSeason && ep.episodeNumber > currentEpisode) ||
+        (ep.season === currentSeason + 1 && ep.episodeNumber === 1)
     )
+    .sort((a, b) => {
+      if (a.season !== b.season) return a.season - b.season;
+      return a.episodeNumber - b.episodeNumber;
+    })
     .slice(0, 10) || [];
 
   const queryClient = useQueryClient();

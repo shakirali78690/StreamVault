@@ -21,6 +21,7 @@
     "update-episodes": "tsx scripts/update-episode-thumbnails.ts",
     "add-show": "tsx scripts/add-show-from-tmdb.ts",
     "migrate-genres": "tsx scripts/migrate-genres-to-string.ts",
+    "update-st-s1": "tsx scripts/update-stranger-things-s1.ts",
     "check-failed": "tsx scripts/check-failed-shows.ts"
   },
   "dependencies": {
