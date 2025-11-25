@@ -59,6 +59,12 @@ app.use((req, res, next) => {
   next();
 });
 
+// Serve IndexNow verification file
+app.get('/430747cadbbf78f339306f7049a8f3c5.txt', (_req, res) => {
+  res.type('text/plain');
+  res.send('430747cadbbf78f339306f7049a8f3c5');
+});
+
 (async () => {
   const server = await registerRoutes(app);
 
