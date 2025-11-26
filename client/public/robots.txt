@@ -5,15 +5,20 @@ User-agent: *
 Allow: /
 Allow: /show/*
 Allow: /watch/*
+Allow: /watch-movie/*
+Allow: /movie/*
 Allow: /search
 Allow: /category/*
 Allow: /series
 Allow: /movies
 Allow: /trending
 Allow: /watchlist
+Allow: /request-content
+Allow: /report-issue
 
 # Block admin and API endpoints
 Disallow: /admin
+Disallow: /admin/*
 Disallow: /api/admin/*
 Disallow: /api/
 

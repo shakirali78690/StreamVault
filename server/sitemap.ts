@@ -18,6 +18,8 @@ export function setupSitemaps(app: Express, storage: IStorage) {
         { url: "/trending", priority: "0.9", changefreq: "daily" },
         { url: "/search", priority: "0.8", changefreq: "weekly" },
         { url: "/watchlist", priority: "0.7", changefreq: "weekly" },
+        { url: "/request-content", priority: "0.7", changefreq: "monthly" },
+        { url: "/report-issue", priority: "0.7", changefreq: "monthly" },
         { url: "/about", priority: "0.6", changefreq: "monthly" },
         { url: "/contact", priority: "0.6", changefreq: "monthly" },
         { url: "/privacy", priority: "0.5", changefreq: "monthly" },
@@ -25,8 +27,6 @@ export function setupSitemaps(app: Express, storage: IStorage) {
         { url: "/dmca", priority: "0.5", changefreq: "monthly" },
         { url: "/help", priority: "0.6", changefreq: "monthly" },
         { url: "/faq", priority: "0.6", changefreq: "monthly" },
-        { url: "/report", priority: "0.6", changefreq: "monthly" },
-        { url: "/request", priority: "0.6", changefreq: "monthly" },
       ];
 
       let allUrls: string[] = [];
@@ -121,6 +121,57 @@ export function setupSitemaps(app: Express, storage: IStorage) {
         } catch (err) {
           console.error(`Error getting episodes for show ${show.id}:`, err);
         }
+      }
+
+      // Add movies with images
+      const movies = await storage.getAllMovies();
+      for (const movie of movies) {
+        const title = (movie.title || "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&apos;");
+
+        const description = (movie.description || "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&apos;");
+
+        const posterUrl = (movie.posterUrl || "").replace(/&/g, "&amp;");
+        const backdropUrl = (movie.backdropUrl || "").replace(/&/g, "&amp;");
+
+        allUrls.push(`
+  <url>
+    <loc>${baseUrl}/movie/${movie.slug}</loc>
+    <lastmod>${lastmod}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+    <image:image>
+      <image:loc>${posterUrl}</image:loc>
+      <image:title>${title}</image:title>
+      <image:caption>${description}</image:caption>
+    </image:image>
+    <image:image>
+      <image:loc>${backdropUrl}</image:loc>
+      <image:title>${title} - Backdrop</image:title>
+    </image:image>
+  </url>`);
+
+        // Add watch-movie page
+        allUrls.push(`
+  <url>
+    <loc>${baseUrl}/watch-movie/${movie.slug}</loc>
+    <lastmod>${lastmod}</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>${posterUrl}</image:loc>
+      <image:title>Watch ${title} Online Free</image:title>
+    </image:image>
+  </url>`);
       }
 
       const xml = `<?xml version="1.0" encoding="UTF-8"?>
