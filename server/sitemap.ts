@@ -74,22 +74,33 @@ export function setupSitemaps(app: Express, storage: IStorage) {
         const posterUrl = (show.posterUrl || "").replace(/&/g, "&amp;");
         const backdropUrl = (show.backdropUrl || "").replace(/&/g, "&amp;");
 
-        allUrls.push(`
+        let showUrl = `
   <url>
     <loc>${baseUrl}/show/${show.slug}</loc>
     <lastmod>${lastmod}</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.9</priority>
+    <priority>0.9</priority>`;
+
+        // Only add images if URLs exist and are valid
+        if (posterUrl && posterUrl.startsWith('http')) {
+          showUrl += `
     <image:image>
       <image:loc>${posterUrl}</image:loc>
       <image:title>${title}</image:title>
       <image:caption>${description}</image:caption>
-    </image:image>
+    </image:image>`;
+        }
+        if (backdropUrl && backdropUrl.startsWith('http')) {
+          showUrl += `
     <image:image>
       <image:loc>${backdropUrl}</image:loc>
       <image:title>${title} - Backdrop</image:title>
-    </image:image>
-  </url>`);
+    </image:image>`;
+        }
+
+        showUrl += `
+  </url>`;
+        allUrls.push(showUrl);
 
         // Add episodes for this show
         try {
@@ -106,17 +117,25 @@ export function setupSitemaps(app: Express, storage: IStorage) {
 
             const thumbnailUrl = (episode.thumbnailUrl || "").replace(/&/g, "&amp;");
 
-            allUrls.push(`
+            let episodeUrl = `
   <url>
-    <loc>${baseUrl}/watch/${show.slug}/${episode.season}/${episode.episodeNumber}</loc>
+    <loc>${baseUrl}/watch/${show.slug}?season=${episode.season}&amp;episode=${episode.episodeNumber}</loc>
     <lastmod>${lastmod}</lastmod>
     <changefreq>monthly</changefreq>
-    <priority>0.7</priority>
+    <priority>0.7</priority>`;
+
+            // Only add image if thumbnail URL exists and is valid
+            if (thumbnailUrl && thumbnailUrl.startsWith('http')) {
+              episodeUrl += `
     <image:image>
       <image:loc>${thumbnailUrl}</image:loc>
       <image:title>${escapedTitle}</image:title>
-    </image:image>
-  </url>`);
+    </image:image>`;
+            }
+
+            episodeUrl += `
+  </url>`;
+            allUrls.push(episodeUrl);
           });
         } catch (err) {
           console.error(`Error getting episodes for show ${show.id}:`, err);
@@ -143,35 +162,54 @@ export function setupSitemaps(app: Express, storage: IStorage) {
         const posterUrl = (movie.posterUrl || "").replace(/&/g, "&amp;");
         const backdropUrl = (movie.backdropUrl || "").replace(/&/g, "&amp;");
 
-        allUrls.push(`
+        let movieUrl = `
   <url>
     <loc>${baseUrl}/movie/${movie.slug}</loc>
     <lastmod>${lastmod}</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.9</priority>
+    <priority>0.9</priority>`;
+
+        // Only add images if URLs exist and are valid
+        if (posterUrl && posterUrl.startsWith('http')) {
+          movieUrl += `
     <image:image>
       <image:loc>${posterUrl}</image:loc>
       <image:title>${title}</image:title>
       <image:caption>${description}</image:caption>
-    </image:image>
+    </image:image>`;
+        }
+        if (backdropUrl && backdropUrl.startsWith('http')) {
+          movieUrl += `
     <image:image>
       <image:loc>${backdropUrl}</image:loc>
       <image:title>${title} - Backdrop</image:title>
-    </image:image>
-  </url>`);
+    </image:image>`;
+        }
+
+        movieUrl += `
+  </url>`;
+        allUrls.push(movieUrl);
 
         // Add watch-movie page
-        allUrls.push(`
+        let watchMovieUrl = `
   <url>
     <loc>${baseUrl}/watch-movie/${movie.slug}</loc>
     <lastmod>${lastmod}</lastmod>
     <changefreq>monthly</changefreq>
-    <priority>0.8</priority>
+    <priority>0.8</priority>`;
+
+        // Only add image if poster URL exists and is valid
+        if (posterUrl && posterUrl.startsWith('http')) {
+          watchMovieUrl += `
     <image:image>
       <image:loc>${posterUrl}</image:loc>
       <image:title>Watch ${title} Online Free</image:title>
-    </image:image>
-  </url>`);
+    </image:image>`;
+        }
+
+        watchMovieUrl += `
+  </url>`;
+        allUrls.push(watchMovieUrl);
       }
 
       const xml = `<?xml version="1.0" encoding="UTF-8"?>
