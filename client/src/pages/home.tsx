@@ -62,7 +62,7 @@ export default function Home() {
   // Combine shows and movies
   const allContent: (Show | Movie)[] = [...(shows || []), ...(movies || [])];
   
-  const featured = shows?.filter((show) => show.featured) || [];
+  const featured = allContent.filter((item) => item.featured) || [];
   const trending = allContent.filter((item) => item.trending) || [];
   const action = allContent.filter((item) => item.genres?.toLowerCase().includes("action")) || [];
   const drama = allContent.filter((item) => item.genres?.toLowerCase().includes("drama")) || [];
