@@ -46,6 +46,7 @@ export interface IStorage {
   searchShows(query: string): Promise<Show[]>;
 
   // Episodes
+  getAllEpisodes(): Promise<Episode[]>;
   getEpisodesByShowId(showId: string): Promise<Episode[]>;
   getEpisodeById(id: string): Promise<Episode | undefined>;
   createEpisode(episode: InsertEpisode): Promise<Episode>;
@@ -86,6 +87,8 @@ export interface IStorage {
   getCommentsByEpisodeId(episodeId: string): Promise<Comment[]>;
   getCommentsByMovieId(movieId: string): Promise<Comment[]>;
   createComment(comment: InsertComment): Promise<Comment>;
+  getAllComments(): Promise<Comment[]>;
+  deleteComment(commentId: string): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
@@ -287,6 +290,10 @@ export class MemStorage implements IStorage {
   }
 
   // Episodes methods
+  async getAllEpisodes(): Promise<Episode[]> {
+    return Array.from(this.episodes.values());
+  }
+
   async getEpisodesByShowId(showId: string): Promise<Episode[]> {
     return Array.from(this.episodes.values()).filter(
       (episode) => episode.showId === showId
@@ -770,6 +777,16 @@ export class MemStorage implements IStorage {
     this.comments.set(id, newComment);
     this.saveData();
     return newComment;
+  }
+
+  async getAllComments(): Promise<Comment[]> {
+    return Array.from(this.comments.values())
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }
+
+  async deleteComment(commentId: string): Promise<void> {
+    this.comments.delete(commentId);
+    this.saveData();
   }
 }
 

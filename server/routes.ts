@@ -76,6 +76,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get all episodes (for admin)
+  app.get("/api/all-episodes", requireAdmin, async (_req, res) => {
+    try {
+      const episodes = await storage.getAllEpisodes();
+      res.json(episodes);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch all episodes" });
+    }
+  });
+
   // Get episodes by show ID
   app.get("/api/episodes/:showId", async (req, res) => {
     try {
@@ -895,6 +905,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error('Error fetching issue reports:', error);
       res.status(500).json({ error: 'Failed to fetch issue reports' });
+    }
+  });
+
+  // Admin: Get all comments
+  app.get("/api/admin/comments", requireAdmin, async (req, res) => {
+    try {
+      const comments = await storage.getAllComments();
+      res.json(comments);
+    } catch (error: any) {
+      console.error('Error fetching comments:', error);
+      res.status(500).json({ error: 'Failed to fetch comments' });
+    }
+  });
+
+  // Admin: Delete comment
+  app.delete("/api/admin/comments/:commentId", requireAdmin, async (req, res) => {
+    try {
+      const { commentId } = req.params;
+      await storage.deleteComment(commentId);
+      res.json({ success: true, message: 'Comment deleted successfully' });
+    } catch (error: any) {
+      console.error('Error deleting comment:', error);
+      res.status(500).json({ error: 'Failed to delete comment' });
     }
   });
 

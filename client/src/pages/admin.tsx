@@ -101,9 +101,10 @@ export default function AdminPage() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-7 mb-8">
+          <TabsList className="grid w-full grid-cols-8 mb-8">
             <TabsTrigger value="shows">Shows</TabsTrigger>
             <TabsTrigger value="movies">Movies</TabsTrigger>
+            <TabsTrigger value="comments">Comments</TabsTrigger>
             <TabsTrigger value="requests">Requests</TabsTrigger>
             <TabsTrigger value="reports">Reports</TabsTrigger>
             <TabsTrigger value="add-show">Add Show</TabsTrigger>
@@ -119,6 +120,11 @@ export default function AdminPage() {
           {/* Manage Movies Tab */}
           <TabsContent value="movies">
             <ManageMovies movies={movies} />
+          </TabsContent>
+
+          {/* Comments Moderation Tab */}
+          <TabsContent value="comments">
+            <CommentsModeration />
           </TabsContent>
 
           {/* Content Requests Tab */}
@@ -2061,6 +2067,178 @@ function IssueReports() {
                 </CardContent>
               </Card>
             ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// Comments Moderation Component
+function CommentsModeration() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const { data: shows = [] } = useQuery<Show[]>({
+    queryKey: ["/api/shows"],
+  });
+
+  const { data: movies = [] } = useQuery<Movie[]>({
+    queryKey: ["/api/movies"],
+  });
+
+  const { data: comments = [], isLoading } = useQuery({
+    queryKey: ["/api/admin/comments"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/comments", {
+        headers: getAuthHeaders(),
+      });
+      if (!res.ok) throw new Error("Failed to fetch comments");
+      return res.json();
+    },
+  });
+
+  // Fetch all episodes for matching
+  const { data: allEpisodes = [] } = useQuery<Episode[]>({
+    queryKey: ["/api/all-episodes"],
+    queryFn: async () => {
+      const res = await fetch("/api/all-episodes", {
+        headers: getAuthHeaders(),
+      });
+      if (!res.ok) throw new Error("Failed to fetch episodes");
+      return res.json();
+    },
+  });
+
+  const deleteCommentMutation = useMutation({
+    mutationFn: async (commentId: string) => {
+      const res = await fetch(`/api/admin/comments/${commentId}`, {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      });
+      if (!res.ok) throw new Error("Failed to delete comment");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/comments"] });
+      toast({
+        title: "Success",
+        description: "Comment deleted successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to delete comment",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleDelete = (commentId: string, userName: string) => {
+    if (confirm(`Are you sure you want to delete the comment by "${userName}"?`)) {
+      deleteCommentMutation.mutate(commentId);
+    }
+  };
+
+  if (isLoading) {
+    return <div className="text-center py-8">Loading comments...</div>;
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Comments Moderation</CardTitle>
+        <CardDescription>
+          Manage user comments ({comments.length} total)
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {comments.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground">
+            No comments yet
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {comments.map((comment: any) => {
+              let contentInfo = null;
+              
+              if (comment.episodeId) {
+                const episode = allEpisodes.find((e: Episode) => e.id === comment.episodeId);
+                if (episode) {
+                  const show = shows.find((s: Show) => s.id === episode.showId);
+                  contentInfo = {
+                    type: 'Episode',
+                    title: show?.title || 'Unknown Show',
+                    subtitle: `S${episode.season}E${episode.episodeNumber}: ${episode.title}`,
+                    link: `/watch/${show?.slug}?season=${episode.season}&episode=${episode.episodeNumber}`
+                  };
+                }
+              } else if (comment.movieId) {
+                const movie = movies.find((m: Movie) => m.id === comment.movieId);
+                if (movie) {
+                  contentInfo = {
+                    type: 'Movie',
+                    title: movie.title,
+                    subtitle: `${movie.year}`,
+                    link: `/watch-movie/${movie.slug}`
+                  };
+                }
+              }
+
+              return (
+                <Card key={comment.id} className="border-l-4 border-l-primary">
+                  <CardHeader>
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <CardTitle className="text-lg">{comment.userName}</CardTitle>
+                          <Badge variant="outline">
+                            {new Date(comment.createdAt).toLocaleDateString()}
+                          </Badge>
+                        </div>
+                        {contentInfo ? (
+                          <CardDescription>
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <Badge variant="secondary">{contentInfo.type}</Badge>
+                                <span className="font-semibold">{contentInfo.title}</span>
+                              </div>
+                              <div className="text-sm">{contentInfo.subtitle}</div>
+                              <a 
+                                href={contentInfo.link} 
+                                className="text-xs text-primary hover:underline"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                View {contentInfo.type} →
+                              </a>
+                            </div>
+                          </CardDescription>
+                        ) : (
+                          <CardDescription>General Comment</CardDescription>
+                        )}
+                      </div>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => handleDelete(comment.id, comment.userName)}
+                        disabled={deleteCommentMutation.isPending}
+                      >
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        {deleteCommentMutation.isPending ? "Deleting..." : "Delete"}
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm whitespace-pre-wrap">{comment.comment}</p>
+                    <div className="text-xs text-muted-foreground mt-3">
+                      Posted: {new Date(comment.createdAt).toLocaleString()}
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         )}
       </CardContent>
