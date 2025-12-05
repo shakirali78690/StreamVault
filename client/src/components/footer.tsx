@@ -21,6 +21,7 @@ export function Footer() {
   };
 
   const quickLinks = [
+    { name: "Browse", path: "/browse" },
     { name: "About Us", path: "/about" },
     { name: "Contact", path: "/contact" },
     { name: "Site Map", path: "/sitemap" },
@@ -167,7 +168,7 @@ export function Footer() {
                 data-testid="button-social-telegram"
               >
                 <a
-                  href="https://t.me"
+                  href="https://t.me/streamvaultt"
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label="Telegram"

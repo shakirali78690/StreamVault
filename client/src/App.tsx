@@ -31,6 +31,7 @@ import BrowseShows from "@/pages/browse-shows";
 import BrowseMovies from "@/pages/browse-movies";
 import Trending from "@/pages/trending";
 import Sitemap from "@/pages/sitemap";
+import Browse from "@/pages/browse";
 import ContinueWatching from "@/pages/continue-watching";
 import NotFound from "@/pages/not-found";
 
@@ -65,6 +66,7 @@ function Router() {
           <Route path="/browse/movies" component={BrowseMovies} />
           <Route path="/trending" component={Trending} />
           <Route path="/sitemap" component={Sitemap} />
+          <Route path="/browse" component={Browse} />
           <Route path="/continue-watching" component={ContinueWatching} />
           <Route component={NotFound} />
         </Switch>

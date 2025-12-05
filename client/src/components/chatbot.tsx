@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { MessageCircle, X, Send, Loader2 } from "lucide-react";
+import { MessageCircle, X, Send, Loader2, Sparkles, Star, Clock, TrendingUp, Film, Tv, Shuffle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useQuery } from "@tanstack/react-query";
@@ -11,7 +11,15 @@ interface Message {
   text: string;
   isBot: boolean;
   suggestions?: string[];
-  showLinks?: Array<{ title: string; slug: string; type: 'show' | 'movie' }>;
+  showLinks?: Array<{ title: string; slug: string; type: 'show' | 'movie'; rating?: string; year?: number; poster?: string }>;
+  quickActions?: Array<{ label: string; icon: string; action: string }>;
+}
+
+interface ConversationContext {
+  lastGenre?: string;
+  lastType?: 'show' | 'movie';
+  searchHistory: string[];
+  recommendedIds: string[];
 }
 
 export function Chatbot() {
@@ -19,18 +27,27 @@ export function Chatbot() {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "1",
-      text: "👋 Hi! I'm your StreamVault assistant. How can I help you today?",
+      text: "👋 Hey there! I'm Vault, your personal streaming assistant. I can help you discover amazing content!\n\nTry asking me things like:\n• \"Recommend something like Breaking Bad\"\n• \"What's a good horror movie?\"\n• \"Surprise me with something good\"",
       isBot: true,
       suggestions: [
-        "Find a movie",
-        "Find a show to watch",
-        "Browse by genre",
-        "What's trending?",
+        "🎲 Surprise me",
+        "🔥 What's hot?",
+        "🎬 Top rated movies",
+        "📺 Popular shows",
+      ],
+      quickActions: [
+        { label: "Random Pick", icon: "🎲", action: "surprise" },
+        { label: "Trending", icon: "🔥", action: "trending" },
+        { label: "Top Rated", icon: "⭐", action: "top-rated" },
       ],
     },
   ]);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+  const [context, setContext] = useState<ConversationContext>({
+    searchHistory: [],
+    recommendedIds: [],
+  });
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const { data: shows } = useQuery<Show[]>({
@@ -49,89 +66,283 @@ export function Chatbot() {
     scrollToBottom();
   }, [messages]);
 
-  const findShows = (query: string): Show[] => {
-    if (!shows) return [];
+  // Fuzzy search with scoring
+  const fuzzyMatch = (text: string, query: string): number => {
+    const lowerText = text.toLowerCase();
     const lowerQuery = query.toLowerCase();
-    return shows.filter(
-      (show) => {
-        const genres = show.genres?.split(',').map(g => g.trim().toLowerCase()) || [];
-        return show.title.toLowerCase().includes(lowerQuery) ||
-          genres.some((g) => g.includes(lowerQuery)) ||
-          show.category?.toLowerCase().includes(lowerQuery);
+    
+    if (lowerText === lowerQuery) return 100;
+    if (lowerText.includes(lowerQuery)) return 80;
+    if (lowerText.startsWith(lowerQuery)) return 90;
+    
+    // Check word matches
+    const textWords = lowerText.split(/\s+/);
+    const queryWords = lowerQuery.split(/\s+/);
+    let matchScore = 0;
+    
+    for (const qWord of queryWords) {
+      for (const tWord of textWords) {
+        if (tWord.includes(qWord) || qWord.includes(tWord)) {
+          matchScore += 20;
+        }
       }
-    );
+    }
+    
+    return matchScore;
   };
 
-  const findMovies = (query: string): Movie[] => {
+  const findShows = (query: string, limit = 5): Show[] => {
+    if (!shows) return [];
+    
+    const scored = shows.map(show => {
+      const titleScore = fuzzyMatch(show.title, query);
+      const genreScore = fuzzyMatch(show.genres || '', query) * 0.5;
+      const castScore = fuzzyMatch(show.cast || '', query) * 0.3;
+      const descScore = fuzzyMatch(show.description || '', query) * 0.2;
+      
+      return {
+        show,
+        score: titleScore + genreScore + castScore + descScore
+      };
+    });
+    
+    return scored
+      .filter(s => s.score > 10)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit)
+      .map(s => s.show);
+  };
+
+  const findMovies = (query: string, limit = 5): Movie[] => {
     if (!movies) return [];
-    const lowerQuery = query.toLowerCase();
-    return movies.filter(
-      (movie) => {
-        const genres = movie.genres?.toLowerCase() || '';
-        return movie.title.toLowerCase().includes(lowerQuery) ||
-          genres.includes(lowerQuery);
-      }
-    );
+    
+    const scored = movies.map(movie => {
+      const titleScore = fuzzyMatch(movie.title, query);
+      const genreScore = fuzzyMatch(movie.genres || '', query) * 0.5;
+      const castScore = fuzzyMatch(movie.cast || '', query) * 0.3;
+      const descScore = fuzzyMatch(movie.description || '', query) * 0.2;
+      
+      return {
+        movie,
+        score: titleScore + genreScore + castScore + descScore
+      };
+    });
+    
+    return scored
+      .filter(m => m.score > 10)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit)
+      .map(m => m.movie);
+  };
+
+  // Get similar content based on genres
+  const getSimilarContent = (title: string): (Show | Movie)[] => {
+    const allContent = [...(shows || []), ...(movies || [])];
+    const source = allContent.find(c => c.title.toLowerCase().includes(title.toLowerCase()));
+    
+    if (!source) return [];
+    
+    const sourceGenres = source.genres?.toLowerCase().split(',').map(g => g.trim()) || [];
+    
+    return allContent
+      .filter(c => c.id !== source.id)
+      .map(c => {
+        const cGenres = c.genres?.toLowerCase().split(',').map(g => g.trim()) || [];
+        const matchCount = sourceGenres.filter(g => cGenres.includes(g)).length;
+        return { content: c, matchCount };
+      })
+      .filter(c => c.matchCount > 0)
+      .sort((a, b) => b.matchCount - a.matchCount)
+      .slice(0, 5)
+      .map(c => c.content);
+  };
+
+  // Get random recommendation
+  const getRandomPick = (): (Show | Movie) | null => {
+    const allContent = [...(shows || []), ...(movies || [])];
+    const highRated = allContent.filter(c => parseFloat(c.imdbRating || '0') >= 7.5);
+    if (highRated.length === 0) return null;
+    return highRated[Math.floor(Math.random() * highRated.length)];
+  };
+
+  // Get top rated content
+  const getTopRated = (type?: 'show' | 'movie', limit = 5): (Show | Movie)[] => {
+    let content: (Show | Movie)[] = [];
+    
+    if (type === 'movie') {
+      content = [...(movies || [])];
+    } else if (type === 'show') {
+      content = [...(shows || [])];
+    } else {
+      content = [...(shows || []), ...(movies || [])];
+    }
+    
+    return content
+      .sort((a, b) => parseFloat(b.imdbRating || '0') - parseFloat(a.imdbRating || '0'))
+      .slice(0, limit);
+  };
+
+  // Get content by mood/vibe
+  const getByMood = (mood: string): (Show | Movie)[] => {
+    const moodGenres: Record<string, string[]> = {
+      'happy': ['comedy', 'animation', 'family'],
+      'sad': ['drama', 'romance'],
+      'excited': ['action', 'thriller', 'adventure'],
+      'scared': ['horror', 'mystery', 'thriller'],
+      'romantic': ['romance', 'drama'],
+      'thoughtful': ['documentary', 'drama', 'mystery'],
+      'relaxed': ['comedy', 'animation', 'family'],
+      'adventurous': ['action', 'adventure', 'sci-fi', 'fantasy'],
+    };
+    
+    const genres = moodGenres[mood.toLowerCase()] || [];
+    const allContent = [...(shows || []), ...(movies || [])];
+    
+    return allContent
+      .filter(c => {
+        const cGenres = c.genres?.toLowerCase() || '';
+        return genres.some(g => cGenres.includes(g));
+      })
+      .sort((a, b) => parseFloat(b.imdbRating || '0') - parseFloat(a.imdbRating || '0'))
+      .slice(0, 5);
+  };
+
+  // Helper to check if item is a movie
+  const isMovie = (item: Show | Movie): item is Movie => {
+    return 'googleDriveUrl' in item;
+  };
+
+  // Format content for display
+  const formatContent = (items: (Show | Movie)[]): Array<{ title: string; slug: string; type: 'show' | 'movie'; rating?: string; year?: number }> => {
+    return items.map(item => ({
+      title: item.title,
+      slug: item.slug,
+      type: isMovie(item) ? 'movie' as const : 'show' as const,
+      rating: item.imdbRating || undefined,
+      year: item.year,
+    }));
   };
 
   const generateResponse = (userMessage: string): Message => {
     const lowerMessage = userMessage.toLowerCase();
 
-    // Check for movies specifically
-    const matchedMovies = findMovies(userMessage);
-    const matchedShows = findShows(userMessage);
-    
-    // If user mentions "movie" or "film", prioritize movies
-    if ((lowerMessage.includes("movie") || lowerMessage.includes("film")) && matchedMovies.length > 0) {
-      return {
-        id: Date.now().toString(),
-        text: `I found ${matchedMovies.length} movie(s) for you! Click any to watch:`,
-        isBot: true,
-        showLinks: matchedMovies.slice(0, 5).map((m) => ({
-          title: m.title,
-          slug: m.slug,
-          type: 'movie' as const,
-        })),
-        suggestions: ["Show me more movies", "Browse shows", "What's trending?"],
-      };
-    }
-    
-    // Combined search for both shows and movies
-    if ((matchedShows.length > 0 || matchedMovies.length > 0) && userMessage.length > 3) {
-      const combinedResults = [
-        ...matchedShows.slice(0, 3).map(s => ({ title: s.title, slug: s.slug, type: 'show' as const })),
-        ...matchedMovies.slice(0, 3).map(m => ({ title: m.title, slug: m.slug, type: 'movie' as const }))
-      ].slice(0, 5);
-      
-      if (combinedResults.length > 0) {
+    // Update context with search history
+    setContext(prev => ({
+      ...prev,
+      searchHistory: [...prev.searchHistory.slice(-5), userMessage],
+    }));
+
+    // ===== SURPRISE ME / RANDOM =====
+    if (
+      lowerMessage.includes("surprise") ||
+      lowerMessage.includes("random") ||
+      lowerMessage.includes("🎲") ||
+      lowerMessage.includes("anything") ||
+      lowerMessage.includes("don't know") ||
+      lowerMessage.includes("dont know")
+    ) {
+      const pick = getRandomPick();
+      if (pick) {
+        const type = isMovie(pick) ? 'movie' : 'show';
         return {
           id: Date.now().toString(),
-          text: `I found ${combinedResults.length} result(s) for you! Click any to watch:`,
+          text: `🎲 Here's my pick for you!\n\n**${pick.title}** (${pick.year})\n⭐ ${pick.imdbRating || 'N/A'}/10\n\n${pick.description?.slice(0, 150)}...`,
           isBot: true,
-          showLinks: combinedResults,
-          suggestions: ["Show me more", "Browse by genre", "What's trending?"],
+          showLinks: [{ title: pick.title, slug: pick.slug, type, rating: pick.imdbRating || undefined, year: pick.year }],
+          suggestions: ["🎲 Another one!", "Similar to this", "Top rated instead"],
         };
       }
     }
 
-    // Generic find/watch queries without specific show/movie name
-    if (
-      (lowerMessage.includes("find") ||
-      lowerMessage.includes("watch") ||
-      lowerMessage.includes("show me")) &&
-      matchedShows.length === 0 &&
-      matchedMovies.length === 0
-    ) {
-      return {
-        id: Date.now().toString(),
-        text: "What would you like to watch? Try:\n• Typing a show name (e.g., 'Stranger Things')\n• Typing a movie name (e.g., 'The Godfather')\n• Browsing by category\n• Checking what's trending",
-        isBot: true,
-        suggestions: ["Action movies", "Drama series", "Comedy shows", "Trending now"],
-      };
+    // ===== SIMILAR TO / LIKE =====
+    const similarMatch = lowerMessage.match(/(?:similar to|like|recommend.*like|something like)\s+(.+)/i);
+    if (similarMatch) {
+      const title = similarMatch[1].replace(/['"]/g, '').trim();
+      const similar = getSimilarContent(title);
+      
+      if (similar.length > 0) {
+        return {
+          id: Date.now().toString(),
+          text: `🎯 If you liked "${title}", you might enjoy these:`,
+          isBot: true,
+          showLinks: formatContent(similar),
+          suggestions: ["🎲 Surprise me", "Top rated", "More recommendations"],
+        };
+      } else {
+        return {
+          id: Date.now().toString(),
+          text: `I couldn't find "${title}" in our library. Try a different title or browse by genre!`,
+          isBot: true,
+          suggestions: ["Browse genres", "🔥 What's trending", "Top rated"],
+        };
+      }
     }
 
-    // Episode navigation - handle specific episode requests
-    const episodeMatch = userMessage.match(/(.*?)\s*(?:season|s)(\d+)\s*(?:episode|e)(\d+)/i);
+    // ===== MOOD-BASED =====
+    const moods = ['happy', 'sad', 'excited', 'scared', 'romantic', 'thoughtful', 'relaxed', 'adventurous'];
+    const foundMood = moods.find(m => lowerMessage.includes(m));
+    if (foundMood || lowerMessage.includes("mood") || lowerMessage.includes("feel like")) {
+      const mood = foundMood || 'excited';
+      const moodContent = getByMood(mood);
+      
+      if (moodContent.length > 0) {
+        const emoji = { happy: '😊', sad: '😢', excited: '🔥', scared: '😱', romantic: '💕', thoughtful: '🤔', relaxed: '😌', adventurous: '🗺️' }[mood] || '🎬';
+        return {
+          id: Date.now().toString(),
+          text: `${emoji} Perfect picks for your ${mood} mood:`,
+          isBot: true,
+          showLinks: formatContent(moodContent),
+          suggestions: ["Different mood", "🎲 Surprise me", "Top rated"],
+        };
+      }
+    }
+
+    // ===== TOP RATED =====
+    if (
+      lowerMessage.includes("top rated") ||
+      lowerMessage.includes("best") ||
+      lowerMessage.includes("highest rated") ||
+      lowerMessage.includes("⭐")
+    ) {
+      const type = lowerMessage.includes("movie") ? 'movie' : lowerMessage.includes("show") ? 'show' : undefined;
+      const topRated = getTopRated(type, 5);
+      
+      if (topRated.length > 0) {
+        const label = type === 'movie' ? 'movies' : type === 'show' ? 'shows' : 'titles';
+        return {
+          id: Date.now().toString(),
+          text: `⭐ Top rated ${label} in our library:`,
+          isBot: true,
+          showLinks: formatContent(topRated),
+          suggestions: ["Top movies", "Top shows", "🎲 Surprise me"],
+        };
+      }
+    }
+
+    // ===== TRENDING / HOT =====
+    if (
+      lowerMessage.includes("trending") ||
+      lowerMessage.includes("popular") ||
+      lowerMessage.includes("hot") ||
+      lowerMessage.includes("🔥")
+    ) {
+      const trendingShows = shows?.filter(s => s.trending).slice(0, 3) || [];
+      const trendingMovies = movies?.filter(m => m.trending).slice(0, 2) || [];
+      const combined = [...trendingShows, ...trendingMovies];
+      
+      if (combined.length > 0) {
+        return {
+          id: Date.now().toString(),
+          text: "🔥 What's hot right now:",
+          isBot: true,
+          showLinks: formatContent(combined),
+          suggestions: ["Top rated", "🎲 Surprise me", "Browse genres"],
+        };
+      }
+    }
+
+    // ===== SPECIFIC EPISODE =====
+    const episodeMatch = userMessage.match(/(.+?)\s*(?:season|s)\s*(\d+)\s*(?:episode|ep|e)\s*(\d+)/i);
     if (episodeMatch) {
       const showName = episodeMatch[1].trim();
       const season = episodeMatch[2];
@@ -144,275 +355,164 @@ export function Chatbot() {
       if (foundShow) {
         return {
           id: Date.now().toString(),
-          text: `Found ${foundShow.title}! Click below to watch Season ${season}, Episode ${episode}:`,
+          text: `🎬 Found it! Click to watch ${foundShow.title} S${season}E${episode}:`,
           isBot: true,
           showLinks: [{
-            title: `${foundShow.title} - S${season}E${episode}`,
+            title: `▶️ ${foundShow.title} - Season ${season}, Episode ${episode}`,
             slug: `${foundShow.slug}?season=${season}&episode=${episode}`,
             type: 'show' as const,
           }],
-          suggestions: ["Show all episodes", "Find another show", "Browse shows"],
+          suggestions: ["Next episode", "Show info", "Find another show"],
         };
       }
     }
-    
-    if (
-      lowerMessage.includes("episode") ||
-      lowerMessage.includes("season") ||
-      lowerMessage.includes("s0") ||
-      lowerMessage.includes("e0")
-    ) {
+
+    // ===== GENRE SEARCHES =====
+    const genreKeywords: Record<string, string[]> = {
+      'action': ['action', 'thriller', 'adventure'],
+      'comedy': ['comedy', 'funny', 'laugh'],
+      'drama': ['drama', 'emotional', 'serious'],
+      'horror': ['horror', 'scary', 'creepy', 'spooky'],
+      'romance': ['romance', 'romantic', 'love'],
+      'scifi': ['sci-fi', 'science fiction', 'space', 'futuristic'],
+      'fantasy': ['fantasy', 'magic', 'magical'],
+      'crime': ['crime', 'detective', 'mystery', 'murder'],
+      'documentary': ['documentary', 'doc', 'real'],
+      'animation': ['animation', 'animated', 'cartoon', 'anime'],
+    };
+
+    for (const [genre, keywords] of Object.entries(genreKeywords)) {
+      if (keywords.some(k => lowerMessage.includes(k))) {
+        const allContent = [...(shows || []), ...(movies || [])];
+        const genreContent = allContent
+          .filter(c => {
+            const cGenres = c.genres?.toLowerCase() || '';
+            return keywords.some(k => cGenres.includes(k));
+          })
+          .sort((a, b) => parseFloat(b.imdbRating || '0') - parseFloat(a.imdbRating || '0'))
+          .slice(0, 5);
+        
+        if (genreContent.length > 0) {
+          const emoji = { action: '💥', comedy: '😂', drama: '🎭', horror: '👻', romance: '💕', scifi: '🚀', fantasy: '✨', crime: '🔍', documentary: '📹', animation: '🎨' }[genre] || '🎬';
+          return {
+            id: Date.now().toString(),
+            text: `${emoji} Best ${genre} content for you:`,
+            isBot: true,
+            showLinks: formatContent(genreContent),
+            suggestions: ["More genres", "🎲 Surprise me", "Top rated"],
+          };
+        }
+      }
+    }
+
+    // ===== MOVIES SPECIFICALLY =====
+    if (lowerMessage.includes("movie") || lowerMessage.includes("film")) {
+      const matchedMovies = findMovies(userMessage.replace(/movie|film/gi, '').trim(), 5);
+      
+      if (matchedMovies.length > 0) {
+        return {
+          id: Date.now().toString(),
+          text: `🎬 Found ${matchedMovies.length} movie(s):`,
+          isBot: true,
+          showLinks: formatContent(matchedMovies),
+          suggestions: ["Top rated movies", "🎲 Random movie", "Browse shows"],
+        };
+      }
+      
+      // Show top movies if no specific match
+      const topMovies = getTopRated('movie', 5);
       return {
         id: Date.now().toString(),
-        text: "To play a specific episode, try:\n• 'Stranger Things season 1 episode 1'\n• 'Breaking Bad s5e16'\n• Or search for the show and select the episode\n\nWhich show are you looking for?",
+        text: "🎬 Here are some great movies to watch:",
         isBot: true,
-        suggestions: ["Stranger Things s1e1", "Breaking Bad s5e16", "Browse shows"],
+        showLinks: formatContent(topMovies),
+        suggestions: ["Action movies", "Comedy movies", "Horror movies"],
       };
     }
 
-    // Playback issues
+    // ===== SHOWS SPECIFICALLY =====
+    if (lowerMessage.includes("show") || lowerMessage.includes("series") || lowerMessage.includes("tv")) {
+      const matchedShows = findShows(userMessage.replace(/show|series|tv/gi, '').trim(), 5);
+      
+      if (matchedShows.length > 0) {
+        return {
+          id: Date.now().toString(),
+          text: `📺 Found ${matchedShows.length} show(s):`,
+          isBot: true,
+          showLinks: formatContent(matchedShows),
+          suggestions: ["Top rated shows", "🎲 Random show", "Browse movies"],
+        };
+      }
+      
+      const topShows = getTopRated('show', 5);
+      return {
+        id: Date.now().toString(),
+        text: "📺 Here are some great shows to binge:",
+        isBot: true,
+        showLinks: formatContent(topShows),
+        suggestions: ["Action shows", "Drama shows", "Comedy shows"],
+      };
+    }
+
+    // ===== GENERAL SEARCH =====
+    const matchedShows = findShows(userMessage, 3);
+    const matchedMovies = findMovies(userMessage, 3);
+    
+    if (matchedShows.length > 0 || matchedMovies.length > 0) {
+      const combined = [...matchedShows, ...matchedMovies].slice(0, 5);
+      return {
+        id: Date.now().toString(),
+        text: `🔍 Found ${combined.length} result(s):`,
+        isBot: true,
+        showLinks: formatContent(combined),
+        suggestions: ["Similar content", "🎲 Surprise me", "Browse genres"],
+      };
+    }
+
+    // ===== HELP / PLAYBACK ISSUES =====
     if (
-      lowerMessage.includes("play") ||
-      lowerMessage.includes("video") ||
+      lowerMessage.includes("help") ||
       lowerMessage.includes("not working") ||
       lowerMessage.includes("error") ||
-      lowerMessage.includes("loading")
+      lowerMessage.includes("problem") ||
+      lowerMessage.includes("issue")
     ) {
       return {
         id: Date.now().toString(),
-        text: "🔧 Playback troubleshooting:\n\n1. Refresh the page (F5)\n2. Clear browser cache\n3. Try a different browser\n4. Check your internet connection\n5. Disable ad blockers\n\nStill having issues? Report it to our team!",
+        text: "🔧 **Troubleshooting Tips:**\n\n1. 🔄 Refresh the page\n2. 🧹 Clear browser cache\n3. 🌐 Try a different browser\n4. 📶 Check internet connection\n5. 🚫 Disable ad blockers\n\nStill stuck? Report the issue!",
         isBot: true,
-        suggestions: ["Report an issue", "Try another show", "Contact support"],
+        suggestions: ["Report issue", "Contact support", "Try another title"],
       };
     }
 
-    // Watchlist help
+    // ===== WATCHLIST =====
+    if (lowerMessage.includes("watchlist") || lowerMessage.includes("save") || lowerMessage.includes("bookmark")) {
+      return {
+        id: Date.now().toString(),
+        text: "📚 **Your Watchlist:**\n\n• Click the ❤️ button on any show/movie\n• Access from the header menu\n• Saved locally in your browser\n\nStart building your list!",
+        isBot: true,
+        suggestions: ["Browse shows", "Browse movies", "🔥 Trending"],
+      };
+    }
+
+    // ===== GREETINGS =====
     if (
-      lowerMessage.includes("watchlist") ||
-      lowerMessage.includes("save") ||
-      lowerMessage.includes("bookmark") ||
-      lowerMessage.includes("favorite")
+      lowerMessage.match(/^(hi|hello|hey|yo|sup|hola|howdy)/i)
     ) {
       return {
         id: Date.now().toString(),
-        text: "📚 To add shows or movies to your watchlist:\n\n1. Go to any show or movie page\n2. Click the 'Add to Watchlist' button\n3. Access your watchlist from the header\n\nYour watchlist is saved in your browser!",
+        text: "👋 Hey! Ready to find something awesome to watch?\n\nI can help you:\n• 🎲 Get a random recommendation\n• 🔍 Find specific titles\n• 🎭 Browse by genre or mood\n• ⭐ See top rated content",
         isBot: true,
-        suggestions: ["Browse shows", "Browse movies", "View trending"],
+        suggestions: ["🎲 Surprise me", "🔥 What's hot", "⭐ Top rated", "Browse genres"],
       };
     }
 
-    // Browse categories - show category list
-    if (
-      lowerMessage.includes("browse categor") ||
-      lowerMessage.includes("show categor") ||
-      lowerMessage.includes("all categor") ||
-      lowerMessage === "browse" ||
-      lowerMessage === "categories"
-    ) {
-      return {
-        id: Date.now().toString(),
-        text: "🎭 Browse by category:\n• Action & Thriller\n• Drama & Romance\n• Comedy\n• Horror & Mystery\n• Crime & Romance\n• Sci-Fi & Fantasy\n\nClick any category below:",
-        isBot: true,
-        suggestions: ["Action shows", "Drama series", "Comedy shows", "Horror shows"],
-      };
-    }
-
-    // Specific category searches
-    if (
-      lowerMessage.includes("action") ||
-      lowerMessage.includes("thriller")
-    ) {
-      const categoryShows = shows?.filter(s => {
-        const genres = s.genres?.toLowerCase() || '';
-        return s.category === "action" || 
-          genres.includes("action") || genres.includes("thriller");
-      }).slice(0, 3) || [];
-      
-      const categoryMovies = movies?.filter(m => {
-        const genres = m.genres?.toLowerCase() || '';
-        return genres.includes("action") || genres.includes("thriller");
-      }).slice(0, 3) || [];
-      
-      const combined = [
-        ...categoryShows.map(s => ({ title: s.title, slug: s.slug, type: 'show' as const })),
-        ...categoryMovies.map(m => ({ title: m.title, slug: m.slug, type: 'movie' as const }))
-      ];
-      
-      if (combined.length > 0) {
-        return {
-          id: Date.now().toString(),
-          text: `🎬 Found ${combined.length} action/thriller titles:`,
-          isBot: true,
-          showLinks: combined,
-          suggestions: ["Drama shows", "Comedy shows", "What's trending?"],
-        };
-      }
-    }
-
-    if (
-      lowerMessage.includes("drama") ||
-      lowerMessage.includes("romance")
-    ) {
-      const categoryShows = shows?.filter(s => {
-        const genres = s.genres?.toLowerCase() || '';
-        return s.category === "drama" || s.category === "romance" ||
-          genres.includes("drama") || genres.includes("romance");
-      }).slice(0, 5) || [];
-      
-      if (categoryShows.length > 0) {
-        return {
-          id: Date.now().toString(),
-          text: `💕 Found ${categoryShows.length} drama/romance shows:`,
-          isBot: true,
-          showLinks: categoryShows.map((s) => ({
-            title: s.title,
-            slug: s.slug,
-            type: 'show' as const,
-          })),
-          suggestions: ["Action shows", "Comedy shows", "What's trending?"],
-        };
-      }
-    }
-
-    if (lowerMessage.includes("comedy")) {
-      const categoryShows = shows?.filter(s => {
-        const genres = s.genres?.toLowerCase() || '';
-        return s.category === "comedy" ||
-          genres.includes("comedy");
-      }).slice(0, 5) || [];
-      
-      if (categoryShows.length > 0) {
-        return {
-          id: Date.now().toString(),
-          text: `😂 Found ${categoryShows.length} comedy shows:`,
-          isBot: true,
-          showLinks: categoryShows.map((s) => ({
-            title: s.title,
-            slug: s.slug,
-            type: 'show' as const,
-          })),
-          suggestions: ["Action shows", "Drama shows", "What's trending?"],
-        };
-      }
-    }
-
-    if (lowerMessage.includes("horror") || lowerMessage.includes("mystery")) {
-      const categoryShows = shows?.filter(s => {
-        const genres = s.genres?.toLowerCase() || '';
-        return s.category === "horror" || s.category === "mystery" ||
-          genres.includes("horror") || genres.includes("mystery");
-      }).slice(0, 5) || [];
-      
-      if (categoryShows.length > 0) {
-        return {
-          id: Date.now().toString(),
-          text: `👻 Found ${categoryShows.length} horror/mystery shows:`,
-          isBot: true,
-          showLinks: categoryShows.map((s) => ({
-            title: s.title,
-            slug: s.slug,
-            type: 'show' as const,
-          })),
-          suggestions: ["Action shows", "Comedy shows", "What's trending?"],
-        };
-      }
-    }
-
-    // Trending
-    if (lowerMessage.includes("trending") || lowerMessage.includes("popular")) {
-      const trendingShows = shows?.filter(s => s.trending).slice(0, 5) || [];
-      
-      if (trendingShows.length > 0) {
-        return {
-          id: Date.now().toString(),
-          text: "🔥 Here are the trending shows right now:",
-          isBot: true,
-          showLinks: trendingShows.map((s) => ({
-            title: s.title,
-            slug: s.slug,
-            type: 'show' as const,
-          })),
-          suggestions: ["Show more", "Browse categories", "Search shows"],
-        };
-      }
-      
-      return {
-        id: Date.now().toString(),
-        text: "🔥 Check out what's trending! Visit our Trending page to see the most popular shows right now.",
-        isBot: true,
-        suggestions: ["Browse all shows", "Search shows", "View categories"],
-      };
-    }
-
-    // Browse movies
-    if (
-      lowerMessage.includes("browse movies") ||
-      lowerMessage.includes("show movies") ||
-      lowerMessage.includes("all movies") ||
-      lowerMessage.includes("movie list")
-    ) {
-      const allMovies = movies?.slice(0, 10) || [];
-      
-      if (allMovies.length > 0) {
-        return {
-          id: Date.now().toString(),
-          text: `🎬 Here are ${allMovies.length} popular movies:`,
-          isBot: true,
-          showLinks: allMovies.map((m) => ({
-            title: m.title,
-            slug: m.slug,
-            type: 'movie' as const,
-          })),
-          suggestions: ["Browse shows", "What's trending?", "Browse categories"],
-        };
-      }
-    }
-    
-    // Show more / Browse all
-    if (
-      lowerMessage.includes("show more") ||
-      lowerMessage.includes("more shows") ||
-      lowerMessage.includes("browse all") ||
-      lowerMessage.includes("all shows")
-    ) {
-      const allShows = shows?.slice(0, 10) || [];
-      
-      if (allShows.length > 0) {
-        return {
-          id: Date.now().toString(),
-          text: `📺 Here are ${allShows.length} popular shows:`,
-          isBot: true,
-          showLinks: allShows.map((s) => ({
-            title: s.title,
-            slug: s.slug,
-            type: 'show' as const,
-          })),
-          suggestions: ["Browse movies", "Browse categories", "What's trending?"],
-        };
-      }
-    }
-
-    // Search help
-    if (lowerMessage.includes("search") || lowerMessage.includes("how to find")) {
-      return {
-        id: Date.now().toString(),
-        text: "🔍 To search for shows:\n\n1. Click the search icon in the header\n2. Type the show name\n3. See instant results as you type\n4. Click any result to watch\n\nTry searching now!",
-        isBot: true,
-        suggestions: ["Find a show", "Browse categories", "What's trending?"],
-      };
-    }
-
-    // Default response
+    // ===== DEFAULT RESPONSE =====
     return {
       id: Date.now().toString(),
-      text: "I can help you with:\n• Finding shows and movies\n• Playing specific episodes (e.g., 'Stranger Things s1e1')\n• Fixing playback issues\n• Managing your watchlist\n• Browsing by genre\n\nWhat would you like to do?",
+      text: "🤔 I'm not sure what you're looking for. Try:\n\n• **\"Surprise me\"** - Random pick\n• **\"Something like Breaking Bad\"** - Similar content\n• **\"I'm feeling happy\"** - Mood-based\n• **\"Best horror movies\"** - Genre search\n• **\"Stranger Things s1e1\"** - Specific episode",
       isBot: true,
-      suggestions: [
-        "Find a movie",
-        "Find a show",
-        "Browse categories",
-        "What's trending?",
-      ],
+      suggestions: ["🎲 Surprise me", "🔥 Trending", "⭐ Top rated", "Browse genres"],
     };
   };
 
@@ -465,12 +565,17 @@ export function Chatbot() {
       style={{ position: 'fixed', bottom: '24px', right: '24px' }}
     >
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-border bg-primary text-primary-foreground rounded-t-lg">
-        <div className="flex items-center gap-2">
-          <MessageCircle className="h-5 w-5" />
+      <div className="flex items-center justify-between p-4 border-b border-border bg-gradient-to-r from-primary to-primary/80 text-primary-foreground rounded-t-lg">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-primary-foreground/20 flex items-center justify-center">
+            <Sparkles className="h-5 w-5" />
+          </div>
           <div>
-            <h3 className="font-semibold">StreamVault Assistant</h3>
-            <p className="text-xs opacity-90">Always here to help</p>
+            <h3 className="font-semibold">Vault AI</h3>
+            <p className="text-xs opacity-90 flex items-center gap-1">
+              <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
+              Online • Ready to help
+            </p>
           </div>
         </div>
         <Button
@@ -520,10 +625,18 @@ export function Chatbot() {
                     return (
                       <Link key={item.slug} href={href}>
                         <div
-                          className="text-sm bg-background hover:bg-accent p-2 rounded border border-border cursor-pointer transition-colors"
+                          className="text-sm bg-background hover:bg-accent p-2 rounded border border-border cursor-pointer transition-all hover:scale-[1.02] hover:shadow-sm"
                           onClick={() => setIsOpen(false)}
                         >
-                          {icon} {item.title}
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="flex-1 truncate">{icon} {item.title}</span>
+                            {item.rating && (
+                              <span className="text-xs text-yellow-500 shrink-0">⭐ {item.rating}</span>
+                            )}
+                          </div>
+                          {item.year && (
+                            <span className="text-xs text-muted-foreground">{item.year}</span>
+                          )}
                         </div>
                       </Link>
                     );
