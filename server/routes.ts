@@ -1042,7 +1042,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Comments - Create a new comment
   app.post("/api/comments", async (req, res) => {
     try {
-      const { episodeId, movieId, userName, comment } = req.body;
+      const { episodeId, movieId, parentId, userName, comment } = req.body;
       
       // Validate input
       if (!userName || !comment) {
@@ -1056,6 +1056,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const newComment = await storage.createComment({
         episodeId: episodeId || null,
         movieId: movieId || null,
+        parentId: parentId || null,
         userName,
         comment,
       });

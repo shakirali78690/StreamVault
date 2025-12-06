@@ -68,6 +68,7 @@ export const comments = pgTable("comments", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   episodeId: varchar("episode_id"), // null if it's a movie comment
   movieId: varchar("movie_id"), // null if it's an episode comment
+  parentId: varchar("parent_id"), // null if it's a top-level comment, otherwise the id of the parent comment
   userName: text("user_name").notNull(),
   comment: text("comment").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),

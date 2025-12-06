@@ -154,7 +154,14 @@ export class MemStorage implements IStorage {
         
         // Restore comments
         if (data.comments) {
-          data.comments.forEach((comment: Comment) => this.comments.set(comment.id, comment));
+          data.comments.forEach((comment: any) => {
+            // Ensure parentId exists for old comments
+            const normalizedComment: Comment = {
+              ...comment,
+              parentId: comment.parentId || null,
+            };
+            this.comments.set(comment.id, normalizedComment);
+          });
           console.log(`✅ Loaded ${data.comments.length} comments`);
         }
         
@@ -770,6 +777,7 @@ export class MemStorage implements IStorage {
       id,
       episodeId: comment.episodeId || null,
       movieId: comment.movieId || null,
+      parentId: comment.parentId || null,
       userName: comment.userName,
       comment: comment.comment,
       createdAt: new Date(),
