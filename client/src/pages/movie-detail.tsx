@@ -264,8 +264,43 @@ export default function MovieDetail() {
             </p>
           </div>
 
-          {/* Cast */}
-          {movie.cast && (
+          {/* Cast Grid with Photos */}
+          {movie.castDetails && (
+            <div className="mb-8">
+              <h2 className="text-2xl font-bold mb-4">Cast</h2>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                {JSON.parse(movie.castDetails).map((member: { name: string; character: string; profileUrl: string | null }, index: number) => (
+                  <div key={index} className="text-center">
+                    <div className="aspect-square rounded-lg overflow-hidden bg-card mb-2">
+                      {member.profileUrl ? (
+                        <img
+                          src={member.profileUrl}
+                          alt={member.name}
+                          className="w-full h-full object-cover"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-muted">
+                          <img
+                            src="https://static.vecteezy.com/system/resources/thumbnails/005/544/718/small/profile-icon-design-free-vector.jpg"
+                            alt={member.name}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      )}
+                    </div>
+                    <p className="font-medium text-sm line-clamp-1">{member.name}</p>
+                    {member.character && (
+                      <p className="text-xs text-muted-foreground line-clamp-1">as {member.character}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Fallback to text cast if no castDetails */}
+          {!movie.castDetails && movie.cast && (
             <div className="mb-8">
               <h2 className="text-2xl font-bold mb-4">Cast</h2>
               <p className="text-muted-foreground">{movie.cast}</p>

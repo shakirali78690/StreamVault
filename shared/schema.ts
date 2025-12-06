@@ -18,6 +18,7 @@ export const shows = pgTable("shows", {
   language: text("language").notNull(),
   totalSeasons: integer("total_seasons").notNull(),
   cast: text("cast"), // comma-separated string
+  castDetails: text("cast_details"), // JSON string with cast photos and character names
   creators: text("creators"), // comma-separated string
   featured: boolean("featured").default(false),
   trending: boolean("trending").default(false),
@@ -54,6 +55,7 @@ export const movies = pgTable("movies", {
   language: text("language").notNull(),
   duration: integer("duration").notNull(), // in minutes
   cast: text("cast"), // comma-separated string
+  castDetails: text("cast_details"), // JSON string with cast photos and character names
   directors: text("directors"), // comma-separated string
   googleDriveUrl: text("google_drive_url").notNull(),
   featured: boolean("featured").default(false),

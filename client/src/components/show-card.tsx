@@ -156,12 +156,11 @@ export function ShowCard({
           </div>
         </div>
 
-        {/* Title below (when not hovered, for landscape) */}
-        {orientation === "landscape" && !isHovered && (
-          <div className="mt-2">
-            <h3 className="font-medium text-sm line-clamp-1">{show.title}</h3>
-          </div>
-        )}
+        {/* Title below poster */}
+        <div className="mt-2 text-center">
+          <h3 className="font-medium text-sm line-clamp-1">{show.title}</h3>
+          <p className="text-xs text-muted-foreground">{show.year}</p>
+        </div>
       </div>
     </Link>
   );

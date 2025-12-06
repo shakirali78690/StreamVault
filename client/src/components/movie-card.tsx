@@ -137,6 +137,12 @@ export function MovieCard({
             </div>
           </div>
         </div>
+
+        {/* Title below poster */}
+        <div className="mt-2 text-center">
+          <h3 className="font-medium text-sm line-clamp-1">{movie.title}</h3>
+          <p className="text-xs text-muted-foreground">{movie.year}</p>
+        </div>
       </div>
     </Link>
   );

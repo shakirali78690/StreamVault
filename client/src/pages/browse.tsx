@@ -287,13 +287,6 @@ export default function Browse() {
                     >
                       {isMovie(item) ? "Movie" : "TV"}
                     </Badge>
-                    {item.imdbRating && (
-                      <Badge
-                        className="absolute bottom-2 left-2 bg-yellow-500/90 text-black text-xs"
-                      >
-                        ⭐ {item.imdbRating}
-                      </Badge>
-                    )}
                   </div>
                   <h3 className="font-medium text-sm line-clamp-1 group-hover:text-primary transition-colors">
                     {item.title}

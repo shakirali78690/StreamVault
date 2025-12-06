@@ -438,7 +438,43 @@ export default function ShowDetail() {
                 <p className="text-muted-foreground">{show.description}</p>
               </div>
 
-              {show.cast && show.cast.trim() && (
+              {/* Cast Grid with Photos */}
+              {show.castDetails && (
+                <div>
+                  <h3 className="text-lg font-semibold mb-4">Cast</h3>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                    {JSON.parse(show.castDetails).map((member: { name: string; character: string; profileUrl: string | null }, index: number) => (
+                      <div key={index} className="text-center">
+                        <div className="aspect-square rounded-lg overflow-hidden bg-card mb-2">
+                          {member.profileUrl ? (
+                            <img
+                              src={member.profileUrl}
+                              alt={member.name}
+                              className="w-full h-full object-cover"
+                              loading="lazy"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center bg-muted">
+                              <img
+                                src="https://static.vecteezy.com/system/resources/thumbnails/005/544/718/small/profile-icon-design-free-vector.jpg"
+                                alt={member.name}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                          )}
+                        </div>
+                        <p className="font-medium text-sm line-clamp-1">{member.name}</p>
+                        {member.character && (
+                          <p className="text-xs text-muted-foreground line-clamp-1">as {member.character}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Fallback to text cast if no castDetails */}
+              {!show.castDetails && show.cast && show.cast.trim() && (
                 <div>
                   <h3 className="text-lg font-semibold mb-2">Cast</h3>
                   <p className="text-muted-foreground">{show.cast}</p>
