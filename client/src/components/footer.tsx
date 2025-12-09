@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { Facebook, Instagram, Twitter, Send } from "lucide-react";
+import { Instagram, Twitter, Send, Facebook } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useState } from "react";
@@ -117,15 +117,15 @@ export function Footer() {
                 size="icon"
                 className="h-9 w-9"
                 asChild
-                data-testid="button-social-facebook"
+                data-testid="button-social-twitter"
               >
                 <a
-                  href="https://facebook.com"
+                  href="https://x.com/streamvaultlive"
                   target="_blank"
                   rel="noopener noreferrer"
-                  aria-label="Facebook"
+                  aria-label="X (Twitter)"
                 >
-                  <Facebook className="h-4 w-4" />
+                  <Twitter className="h-4 w-4" />
                 </a>
               </Button>
               <Button
@@ -136,7 +136,7 @@ export function Footer() {
                 data-testid="button-social-instagram"
               >
                 <a
-                  href="https://instagram.com"
+                  href="https://instagram.com/streamvault.live"
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label="Instagram"
@@ -144,23 +144,7 @@ export function Footer() {
                   <Instagram className="h-4 w-4" />
                 </a>
               </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-9 w-9"
-                asChild
-                data-testid="button-social-twitter"
-              >
-                <a
-                  href="https://twitter.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label="Twitter"
-                >
-                  <Twitter className="h-4 w-4" />
-                </a>
-              </Button>
-              <Button
+                            <Button
                 variant="outline"
                 size="icon"
                 className="h-9 w-9"
@@ -174,6 +158,22 @@ export function Footer() {
                   aria-label="Telegram"
                 >
                   <Send className="h-4 w-4" />
+                </a>
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-9 w-9"
+                asChild
+                data-testid="button-social-facebook"
+              >
+                <a
+                  href="https://www.facebook.com/streamvault.live/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Facebook"
+                >
+                  <Facebook className="h-4 w-4" />
                 </a>
               </Button>
             </div>

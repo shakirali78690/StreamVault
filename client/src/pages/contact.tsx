@@ -1,4 +1,4 @@
-import { Mail, MessageSquare, HelpCircle } from "lucide-react";
+import { Mail, MessageSquare, HelpCircle, Twitter, Instagram, Send, Facebook } from "lucide-react";
 
 export default function Contact() {
   return (
@@ -114,6 +114,52 @@ export default function Contact() {
             >
               contact@streamvault.live
             </a>
+          </div>
+
+          {/* Social Links */}
+          <div className="p-8 rounded-lg bg-card border border-border mt-8">
+            <h2 className="text-2xl font-bold mb-4">Follow Us</h2>
+            <p className="text-muted-foreground mb-6">
+              Stay connected with us on social media for updates and announcements.
+            </p>
+            <div className="flex flex-wrap gap-4">
+              <a 
+                href="https://x.com/streamvaultlive" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-background border border-border hover:border-primary transition-colors"
+              >
+                <Twitter className="w-5 h-5 text-primary" />
+                <span>X (Twitter)</span>
+              </a>
+              <a 
+                href="https://instagram.com/streamvault.live" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-background border border-border hover:border-primary transition-colors"
+              >
+                <Instagram className="w-5 h-5 text-primary" />
+                <span>Instagram</span>
+              </a>
+              <a 
+                href="https://t.me/streamvaultt" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-background border border-border hover:border-primary transition-colors"
+              >
+                <Send className="w-5 h-5 text-primary" />
+                <span>Telegram</span>
+              </a>
+              <a 
+                href="https://www.facebook.com/streamvault.live/" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-background border border-border hover:border-primary transition-colors"
+              >
+                <Facebook className="w-5 h-5 text-primary" />
+                <span>Facebook</span>
+              </a>
+            </div>
           </div>
         </div>
       </div>
