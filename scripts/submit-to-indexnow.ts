@@ -120,7 +120,7 @@ async function submitBatchToIndexNow(urls: string[], apiKey: string): Promise<bo
     };
 
     try {
-      const response = await fetch('https://api.indexnow.org/indexnow', {
+      const response = await fetch(INDEXNOW_ENDPOINTS.bing, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json; charset=utf-8',
