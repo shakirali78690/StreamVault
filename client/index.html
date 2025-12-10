@@ -107,5 +107,83 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    
+    <!-- Disable right-click and DevTools protection -->
+    <script>
+      // Disable right-click
+      document.addEventListener('contextmenu', function(e) {
+        e.preventDefault();
+      });
+      
+      // Disable keyboard shortcuts
+      document.addEventListener('keydown', function(e) {
+        if (e.keyCode === 123 || // F12
+            (e.ctrlKey && e.shiftKey && e.keyCode === 73) || // Ctrl+Shift+I
+            (e.ctrlKey && e.shiftKey && e.keyCode === 74) || // Ctrl+Shift+J
+            (e.ctrlKey && e.shiftKey && e.keyCode === 67) || // Ctrl+Shift+C
+            (e.ctrlKey && e.keyCode === 85)) { // Ctrl+U
+          e.preventDefault();
+          return false;
+        }
+      });
+      
+      // DevTools detection and redirect
+      (function() {
+        var devtoolsOpen = false;
+        var threshold = 160;
+        
+        // Method 1: Check window size difference
+        var checkDevTools = function() {
+          var widthThreshold = window.outerWidth - window.innerWidth > threshold;
+          var heightThreshold = window.outerHeight - window.innerHeight > threshold;
+          
+          if (widthThreshold || heightThreshold) {
+            if (!devtoolsOpen) {
+              devtoolsOpen = true;
+              handleDevToolsOpen();
+            }
+          } else {
+            devtoolsOpen = false;
+          }
+        };
+        
+        // Method 2: Console detection
+        var element = new Image();
+        Object.defineProperty(element, 'id', {
+          get: function() {
+            devtoolsOpen = true;
+            handleDevToolsOpen();
+          }
+        });
+        
+        // Method 3: debugger detection
+        var checkDebugger = function() {
+          var before = new Date();
+          debugger;
+          var after = new Date();
+          if (after - before > 100) {
+            handleDevToolsOpen();
+          }
+        };
+        
+        // Redirect to homepage when DevTools detected
+        function handleDevToolsOpen() {
+          if (window.location.pathname !== '/' && window.location.pathname !== '') {
+            window.location.href = '/';
+          }
+        }
+        
+        // Run checks continuously
+        setInterval(checkDevTools, 500);
+        setInterval(function() {
+          console.log(element);
+          console.clear();
+        }, 1000);
+        setInterval(checkDebugger, 1000);
+        
+        // Additional detection on resize
+        window.addEventListener('resize', checkDevTools);
+      })();
+    </script>
   </body>
 </html>
