@@ -1,6 +1,13 @@
+import { SEO } from "@/components/seo";
+
 export default function PrivacyPolicy() {
   return (
     <div className="min-h-screen bg-background">
+      <SEO 
+        title="Privacy Policy"
+        description="Learn how StreamVault collects, uses, and protects your personal information. We value your privacy and are committed to transparency."
+        canonical="https://streamvault.live/privacy"
+      />
       <div className="container mx-auto px-4 py-12 max-w-4xl">
         <h1 className="text-4xl font-bold mb-8">Privacy Policy</h1>
         

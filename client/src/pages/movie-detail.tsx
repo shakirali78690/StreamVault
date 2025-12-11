@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRoute, Link } from "wouter";
+import { Helmet } from "react-helmet-async";
 import { Play, Clock, Calendar, Star, Plus, Check, Share2, ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -136,8 +137,60 @@ export default function MovieDetail() {
     );
   }
 
+  // Generate structured data for SEO
+  const structuredData = {
+    "@context": "https://schema.org",
+    "@type": "Movie",
+    "name": movie.title,
+    "description": movie.description,
+    "image": movie.backdropUrl,
+    "datePublished": movie.year?.toString(),
+    "genre": movie.genres?.split(',').map(g => g.trim()),
+    "inLanguage": movie.language || "English",
+    "duration": `PT${movie.duration}M`,
+    "aggregateRating": movie.imdbRating ? {
+      "@type": "AggregateRating",
+      "ratingValue": movie.imdbRating,
+      "bestRating": "10",
+      "worstRating": "1"
+    } : undefined,
+    "director": movie.directors ? {
+      "@type": "Person",
+      "name": movie.directors
+    } : undefined,
+    "actor": movie.castDetails ? JSON.parse(movie.castDetails).map((c: any) => ({
+      "@type": "Person",
+      "name": c.name
+    })) : undefined,
+    "url": `https://streamvault.live/movie/${movie.slug}`
+  };
+
   return (
     <div className="min-h-screen bg-background">
+      <Helmet>
+        <title>{`${movie.title} (${movie.year}) - Watch Free | StreamVault`}</title>
+        <meta name="description" content={movie.description} />
+        <link rel="canonical" href={`https://streamvault.live/movie/${movie.slug}`} />
+        
+        {/* Open Graph */}
+        <meta property="og:type" content="video.movie" />
+        <meta property="og:title" content={`${movie.title} - Watch Free | StreamVault`} />
+        <meta property="og:description" content={movie.description} />
+        <meta property="og:image" content={movie.backdropUrl} />
+        <meta property="og:url" content={`https://streamvault.live/movie/${movie.slug}`} />
+        
+        {/* Twitter */}
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content={`${movie.title} - Watch Free`} />
+        <meta name="twitter:description" content={movie.description} />
+        <meta name="twitter:image" content={movie.backdropUrl} />
+        
+        {/* Structured Data */}
+        <script type="application/ld+json">
+          {JSON.stringify(structuredData)}
+        </script>
+      </Helmet>
+
       {/* Hero Section - Poster on mobile, Backdrop on desktop */}
       <div className="relative h-[60vh] overflow-hidden">
         {/* Poster for mobile */}

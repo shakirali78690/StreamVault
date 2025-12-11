@@ -1,8 +1,14 @@
 import { Play, Users, Tv, Heart } from "lucide-react";
+import { SEO } from "@/components/seo";
 
 export default function About() {
   return (
     <div className="min-h-screen bg-background">
+      <SEO 
+        title="About StreamVault"
+        description="Learn about StreamVault - your premium destination for streaming movies and TV shows in HD quality. Free, fast, and user-friendly."
+        canonical="https://streamvault.live/about"
+      />
       <div className="container mx-auto px-4 py-12">
         {/* Hero Section */}
         <div className="text-center mb-16">

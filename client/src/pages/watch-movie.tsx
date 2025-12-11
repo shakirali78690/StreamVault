@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CommentsSection } from "@/components/comments-section";
+import { Helmet } from "react-helmet-async";
 import type { Movie } from "@shared/schema";
 
 export default function WatchMovie() {
@@ -92,6 +93,15 @@ export default function WatchMovie() {
 
   return (
     <div className="min-h-screen bg-background">
+      <Helmet>
+        <title>{`Watch ${movie.title} (${movie.year}) Free | StreamVault`}</title>
+        <meta name="description" content={movie.description} />
+        <link rel="canonical" href={`https://streamvault.live/watch-movie/${movie.slug}`} />
+        <meta property="og:type" content="video.movie" />
+        <meta property="og:title" content={`Watch ${movie.title} Free`} />
+        <meta property="og:description" content={movie.description} />
+        <meta property="og:image" content={movie.backdropUrl} />
+      </Helmet>
       <div className="container mx-auto px-4 py-6">
         {/* Back Button */}
         <Link href={`/movie/${slug}`}>

@@ -4,6 +4,7 @@ import { ShowCard } from "@/components/show-card";
 import { MovieCard } from "@/components/movie-card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { SEO } from "@/components/seo";
 import type { Show, Movie } from "@shared/schema";
 
 const categoryMap: Record<string, string> = {
@@ -87,6 +88,11 @@ export default function Category() {
 
   return (
     <div className="min-h-screen">
+      <SEO 
+        title={`${categoryName} Movies & TV Shows`}
+        description={`Watch the best ${categoryName} movies and TV shows free in HD on StreamVault. Stream ${categoryName.toLowerCase()} content instantly.`}
+        canonical={`https://streamvault.live/category/${slug}`}
+      />
       <div className="container mx-auto px-4 py-8">
         <h1
           className="text-3xl md:text-4xl font-bold mb-8"

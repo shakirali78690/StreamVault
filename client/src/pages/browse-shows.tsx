@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { ShowCard } from "@/components/show-card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { SEO } from "@/components/seo";
 import type { Show } from "@shared/schema";
 
 export default function BrowseShows() {
@@ -10,6 +11,11 @@ export default function BrowseShows() {
 
   return (
     <div className="min-h-screen">
+      <SEO 
+        title="Browse All TV Shows"
+        description="Browse our complete collection of TV shows. Watch popular series, new releases, and classic shows free in HD."
+        canonical="https://streamvault.live/browse/shows"
+      />
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8">
           <h1 className="text-4xl font-bold mb-2">All Shows</h1>

@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Search, Filter, Film, Tv, Grid, List, X } from "lucide-react";
+import { SEO } from "@/components/seo";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -134,6 +135,12 @@ export default function Browse() {
 
   return (
     <div className="min-h-screen bg-background">
+      <SEO 
+        title="Browse All Movies & TV Shows | StreamVault"
+        description="Browse our complete collection of movies and TV shows. Filter by genre, sort by rating, and find your next favorite content."
+        canonical="https://streamvault.live/browse"
+      />
+      
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">

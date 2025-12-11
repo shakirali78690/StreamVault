@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CommentsSection } from "@/components/comments-section";
+import { Helmet } from "react-helmet-async";
 import type { Show, Episode } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 
@@ -134,8 +135,19 @@ export default function Watch() {
   const isPlaceholder = PLACEHOLDER_IDS.some(id => videoUrl?.includes(id));
   const driveId = (!videoUrl || isPlaceholder) ? null : extractDriveId(videoUrl);
 
+  const episodeTitle = currentEpisodeData.title || `Episode ${currentEpisode}`;
+
   return (
     <div className="min-h-screen bg-background">
+      <Helmet>
+        <title>{`${episodeTitle} - ${show.title} S${currentSeason}E${currentEpisode} | StreamVault`}</title>
+        <meta name="description" content={currentEpisodeData.description || show.description} />
+        <link rel="canonical" href={`https://streamvault.live/watch/${show.slug}?season=${currentSeason}&episode=${currentEpisode}`} />
+        <meta property="og:type" content="video.episode" />
+        <meta property="og:title" content={`${episodeTitle} - ${show.title}`} />
+        <meta property="og:description" content={currentEpisodeData.description || show.description} />
+        <meta property="og:image" content={currentEpisodeData.thumbnailUrl || show.backdropUrl} />
+      </Helmet>
       <div className="container mx-auto px-4 py-6">
         {/* Back Button */}
         <Link href={`/show/${slug}`}>

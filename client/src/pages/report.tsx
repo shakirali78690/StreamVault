@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { SEO } from "@/components/seo";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -94,6 +95,11 @@ export default function ReportIssue() {
 
   return (
     <div className="min-h-screen bg-background">
+      <SEO 
+        title="Report an Issue"
+        description="Report broken videos, playback issues, or other problems on StreamVault. Help us improve your streaming experience."
+        canonical="https://streamvault.live/report"
+      />
       <div className="container mx-auto px-4 py-12">
         <div className="max-w-4xl mx-auto">
           <div className="text-center mb-12">

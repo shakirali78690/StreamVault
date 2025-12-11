@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { HeroCarousel } from "@/components/hero-carousel";
 import { ContentRow } from "@/components/content-row";
 import { Skeleton } from "@/components/ui/skeleton";
+import { SEO } from "@/components/seo";
 import type { Show, Movie, ViewingProgress } from "@shared/schema";
 import { useMemo } from "react";
 
@@ -71,6 +72,12 @@ export default function Home() {
 
   return (
     <div className="min-h-screen">
+      <SEO 
+        title="Free Movies Online | Watch TV Shows Free | HD Streaming"
+        description="Watch 200+ movies & TV shows free in HD. No registration required. Stream Hollywood, Bollywood & international content instantly on any device."
+        canonical="https://streamvault.live"
+      />
+      
       {/* Hero Carousel */}
       {featured.length > 0 && <HeroCarousel shows={featured} />}
 

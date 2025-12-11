@@ -1,5 +1,6 @@
 import { Search, Play, Bookmark, Settings, HelpCircle, Mail } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { SEO } from "@/components/seo";
 import { useState } from "react";
 
 export default function HelpCenter() {
@@ -157,6 +158,11 @@ export default function HelpCenter() {
 
   return (
     <div className="min-h-screen bg-background">
+      <SEO 
+        title="Help Center"
+        description="Get help with StreamVault. Find answers to common questions about streaming, playback issues, watchlist management, and more."
+        canonical="https://streamvault.live/help"
+      />
       <div className="container mx-auto px-4 py-12">
         {/* Header */}
         <div className="text-center mb-12">

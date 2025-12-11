@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { SEO } from "@/components/seo";
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
@@ -108,6 +109,11 @@ export default function RequestContent() {
 
   return (
     <div className="min-h-screen bg-background">
+      <SEO 
+        title="Request Content"
+        description="Request movies or TV shows to be added to StreamVault. We listen to our community and add popular requests."
+        canonical="https://streamvault.live/request"
+      />
       <div className="container mx-auto px-4 py-12">
         <div className="max-w-4xl mx-auto">
           <div className="text-center mb-12">

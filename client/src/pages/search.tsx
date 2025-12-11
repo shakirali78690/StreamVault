@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ShowCard } from "@/components/show-card";
 import { MovieCard } from "@/components/movie-card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { SEO } from "@/components/seo";
 import {
   Sheet,
   SheetContent,
@@ -190,6 +191,11 @@ export default function Search() {
 
   return (
     <div className="min-h-screen">
+      <SEO 
+        title="Search Movies & TV Shows"
+        description="Search for your favorite movies and TV shows on StreamVault. Filter by genre, year, and more."
+        canonical="https://streamvault.live/search"
+      />
       <div className="container mx-auto px-4 py-8">
         {/* Search Header */}
         <div className="mb-8">

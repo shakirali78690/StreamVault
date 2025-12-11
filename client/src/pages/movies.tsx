@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { MovieHeroCarousel } from "@/components/movie-hero-carousel";
 import { MovieContentRow } from "@/components/movie-content-row";
 import { Skeleton } from "@/components/ui/skeleton";
+import { SEO } from "@/components/seo";
 import type { Movie } from "@shared/schema";
 
 export default function MoviesPage() {
@@ -34,6 +35,12 @@ export default function MoviesPage() {
 
   return (
     <div className="min-h-screen">
+      <SEO 
+        title="Watch Movies Free Online | HD Movies Streaming"
+        description="Stream 200+ movies free in HD quality. Action, Drama, Comedy, Horror and more. No registration required."
+        canonical="https://streamvault.live/movies"
+      />
+      
       {/* Hero Carousel */}
       {featured.length > 0 && <MovieHeroCarousel movies={featured} />}
 

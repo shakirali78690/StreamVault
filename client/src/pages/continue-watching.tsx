@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { Play, Clock, Tv, Film } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { SEO } from "@/components/seo";
 import type { Show, Episode, Movie } from "@shared/schema";
 
 interface ProgressEntry {
@@ -69,6 +70,11 @@ export default function ContinueWatchingPage() {
 
   return (
     <div className="min-h-screen bg-background">
+      <SEO 
+        title="Continue Watching"
+        description="Resume watching your movies and TV shows where you left off on StreamVault."
+        canonical="https://streamvault.live/continue-watching"
+      />
       {/* Header */}
       <div className="border-b bg-card">
         <div className="container mx-auto px-4 py-8">

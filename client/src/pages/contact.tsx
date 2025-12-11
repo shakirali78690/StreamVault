@@ -1,8 +1,14 @@
 import { Mail, MessageSquare, HelpCircle, Twitter, Instagram, Send, Facebook } from "lucide-react";
+import { SEO } from "@/components/seo";
 
 export default function Contact() {
   return (
     <div className="min-h-screen bg-background">
+      <SEO 
+        title="Contact Us"
+        description="Get in touch with StreamVault. Have questions, feedback, or need support? We're here to help you 24/7."
+        canonical="https://streamvault.live/contact"
+      />
       <div className="container mx-auto px-4 py-12">
         <div className="max-w-4xl mx-auto">
           <h1 className="text-4xl font-bold mb-4">Contact Us</h1>

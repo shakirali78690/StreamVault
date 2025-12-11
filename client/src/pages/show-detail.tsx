@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRoute, Link, useLocation } from "wouter";
+import { Helmet } from "react-helmet-async";
 import { Play, Plus, Check, Star, Share2, ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -127,48 +128,6 @@ export default function ShowDetail() {
     }
   };
 
-  // Update meta tags dynamically for social sharing
-  useEffect(() => {
-    if (!show) return;
-
-    // Update page title
-    document.title = `${show.title} - Watch Online Free | StreamVault`;
-
-    // Update or create meta tags
-    const updateMetaTag = (property: string, content: string, isProperty = true) => {
-      const attribute = isProperty ? 'property' : 'name';
-      let meta = document.querySelector(`meta[${attribute}="${property}"]`);
-      
-      if (!meta) {
-        meta = document.createElement('meta');
-        meta.setAttribute(attribute, property);
-        document.head.appendChild(meta);
-      }
-      
-      meta.setAttribute('content', content);
-    };
-
-    // Update Open Graph tags
-    updateMetaTag('og:title', `${show.title} - Watch Online Free | StreamVault`);
-    updateMetaTag('og:description', show.description);
-    updateMetaTag('og:image', show.backdropUrl);
-    updateMetaTag('og:url', `https://streamvault.live/show/${show.slug}`);
-    updateMetaTag('og:type', 'video.tv_show');
-
-    // Update Twitter Card tags
-    updateMetaTag('twitter:title', `${show.title} - Watch Online Free`, false);
-    updateMetaTag('twitter:description', show.description, false);
-    updateMetaTag('twitter:image', show.backdropUrl, false);
-    updateMetaTag('twitter:card', 'summary_large_image', false);
-
-    // Update description meta tag
-    updateMetaTag('description', show.description, false);
-
-    // Cleanup function to reset to default on unmount
-    return () => {
-      document.title = 'StreamVault - Online Movie Streaming | Watch TV Shows Free | Stream Movies HD';
-    };
-  }, [show]);
 
   if (showLoading) {
     return (
@@ -210,8 +169,56 @@ export default function ShowDetail() {
       }
     ).slice(0, 12) || [];
 
+  // Generate structured data for SEO
+  const structuredData = {
+    "@context": "https://schema.org",
+    "@type": "TVSeries",
+    "name": show.title,
+    "description": show.description,
+    "image": show.backdropUrl,
+    "datePublished": show.year?.toString(),
+    "genre": show.genres?.split(',').map(g => g.trim()),
+    "inLanguage": show.language || "English",
+    "numberOfSeasons": show.totalSeasons,
+    "aggregateRating": show.imdbRating ? {
+      "@type": "AggregateRating",
+      "ratingValue": show.imdbRating,
+      "bestRating": "10",
+      "worstRating": "1"
+    } : undefined,
+    "actor": show.castDetails ? JSON.parse(show.castDetails).map((c: any) => ({
+      "@type": "Person",
+      "name": c.name
+    })) : undefined,
+    "url": `https://streamvault.live/show/${show.slug}`
+  };
+
   return (
     <div className="min-h-screen">
+      <Helmet>
+        <title>{`${show.title} - Watch Online Free | StreamVault`}</title>
+        <meta name="description" content={show.description} />
+        <link rel="canonical" href={`https://streamvault.live/show/${show.slug}`} />
+        
+        {/* Open Graph */}
+        <meta property="og:type" content="video.tv_show" />
+        <meta property="og:title" content={`${show.title} - Watch Online Free | StreamVault`} />
+        <meta property="og:description" content={show.description} />
+        <meta property="og:image" content={show.backdropUrl} />
+        <meta property="og:url" content={`https://streamvault.live/show/${show.slug}`} />
+        
+        {/* Twitter */}
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content={`${show.title} - Watch Online Free`} />
+        <meta name="twitter:description" content={show.description} />
+        <meta name="twitter:image" content={show.backdropUrl} />
+        
+        {/* Structured Data */}
+        <script type="application/ld+json">
+          {JSON.stringify(structuredData)}
+        </script>
+      </Helmet>
+
       {/* Hero Section - Poster on mobile, Backdrop on desktop */}
       <div className="relative w-full h-96 md:h-[500px] overflow-hidden">
         {/* Poster for mobile */}

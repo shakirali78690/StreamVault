@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { ShowCard } from "@/components/show-card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { SEO } from "@/components/seo";
 import type { Show, Movie } from "@shared/schema";
 import { Flame } from "lucide-react";
 
@@ -34,6 +35,12 @@ export default function Trending() {
 
   return (
     <div className="min-h-screen container mx-auto px-4 py-8">
+      <SEO 
+        title="Trending Movies & TV Shows | What's Popular Now"
+        description="Discover the most popular movies and TV shows streaming right now. Updated daily with trending content."
+        canonical="https://streamvault.live/trending"
+      />
+      
       {/* Header */}
       <div className="mb-8">
         <div className="flex items-center gap-3 mb-2">

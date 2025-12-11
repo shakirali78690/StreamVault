@@ -6,6 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ShowCard } from "@/components/show-card";
 import { MovieCard } from "@/components/movie-card";
+import { SEO } from "@/components/seo";
 import type { Show, Movie } from "@shared/schema";
 
 interface WatchlistItem {
@@ -46,6 +47,11 @@ export default function Watchlist() {
 
   return (
     <div className="min-h-screen bg-background">
+      <SEO 
+        title="My Watchlist"
+        description="Your personal watchlist on StreamVault. Keep track of movies and TV shows you want to watch."
+        canonical="https://streamvault.live/watchlist"
+      />
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">

@@ -1,8 +1,14 @@
 import { Mail, AlertTriangle } from "lucide-react";
+import { SEO } from "@/components/seo";
 
 export default function DMCA() {
   return (
     <div className="min-h-screen bg-background">
+      <SEO 
+        title="DMCA Policy"
+        description="StreamVault's DMCA policy. Learn how to report copyright infringement and our process for handling takedown requests."
+        canonical="https://streamvault.live/dmca"
+      />
       <div className="container mx-auto px-4 py-12 max-w-4xl">
         <h1 className="text-4xl font-bold mb-8">DMCA Policy</h1>
         
