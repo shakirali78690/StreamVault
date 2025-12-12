@@ -1,5 +1,4 @@
 import { SEO } from "@/components/seo";
-import { AdsterraNativeBanner } from "@/components/adsterra-banner";
 
 export default function PrivacyPolicy() {
   return (
@@ -9,9 +8,6 @@ export default function PrivacyPolicy() {
         description="Learn how StreamVault collects, uses, and protects your personal information. We value your privacy and are committed to transparency."
         canonical="https://streamvault.live/privacy"
       />
-      {/* Adsterra Native Banner */}
-      <AdsterraNativeBanner />
-
       <div className="container mx-auto px-4 py-12 max-w-4xl">
         <h1 className="text-4xl font-bold mb-8">Privacy Policy</h1>
         

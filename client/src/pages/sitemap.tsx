@@ -2,7 +2,6 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { ChevronRight, Film, Tv, Home, Search, User, Heart, Clock, MessageSquare, AlertCircle, Info } from "lucide-react";
 import { SEO } from "@/components/seo";
-import { AdsterraNativeBanner } from "@/components/adsterra-banner";
 import type { Show, Movie } from "@shared/schema";
 
 export default function SitemapPage() {
@@ -52,9 +51,6 @@ export default function SitemapPage() {
         description="Complete navigation guide to StreamVault. Find all pages, shows, movies, and categories available on our streaming platform."
         canonical="https://streamvault.live/sitemap"
       />
-      {/* Adsterra Native Banner */}
-      <AdsterraNativeBanner />
-
       {/* Header */}
       <div className="border-b bg-card">
         <div className="container mx-auto px-4 py-8">

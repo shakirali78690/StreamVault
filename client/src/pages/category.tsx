@@ -5,7 +5,6 @@ import { MovieCard } from "@/components/movie-card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SEO } from "@/components/seo";
-import { AdsterraNativeBanner } from "@/components/adsterra-banner";
 import type { Show, Movie } from "@shared/schema";
 
 const categoryMap: Record<string, string> = {
@@ -94,9 +93,6 @@ export default function Category() {
         description={`Watch the best ${categoryName} movies and TV shows free in HD on StreamVault. Stream ${categoryName.toLowerCase()} content instantly.`}
         canonical={`https://streamvault.live/category/${slug}`}
       />
-      {/* Adsterra Native Banner */}
-      <AdsterraNativeBanner />
-
       <div className="container mx-auto px-4 py-8">
         <h1
           className="text-3xl md:text-4xl font-bold mb-8"

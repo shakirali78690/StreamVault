@@ -2,7 +2,6 @@ import { useQuery } from "@tanstack/react-query";
 import { MovieCard } from "@/components/movie-card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SEO } from "@/components/seo";
-import { AdsterraNativeBanner } from "@/components/adsterra-banner";
 import type { Movie } from "@shared/schema";
 
 export default function BrowseMovies() {
@@ -17,9 +16,6 @@ export default function BrowseMovies() {
         description="Browse our complete collection of movies. Watch Hollywood blockbusters, indie films, and international cinema free in HD."
         canonical="https://streamvault.live/browse/movies"
       />
-      {/* Adsterra Native Banner */}
-      <AdsterraNativeBanner />
-
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8">
           <h1 className="text-4xl font-bold mb-2">All Movies</h1>

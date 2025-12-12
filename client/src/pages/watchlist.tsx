@@ -7,7 +7,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ShowCard } from "@/components/show-card";
 import { MovieCard } from "@/components/movie-card";
 import { SEO } from "@/components/seo";
-import { AdsterraNativeBanner } from "@/components/adsterra-banner";
 import type { Show, Movie } from "@shared/schema";
 
 interface WatchlistItem {
@@ -53,9 +52,6 @@ export default function Watchlist() {
         description="Your personal watchlist on StreamVault. Keep track of movies and TV shows you want to watch."
         canonical="https://streamvault.live/watchlist"
       />
-      {/* Adsterra Native Banner */}
-      <AdsterraNativeBanner />
-
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">

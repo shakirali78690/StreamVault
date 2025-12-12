@@ -1,5 +1,4 @@
 import { SEO } from "@/components/seo";
-import { AdsterraNativeBanner } from "@/components/adsterra-banner";
 
 export default function TermsOfService() {
   return (
@@ -9,9 +8,6 @@ export default function TermsOfService() {
         description="Read StreamVault's Terms of Service. Understand your rights and responsibilities when using our free streaming platform."
         canonical="https://streamvault.live/terms"
       />
-      {/* Adsterra Native Banner */}
-      <AdsterraNativeBanner />
-
       <div className="container mx-auto px-4 py-12 max-w-4xl">
         <h1 className="text-4xl font-bold mb-8">Terms of Service</h1>
         

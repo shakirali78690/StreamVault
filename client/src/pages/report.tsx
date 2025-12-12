@@ -4,7 +4,6 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { SEO } from "@/components/seo";
-import { AdsterraNativeBanner } from "@/components/adsterra-banner";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -101,9 +100,6 @@ export default function ReportIssue() {
         description="Report broken videos, playback issues, or other problems on StreamVault. Help us improve your streaming experience."
         canonical="https://streamvault.live/report"
       />
-      {/* Adsterra Native Banner */}
-      <AdsterraNativeBanner />
-
       <div className="container mx-auto px-4 py-12">
         <div className="max-w-4xl mx-auto">
           <div className="text-center mb-12">

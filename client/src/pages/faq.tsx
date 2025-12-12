@@ -1,6 +1,5 @@
 import { ChevronDown } from "lucide-react";
 import { SEO } from "@/components/seo";
-import { AdsterraNativeBanner } from "@/components/adsterra-banner";
 import { useState } from "react";
 
 export default function FAQ() {
@@ -139,9 +138,6 @@ export default function FAQ() {
         description="Get answers to frequently asked questions about StreamVault. Learn about streaming, account features, content availability, and troubleshooting."
         canonical="https://streamvault.live/faq"
       />
-      {/* Adsterra Native Banner */}
-      <AdsterraNativeBanner />
-
       <div className="container mx-auto px-4 py-12">
         <div className="max-w-4xl mx-auto">
           <h1 className="text-4xl font-bold mb-4">Frequently Asked Questions</h1>

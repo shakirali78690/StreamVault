@@ -11,7 +11,6 @@ import { ShowCard } from "@/components/show-card";
 import { MovieCard } from "@/components/movie-card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SEO } from "@/components/seo";
-import { AdsterraNativeBanner } from "@/components/adsterra-banner";
 import {
   Sheet,
   SheetContent,
@@ -197,9 +196,6 @@ export default function Search() {
         description="Search for your favorite movies and TV shows on StreamVault. Filter by genre, year, and more."
         canonical="https://streamvault.live/search"
       />
-      {/* Adsterra Native Banner */}
-      <AdsterraNativeBanner />
-
       <div className="container mx-auto px-4 py-8">
         {/* Search Header */}
         <div className="mb-8">

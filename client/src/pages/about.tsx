@@ -1,6 +1,5 @@
 import { Play, Users, Tv, Heart } from "lucide-react";
 import { SEO } from "@/components/seo";
-import { AdsterraNativeBanner } from "@/components/adsterra-banner";
 
 export default function About() {
   return (
@@ -10,9 +9,6 @@ export default function About() {
         description="Learn about StreamVault - your premium destination for streaming movies and TV shows in HD quality. Free, fast, and user-friendly."
         canonical="https://streamvault.live/about"
       />
-      {/* Adsterra Native Banner */}
-      <AdsterraNativeBanner />
-
       <div className="container mx-auto px-4 py-12">
         {/* Hero Section */}
         <div className="text-center mb-16">

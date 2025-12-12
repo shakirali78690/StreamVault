@@ -7,7 +7,6 @@ import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CommentsSection } from "@/components/comments-section";
 import { Helmet } from "react-helmet-async";
-import { AdsterraNativeBanner } from "@/components/adsterra-banner";
 import type { Show, Episode } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 
@@ -273,7 +272,9 @@ export default function Watch() {
         </div>
 
         {/* Adsterra Native Banner - Above Comments */}
-        <AdsterraNativeBanner className="mt-8" />
+        <div className="mt-8 flex justify-center">
+          <div id="container-326e4e570b95e9b55f432cac93890441"></div>
+        </div>
 
         {/* Comments Section - Mobile only (below Up Next) */}
         <div className="mt-8 lg:hidden">

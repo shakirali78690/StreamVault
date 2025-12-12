@@ -1,6 +1,5 @@
 import { Mail, AlertTriangle } from "lucide-react";
 import { SEO } from "@/components/seo";
-import { AdsterraNativeBanner } from "@/components/adsterra-banner";
 
 export default function DMCA() {
   return (
@@ -10,9 +9,6 @@ export default function DMCA() {
         description="StreamVault's DMCA policy. Learn how to report copyright infringement and our process for handling takedown requests."
         canonical="https://streamvault.live/dmca"
       />
-      {/* Adsterra Native Banner */}
-      <AdsterraNativeBanner />
-
       <div className="container mx-auto px-4 py-12 max-w-4xl">
         <h1 className="text-4xl font-bold mb-8">DMCA Policy</h1>
         

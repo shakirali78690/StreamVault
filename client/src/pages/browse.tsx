@@ -3,7 +3,6 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Search, Filter, Film, Tv, Grid, List, X } from "lucide-react";
 import { SEO } from "@/components/seo";
-import { AdsterraNativeBanner } from "@/components/adsterra-banner";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -151,9 +150,6 @@ export default function Browse() {
             {movies?.length || 0} movies
           </p>
         </div>
-
-        {/* Adsterra Native Banner */}
-        <AdsterraNativeBanner className="mb-6" />
 
         {/* Filters */}
         <div className="flex flex-col gap-4 mb-8">

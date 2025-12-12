@@ -2,7 +2,6 @@ import { useQuery } from "@tanstack/react-query";
 import { ShowCard } from "@/components/show-card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SEO } from "@/components/seo";
-import { AdsterraNativeBanner } from "@/components/adsterra-banner";
 import type { Show } from "@shared/schema";
 
 export default function BrowseShows() {
@@ -24,9 +23,6 @@ export default function BrowseShows() {
             Browse all {shows?.length || 0} shows in our collection
           </p>
         </div>
-
-        {/* Adsterra Native Banner */}
-        <AdsterraNativeBanner className="mb-6" />
 
         {isLoading ? (
           <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 sm:gap-4">

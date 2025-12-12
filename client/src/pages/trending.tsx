@@ -2,7 +2,6 @@ import { useQuery } from "@tanstack/react-query";
 import { ShowCard } from "@/components/show-card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SEO } from "@/components/seo";
-import { AdsterraNativeBanner } from "@/components/adsterra-banner";
 import type { Show, Movie } from "@shared/schema";
 import { Flame } from "lucide-react";
 
@@ -52,9 +51,6 @@ export default function Trending() {
           The most popular shows and movies right now
         </p>
       </div>
-
-      {/* Adsterra Native Banner */}
-      <AdsterraNativeBanner className="mb-6" />
 
       {/* Content Grid */}
       {trendingContent.length > 0 ? (
