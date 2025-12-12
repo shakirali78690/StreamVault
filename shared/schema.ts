@@ -111,6 +111,33 @@ export type InsertComment = z.infer<typeof insertCommentSchema>;
 export type WatchlistItem = z.infer<typeof watchlistSchema>;
 export type ViewingProgress = z.infer<typeof viewingProgressSchema>;
 
+// Blog posts table
+export const blogPosts = pgTable("blog_posts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull(),
+  slug: text("slug").notNull().unique(),
+  contentType: text("content_type").notNull(), // "movie" or "show"
+  contentId: varchar("content_id"), // Reference to movie or show ID (optional)
+  featuredImage: text("featured_image").notNull(),
+  excerpt: text("excerpt").notNull(), // Short description for cards
+  content: text("content").notNull(), // Full HTML/Markdown content
+  plotSummary: text("plot_summary"), // Detailed plot
+  review: text("review"), // Review section
+  boxOffice: text("box_office"), // Box office info (JSON string)
+  trivia: text("trivia"), // Fun facts (JSON array string)
+  behindTheScenes: text("behind_the_scenes"), // Production info
+  awards: text("awards"), // Awards info
+  author: text("author").default("StreamVault"),
+  published: boolean("published").default(false),
+  featured: boolean("featured").default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertBlogPostSchema = createInsertSchema(blogPosts).omit({ id: true, createdAt: true, updatedAt: true });
+export type BlogPost = typeof blogPosts.$inferSelect;
+export type InsertBlogPost = z.infer<typeof insertBlogPostSchema>;
+
 // Category type
 export type Category = {
   id: string;

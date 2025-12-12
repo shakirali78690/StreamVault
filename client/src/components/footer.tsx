@@ -22,6 +22,7 @@ export function Footer() {
 
   const quickLinks = [
     { name: "Browse", path: "/browse" },
+    { name: "Blog", path: "/blog" },
     { name: "About Us", path: "/about" },
     { name: "Contact", path: "/contact" },
     { name: "Site Map", path: "/sitemap" },

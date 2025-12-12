@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Trash2, Edit, Plus, Save, X, Upload, FileJson, LogOut } from "lucide-react";
-import type { Show, Episode, Movie } from "@shared/schema";
+import type { Show, Episode, Movie, BlogPost } from "@shared/schema";
 import { getAuthHeaders, logout as authLogout } from "@/lib/auth";
 
 export default function AdminPage() {
@@ -101,9 +101,10 @@ export default function AdminPage() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-8 mb-8">
+          <TabsList className="grid w-full grid-cols-9 mb-8">
             <TabsTrigger value="shows">Shows</TabsTrigger>
             <TabsTrigger value="movies">Movies</TabsTrigger>
+            <TabsTrigger value="blog">Blog</TabsTrigger>
             <TabsTrigger value="comments">Comments</TabsTrigger>
             <TabsTrigger value="requests">Requests</TabsTrigger>
             <TabsTrigger value="reports">Reports</TabsTrigger>
@@ -120,6 +121,11 @@ export default function AdminPage() {
           {/* Manage Movies Tab */}
           <TabsContent value="movies">
             <ManageMovies movies={movies} />
+          </TabsContent>
+
+          {/* Blog Management Tab */}
+          <TabsContent value="blog">
+            <ManageBlog />
           </TabsContent>
 
           {/* Comments Moderation Tab */}
@@ -2239,6 +2245,312 @@ function CommentsModeration() {
                 </Card>
               );
             })}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// Manage Blog Component
+function ManageBlog() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [editingPost, setEditingPost] = useState<BlogPost | null>(null);
+  const [formData, setFormData] = useState({
+    title: "",
+    slug: "",
+    contentType: "movie",
+    contentId: "",
+    featuredImage: "",
+    excerpt: "",
+    content: "",
+    plotSummary: "",
+    review: "",
+    boxOffice: "",
+    trivia: "",
+    behindTheScenes: "",
+    awards: "",
+    author: "StreamVault",
+    published: false,
+    featured: false,
+  });
+
+  const { data: blogPosts = [], isLoading } = useQuery<BlogPost[]>({
+    queryKey: ["/api/admin/blog"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/blog", {
+        headers: getAuthHeaders(),
+      });
+      if (!res.ok) throw new Error("Failed to fetch blog posts");
+      return res.json();
+    },
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async (data: typeof formData) => {
+      const res = await fetch("/api/admin/blog", {
+        method: "POST",
+        headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error("Failed to create blog post");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/blog"] });
+      setIsCreateDialogOpen(false);
+      resetForm();
+      toast({ title: "Success", description: "Blog post created successfully" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to create blog post", variant: "destructive" });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<typeof formData> }) => {
+      const res = await fetch(`/api/admin/blog/${id}`, {
+        method: "PUT",
+        headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error("Failed to update blog post");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/blog"] });
+      setEditingPost(null);
+      resetForm();
+      toast({ title: "Success", description: "Blog post updated successfully" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update blog post", variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/admin/blog/${id}`, {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      });
+      if (!res.ok) throw new Error("Failed to delete blog post");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/blog"] });
+      toast({ title: "Success", description: "Blog post deleted successfully" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to delete blog post", variant: "destructive" });
+    },
+  });
+
+  const resetForm = () => {
+    setFormData({
+      title: "",
+      slug: "",
+      contentType: "movie",
+      contentId: "",
+      featuredImage: "",
+      excerpt: "",
+      content: "",
+      plotSummary: "",
+      review: "",
+      boxOffice: "",
+      trivia: "",
+      behindTheScenes: "",
+      awards: "",
+      author: "StreamVault",
+      published: false,
+      featured: false,
+    });
+  };
+
+  const generateSlug = (title: string) => {
+    return title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+  };
+
+  const handleTitleChange = (title: string) => {
+    setFormData((prev) => ({ ...prev, title, slug: generateSlug(title) }));
+  };
+
+  const handleEdit = (post: BlogPost) => {
+    setEditingPost(post);
+    setFormData({
+      title: post.title,
+      slug: post.slug,
+      contentType: post.contentType,
+      contentId: post.contentId || "",
+      featuredImage: post.featuredImage,
+      excerpt: post.excerpt,
+      content: post.content,
+      plotSummary: post.plotSummary || "",
+      review: post.review || "",
+      boxOffice: post.boxOffice || "",
+      trivia: post.trivia || "",
+      behindTheScenes: post.behindTheScenes || "",
+      awards: post.awards || "",
+      author: post.author || "StreamVault",
+      published: post.published || false,
+      featured: post.featured || false,
+    });
+  };
+
+  const handleSubmit = () => {
+    if (editingPost) {
+      updateMutation.mutate({ id: editingPost.id, data: formData });
+    } else {
+      createMutation.mutate(formData);
+    }
+  };
+
+  const handleDeletePost = (id: string, title: string) => {
+    if (confirm(`Are you sure you want to delete "${title}"?`)) {
+      deleteMutation.mutate(id);
+    }
+  };
+
+  if (isLoading) {
+    return <div className="text-center py-8">Loading blog posts...</div>;
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle>Blog Management</CardTitle>
+            <CardDescription>Create and manage blog posts ({blogPosts.length} total)</CardDescription>
+          </div>
+          <Dialog open={isCreateDialogOpen || !!editingPost} onOpenChange={(open) => {
+            if (!open) { setIsCreateDialogOpen(false); setEditingPost(null); resetForm(); }
+          }}>
+            <DialogTrigger asChild>
+              <Button onClick={() => setIsCreateDialogOpen(true)}>
+                <Plus className="w-4 h-4 mr-2" /> New Blog Post
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>{editingPost ? "Edit Blog Post" : "Create New Blog Post"}</DialogTitle>
+                <DialogDescription>{editingPost ? "Update the blog post details" : "Fill in the details"}</DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Title *</Label>
+                    <Input value={formData.title} onChange={(e) => handleTitleChange(e.target.value)} placeholder="Blog post title" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Slug *</Label>
+                    <Input value={formData.slug} onChange={(e) => setFormData((prev) => ({ ...prev, slug: e.target.value }))} placeholder="url-friendly-slug" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Content Type *</Label>
+                    <select className="w-full p-2 border rounded-md bg-background" value={formData.contentType} onChange={(e) => setFormData((prev) => ({ ...prev, contentType: e.target.value }))}>
+                      <option value="movie">Movie</option>
+                      <option value="show">TV Show</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Author</Label>
+                    <Input value={formData.author} onChange={(e) => setFormData((prev) => ({ ...prev, author: e.target.value }))} placeholder="Author name" />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Featured Image URL *</Label>
+                  <Input value={formData.featuredImage} onChange={(e) => setFormData((prev) => ({ ...prev, featuredImage: e.target.value }))} placeholder="https://example.com/image.jpg" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Excerpt *</Label>
+                  <Textarea value={formData.excerpt} onChange={(e) => setFormData((prev) => ({ ...prev, excerpt: e.target.value }))} placeholder="Short description..." rows={2} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Main Content *</Label>
+                  <Textarea value={formData.content} onChange={(e) => setFormData((prev) => ({ ...prev, content: e.target.value }))} placeholder="Full article content..." rows={6} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Plot Summary</Label>
+                  <Textarea value={formData.plotSummary} onChange={(e) => setFormData((prev) => ({ ...prev, plotSummary: e.target.value }))} placeholder="Detailed plot..." rows={4} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Review</Label>
+                  <Textarea value={formData.review} onChange={(e) => setFormData((prev) => ({ ...prev, review: e.target.value }))} placeholder="Your review..." rows={4} />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Box Office (JSON)</Label>
+                    <Textarea value={formData.boxOffice} onChange={(e) => setFormData((prev) => ({ ...prev, boxOffice: e.target.value }))} placeholder='{"budget": "$100M"}' rows={3} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Awards</Label>
+                    <Textarea value={formData.awards} onChange={(e) => setFormData((prev) => ({ ...prev, awards: e.target.value }))} placeholder="Oscar, Golden Globe..." rows={3} />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Trivia (JSON array)</Label>
+                  <Textarea value={formData.trivia} onChange={(e) => setFormData((prev) => ({ ...prev, trivia: e.target.value }))} placeholder='["Fact 1", "Fact 2"]' rows={3} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Behind The Scenes</Label>
+                  <Textarea value={formData.behindTheScenes} onChange={(e) => setFormData((prev) => ({ ...prev, behindTheScenes: e.target.value }))} placeholder="Production details..." rows={3} />
+                </div>
+                <div className="flex items-center gap-6">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={formData.published} onChange={(e) => setFormData((prev) => ({ ...prev, published: e.target.checked }))} className="w-4 h-4" />
+                    <span>Published</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={formData.featured} onChange={(e) => setFormData((prev) => ({ ...prev, featured: e.target.checked }))} className="w-4 h-4" />
+                    <span>Featured</span>
+                  </label>
+                </div>
+                <Button onClick={handleSubmit} disabled={createMutation.isPending || updateMutation.isPending}>
+                  <Save className="w-4 h-4 mr-2" /> {editingPost ? "Update" : "Create"} Blog Post
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {blogPosts.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground">No blog posts yet. Create your first one!</div>
+        ) : (
+          <div className="space-y-4">
+            {blogPosts.map((post) => (
+              <Card key={post.id} className="border-l-4 border-l-primary">
+                <CardHeader>
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <CardTitle className="text-lg">{post.title}</CardTitle>
+                        <Badge variant={post.published ? "default" : "secondary"}>{post.published ? "Published" : "Draft"}</Badge>
+                        {post.featured && <Badge variant="outline">Featured</Badge>}
+                        <Badge variant="outline">{post.contentType}</Badge>
+                      </div>
+                      <CardDescription className="line-clamp-2">{post.excerpt}</CardDescription>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" onClick={() => handleEdit(post)}><Edit className="w-4 h-4 mr-2" />Edit</Button>
+                      <Button variant="destructive" size="sm" onClick={() => handleDeletePost(post.id, post.title)} disabled={deleteMutation.isPending}><Trash2 className="w-4 h-4 mr-2" />Delete</Button>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                    <span>Slug: /blog/{post.slug}</span>
+                    <span>Author: {post.author}</span>
+                    <span>Created: {new Date(post.createdAt).toLocaleDateString()}</span>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
           </div>
         )}
       </CardContent>

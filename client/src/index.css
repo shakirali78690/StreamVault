@@ -2,6 +2,23 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Red text selection for entire site - desktop and mobile */
+::selection {
+  background-color: hsl(0 86% 46%);
+  color: white;
+}
+
+::-moz-selection {
+  background-color: hsl(0 86% 46%);
+  color: white;
+}
+
+/* iOS/Safari touch selection */
+*::selection {
+  background-color: hsl(0 86% 46%);
+  color: white;
+}
+
 /* LIGHT MODE */
 :root {
   --button-outline: rgba(0,0,0, .10);

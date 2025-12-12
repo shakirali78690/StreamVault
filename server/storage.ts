@@ -1,4 +1,4 @@
-import type { Show, Episode, Movie, Comment, InsertShow, InsertEpisode, InsertMovie, InsertComment, WatchlistItem, ViewingProgress, Category } from "@shared/schema";
+import type { Show, Episode, Movie, Comment, InsertShow, InsertEpisode, InsertMovie, InsertComment, WatchlistItem, ViewingProgress, Category, BlogPost, InsertBlogPost } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
 import { join } from "path";
@@ -89,6 +89,15 @@ export interface IStorage {
   createComment(comment: InsertComment): Promise<Comment>;
   getAllComments(): Promise<Comment[]>;
   deleteComment(commentId: string): Promise<void>;
+
+  // Blog Posts
+  getAllBlogPosts(): Promise<BlogPost[]>;
+  getPublishedBlogPosts(): Promise<BlogPost[]>;
+  getBlogPostById(id: string): Promise<BlogPost | undefined>;
+  getBlogPostBySlug(slug: string): Promise<BlogPost | undefined>;
+  createBlogPost(post: InsertBlogPost): Promise<BlogPost>;
+  updateBlogPost(id: string, updates: Partial<BlogPost>): Promise<BlogPost>;
+  deleteBlogPost(id: string): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
@@ -101,6 +110,7 @@ export class MemStorage implements IStorage {
   private categories: Category[];
   private contentRequests: Map<string, ContentRequest>;
   private issueReports: Map<string, IssueReport>;
+  private blogPosts: Map<string, BlogPost>;
   private dataFile: string;
 
   constructor() {
@@ -113,6 +123,7 @@ export class MemStorage implements IStorage {
     this.viewingProgress = new Map();
     this.contentRequests = new Map();
     this.issueReports = new Map();
+    this.blogPosts = new Map();
     this.categories = [
       { id: "action", name: "Action & Thriller", slug: "action" },
       { id: "drama", name: "Drama & Romance", slug: "drama" },
@@ -176,6 +187,12 @@ export class MemStorage implements IStorage {
           data.issueReports.forEach((report: IssueReport) => this.issueReports.set(report.id, report));
           console.log(`✅ Loaded ${data.issueReports.length} issue reports`);
         }
+        
+        // Restore blog posts
+        if (data.blogPosts) {
+          data.blogPosts.forEach((post: BlogPost) => this.blogPosts.set(post.id, post));
+          console.log(`✅ Loaded ${data.blogPosts.length} blog posts`);
+        }
       } else {
         console.log("📦 No data file found, seeding initial data...");
         this.seedData();
@@ -198,6 +215,7 @@ export class MemStorage implements IStorage {
         comments: Array.from(this.comments.values()),
         contentRequests: Array.from(this.contentRequests.values()),
         issueReports: Array.from(this.issueReports.values()),
+        blogPosts: Array.from(this.blogPosts.values()),
         lastUpdated: new Date().toISOString(),
       };
 
@@ -794,6 +812,79 @@ export class MemStorage implements IStorage {
 
   async deleteComment(commentId: string): Promise<void> {
     this.comments.delete(commentId);
+    this.saveData();
+  }
+
+  // Blog Posts methods
+  async getAllBlogPosts(): Promise<BlogPost[]> {
+    return Array.from(this.blogPosts.values())
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }
+
+  async getPublishedBlogPosts(): Promise<BlogPost[]> {
+    return Array.from(this.blogPosts.values())
+      .filter(post => post.published)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }
+
+  async getBlogPostById(id: string): Promise<BlogPost | undefined> {
+    return this.blogPosts.get(id);
+  }
+
+  async getBlogPostBySlug(slug: string): Promise<BlogPost | undefined> {
+    return Array.from(this.blogPosts.values()).find(post => post.slug === slug);
+  }
+
+  async createBlogPost(insertPost: InsertBlogPost): Promise<BlogPost> {
+    const id = randomUUID();
+    const now = new Date();
+    const post: BlogPost = {
+      id,
+      title: insertPost.title,
+      slug: insertPost.slug,
+      contentType: insertPost.contentType,
+      contentId: insertPost.contentId || null,
+      featuredImage: insertPost.featuredImage,
+      excerpt: insertPost.excerpt,
+      content: insertPost.content,
+      plotSummary: insertPost.plotSummary || null,
+      review: insertPost.review || null,
+      boxOffice: insertPost.boxOffice || null,
+      trivia: insertPost.trivia || null,
+      behindTheScenes: insertPost.behindTheScenes || null,
+      awards: insertPost.awards || null,
+      author: insertPost.author || "StreamVault",
+      published: insertPost.published || false,
+      featured: insertPost.featured || false,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.blogPosts.set(id, post);
+    this.saveData();
+    return post;
+  }
+
+  async updateBlogPost(id: string, updates: Partial<BlogPost>): Promise<BlogPost> {
+    const existingPost = this.blogPosts.get(id);
+    if (!existingPost) {
+      throw new Error("Blog post not found");
+    }
+    
+    const updatedPost: BlogPost = {
+      ...existingPost,
+      ...updates,
+      id: existingPost.id,
+      createdAt: existingPost.createdAt,
+      updatedAt: new Date(),
+    };
+    
+    this.blogPosts.set(id, updatedPost);
+    this.saveData();
+    return updatedPost;
+  }
+
+  async deleteBlogPost(id: string): Promise<void> {
+    this.blogPosts.delete(id);
     this.saveData();
   }
 }

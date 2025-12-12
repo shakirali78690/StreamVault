@@ -2,8 +2,8 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { z } from "zod";
-import { watchlistSchema, viewingProgressSchema } from "@shared/schema";
-import type { InsertEpisode } from "@shared/schema";
+import { watchlistSchema, viewingProgressSchema, insertBlogPostSchema } from "@shared/schema";
+import type { InsertEpisode, BlogPost } from "@shared/schema";
 import { readFileSync, existsSync } from "fs";
 import { setupSitemaps } from "./sitemap";
 import { sendContentRequestEmail, sendIssueReportEmail } from "./email-service";
@@ -1064,6 +1064,104 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(newComment);
     } catch (error) {
       res.status(500).json({ error: "Failed to create comment" });
+    }
+  });
+
+  // ============ BLOG POSTS API ============
+
+  // Get all published blog posts (public)
+  app.get("/api/blog", async (_req, res) => {
+    try {
+      const posts = await storage.getPublishedBlogPosts();
+      res.json(posts);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch blog posts" });
+    }
+  });
+
+  // Get blog post by slug (public)
+  app.get("/api/blog/:slug", async (req, res) => {
+    try {
+      const { slug } = req.params;
+      const post = await storage.getBlogPostBySlug(slug);
+      
+      if (!post) {
+        return res.status(404).json({ error: "Blog post not found" });
+      }
+      
+      // Only return published posts to public
+      if (!post.published) {
+        return res.status(404).json({ error: "Blog post not found" });
+      }
+      
+      res.json(post);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch blog post" });
+    }
+  });
+
+  // Admin: Get all blog posts (including unpublished)
+  app.get("/api/admin/blog", requireAdmin, async (_req, res) => {
+    try {
+      const posts = await storage.getAllBlogPosts();
+      res.json(posts);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch blog posts" });
+    }
+  });
+
+  // Admin: Get blog post by ID
+  app.get("/api/admin/blog/:id", requireAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const post = await storage.getBlogPostById(id);
+      
+      if (!post) {
+        return res.status(404).json({ error: "Blog post not found" });
+      }
+      
+      res.json(post);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch blog post" });
+    }
+  });
+
+  // Admin: Create blog post
+  app.post("/api/admin/blog", requireAdmin, async (req, res) => {
+    try {
+      const validatedData = insertBlogPostSchema.parse(req.body);
+      const post = await storage.createBlogPost(validatedData);
+      res.status(201).json(post);
+    } catch (error: any) {
+      if (error.name === "ZodError") {
+        return res.status(400).json({ error: "Invalid blog post data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to create blog post" });
+    }
+  });
+
+  // Admin: Update blog post
+  app.put("/api/admin/blog/:id", requireAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const post = await storage.updateBlogPost(id, req.body);
+      res.json(post);
+    } catch (error: any) {
+      if (error.message === "Blog post not found") {
+        return res.status(404).json({ error: "Blog post not found" });
+      }
+      res.status(500).json({ error: "Failed to update blog post" });
+    }
+  });
+
+  // Admin: Delete blog post
+  app.delete("/api/admin/blog/:id", requireAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteBlogPost(id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete blog post" });
     }
   });
 

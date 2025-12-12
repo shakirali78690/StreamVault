@@ -36,6 +36,8 @@ import Trending from "@/pages/trending";
 import Sitemap from "@/pages/sitemap";
 import Browse from "@/pages/browse";
 import ContinueWatching from "@/pages/continue-watching";
+import Blog from "@/pages/blog";
+import BlogPost from "@/pages/blog-post";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -71,6 +73,8 @@ function Router() {
           <Route path="/sitemap" component={Sitemap} />
           <Route path="/browse" component={Browse} />
           <Route path="/continue-watching" component={ContinueWatching} />
+          <Route path="/blog" component={Blog} />
+          <Route path="/blog/:type/:slug" component={BlogPost} />
           <Route component={NotFound} />
         </Switch>
       </main>
