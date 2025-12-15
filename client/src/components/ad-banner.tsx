@@ -51,10 +51,6 @@ function MobileBanner() {
 }
 
 export function AdBanner() {
-  // TEMPORARILY DISABLED - return null to hide all banner ads
-  return null;
-  
-  /*
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
@@ -69,5 +65,4 @@ export function AdBanner() {
       {isMobile ? <MobileBanner /> : <DesktopBanner />}
     </div>
   );
-  */
 }
