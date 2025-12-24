@@ -4,7 +4,8 @@ import { storage } from "./storage";
 import { z } from "zod";
 import { watchlistSchema, viewingProgressSchema, insertBlogPostSchema } from "@shared/schema";
 import type { InsertEpisode, BlogPost } from "@shared/schema";
-import { readFileSync, existsSync } from "fs";
+import { readFileSync, existsSync, writeFileSync } from "fs";
+import path from "path";
 import { setupSitemaps } from "./sitemap";
 import { sendContentRequestEmail, sendIssueReportEmail } from "./email-service";
 
@@ -23,11 +24,11 @@ function getSessionId(req: any): string {
 // Admin authentication middleware
 function requireAdmin(req: any, res: any, next: any) {
   const authToken = req.headers["x-admin-token"];
-  
+
   if (!authToken || !adminSessions.has(authToken)) {
     return res.status(401).json({ error: "Unauthorized" });
   }
-  
+
   next();
 }
 
@@ -218,26 +219,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ========== ADMIN ROUTES ==========
-  
+
   // Admin login
   app.post("/api/admin/login", async (req, res) => {
     try {
       const { username, password } = req.body;
-      
+
       if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
         // Generate a simple token (in production, use JWT or similar)
         const token = `admin_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         adminSessions.add(token);
-        
-        res.json({ 
-          success: true, 
+
+        res.json({
+          success: true,
           token,
-          message: "Login successful" 
+          message: "Login successful"
         });
       } else {
-        res.status(401).json({ 
-          success: false, 
-          error: "Invalid credentials" 
+        res.status(401).json({
+          success: false,
+          error: "Invalid credentials"
         });
       }
     } catch (error) {
@@ -260,7 +261,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const isValid = authToken && adminSessions.has(authToken);
     res.json({ valid: isValid });
   });
-  
+
   // Add new show
   app.post("/api/admin/shows", requireAdmin, async (req, res) => {
     try {
@@ -301,12 +302,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const shows = await storage.getAllShows();
       let deleted = 0;
-      
+
       for (const show of shows) {
         await storage.deleteShow(show.id);
         deleted++;
       }
-      
+
       console.log(`🗑️ Deleted ${deleted} shows and their episodes`);
       res.json({ success: true, deleted });
     } catch (error) {
@@ -361,7 +362,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/admin/episodes/bulk", requireAdmin, async (req, res) => {
     try {
       const { slug, episodes } = req.body;
-      
+
       if (!slug || !episodes || !Array.isArray(episodes)) {
         return res.status(400).json({ error: "Slug and episodes array are required" });
       }
@@ -385,7 +386,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       for (const ep of episodes) {
         const key = `${ep.season}-${ep.episodeNumber}`;
-        
+
         if (existingKeys.has(key)) {
           console.log(`   ⏭️  Skipping S${ep.season}E${ep.episodeNumber} (already exists)`);
           skipped++;
@@ -438,9 +439,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error: any) {
       console.error("❌ Bulk add failed:", error);
-      res.status(500).json({ 
-        error: "Failed to add episodes", 
-        details: error.message 
+      res.status(500).json({
+        error: "Failed to add episodes",
+        details: error.message
       });
     }
   });
@@ -472,26 +473,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { showId, seasonNumber } = req.params;
       const season = parseInt(seasonNumber);
-      
+
       // Get all episodes for this show
       const allEpisodes = await storage.getEpisodesByShowId(showId);
-      
+
       // Filter episodes for this season
       const seasonEpisodes = allEpisodes.filter(ep => ep.season === season);
-      
+
       // Delete each episode
       let deleted = 0;
       for (const episode of seasonEpisodes) {
         await storage.deleteEpisode(episode.id);
         deleted++;
       }
-      
+
       console.log(`🗑️ Deleted ${deleted} episodes from season ${season}`);
-      
-      res.json({ 
-        success: true, 
+
+      res.json({
+        success: true,
         deleted,
-        season 
+        season
       });
     } catch (error) {
       res.status(500).json({ error: "Failed to delete season episodes" });
@@ -502,7 +503,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/admin/import-shows-episodes", requireAdmin, async (req, res) => {
     try {
       const { filePath } = req.body;
-      
+
       if (!filePath) {
         return res.status(400).json({ error: "File path is required" });
       }
@@ -512,9 +513,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Check if file exists
       if (!existsSync(filePath)) {
         console.error(`❌ File not found: ${filePath}`);
-        return res.status(404).json({ 
-          error: "File not found", 
-          details: `The file "${filePath}" does not exist. Please check the path and try again.` 
+        return res.status(404).json({
+          error: "File not found",
+          details: `The file "${filePath}" does not exist. Please check the path and try again.`
         });
       }
 
@@ -525,23 +526,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         rawData = readFileSync(filePath, "utf-8");
         importData = JSON.parse(rawData);
       } catch (error: any) {
-        return res.status(400).json({ 
-          error: "Invalid JSON file", 
-          details: error.message 
+        return res.status(400).json({
+          error: "Invalid JSON file",
+          details: error.message
         });
       }
 
       // Handle new format (single show with episodes array)
       if (importData.showSlug && importData.episodes) {
         console.log(`📊 Found episodes for show: ${importData.showSlug}`);
-        
+
         // Find the show by slug
         const existingShow = await storage.getShowBySlug(importData.showSlug);
-        
+
         if (!existingShow) {
-          return res.status(404).json({ 
-            error: "Show not found", 
-            details: `No show found with slug "${importData.showSlug}". Please create the show first.` 
+          return res.status(404).json({
+            error: "Show not found",
+            details: `No show found with slug "${importData.showSlug}". Please create the show first.`
           });
         }
 
@@ -557,7 +558,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Import each episode
         for (const episode of importData.episodes) {
           const episodeKey = `${episode.seasonNumber}-${episode.episodeNumber}`;
-          
+
           if (existingEpisodeKeys.has(episodeKey)) {
             episodesSkipped++;
             continue;
@@ -633,7 +634,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       for (const importedShow of importData.shows) {
         // Check if show already exists
         const existingShow = await storage.getShowBySlug(importedShow.slug);
-        
+
         let showId: string;
         if (existingShow) {
           console.log(`⏭️  Show already exists: ${importedShow.title}`);
@@ -673,10 +674,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         for (const [seasonKey, episodes] of Object.entries(importedShow.seasons)) {
           const seasonNumber = parseInt(seasonKey.replace("season_", ""));
-          
+
           for (const episode of episodes as any[]) {
             const episodeKey = `${seasonNumber}-${episode.episode}`;
-            
+
             if (existingEpisodeKeys.has(episodeKey)) {
               episodesSkipped++;
               continue;
@@ -727,9 +728,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error: any) {
       console.error("❌ Import failed:", error);
-      res.status(500).json({ 
-        error: "Failed to import", 
-        details: error.message 
+      res.status(500).json({
+        error: "Failed to import",
+        details: error.message
       });
     }
   });
@@ -738,7 +739,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/admin/import-episodes", requireAdmin, async (req, res) => {
     try {
       const { filePath } = req.body;
-      
+
       if (!filePath) {
         return res.status(400).json({ error: "File path is required" });
       }
@@ -748,9 +749,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Check if file exists
       if (!existsSync(filePath)) {
         console.error(`❌ File not found: ${filePath}`);
-        return res.status(404).json({ 
-          error: "File not found", 
-          details: `The file "${filePath}" does not exist. Please check the path and try again.` 
+        return res.status(404).json({
+          error: "File not found",
+          details: `The file "${filePath}" does not exist. Please check the path and try again.`
         });
       }
 
@@ -760,9 +761,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         rawData = readFileSync(filePath, "utf-8");
       } catch (readError: any) {
         console.error(`❌ Error reading file:`, readError);
-        return res.status(500).json({ 
-          error: "Failed to read file", 
-          details: readError.message 
+        return res.status(500).json({
+          error: "Failed to read file",
+          details: readError.message
         });
       }
 
@@ -772,9 +773,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         importData = JSON.parse(rawData);
       } catch (parseError: any) {
         console.error(`❌ Error parsing JSON:`, parseError);
-        return res.status(400).json({ 
-          error: "Invalid JSON file", 
-          details: `The file contains invalid JSON: ${parseError.message}` 
+        return res.status(400).json({
+          error: "Invalid JSON file",
+          details: `The file contains invalid JSON: ${parseError.message}`
         });
       }
 
@@ -799,7 +800,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Process each show in the import data
       for (const importedShow of importData.shows) {
         const showId = slugToShowMap.get(importedShow.slug);
-        
+
         if (!showId) {
           console.log(`⚠️  Show not found in database: ${importedShow.title} (${importedShow.slug})`);
           notFoundShows.push(`${importedShow.title} (${importedShow.slug})`);
@@ -820,10 +821,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Process each season
         for (const [seasonKey, episodes] of Object.entries(importedShow.seasons)) {
           const seasonNumber = parseInt(seasonKey.replace("season_", ""));
-          
+
           for (const episode of episodes as any[]) {
             const episodeKey = `${seasonNumber}-${episode.episode}`;
-            
+
             // Skip if episode already exists
             if (existingEpisodeKeys.has(episodeKey)) {
               console.log(`   ⏭️  Skipping S${seasonNumber}E${episode.episode} (already exists)`);
@@ -879,9 +880,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error: any) {
       console.error("❌ Import failed:", error);
-      res.status(500).json({ 
-        error: "Failed to import episodes", 
-        details: error.message 
+      res.status(500).json({
+        error: "Failed to import episodes",
+        details: error.message
       });
     }
   });
@@ -935,7 +936,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/report-issue", async (req, res) => {
     try {
       const { issueType, title, description, url, email } = req.body;
-      
+
       // Save to storage
       const report = await storage.createIssueReport({
         issueType,
@@ -944,27 +945,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         url,
         email,
       });
-      
+
       console.log('📝 Issue Report Received:', report.id);
       console.log('Type:', issueType);
       console.log('Title:', title);
       console.log('---');
-      
+
       // Send email notification (don't wait for it)
-      sendIssueReportEmail(report).catch(err => 
+      sendIssueReportEmail(report).catch(err =>
         console.error('Failed to send issue report email:', err)
       );
-      
-      res.json({ 
-        success: true, 
+
+      res.json({
+        success: true,
         message: 'Report submitted successfully',
         reportId: report.id
       });
     } catch (error: any) {
       console.error('Error submitting report:', error);
-      res.status(500).json({ 
-        success: false, 
-        message: 'Failed to submit report' 
+      res.status(500).json({
+        success: false,
+        message: 'Failed to submit report'
       });
     }
   });
@@ -973,7 +974,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/request-content", async (req, res) => {
     try {
       const { contentType, title, year, genre, description, reason, email } = req.body;
-      
+
       // Save to storage (increments count if duplicate)
       const request = await storage.createContentRequest({
         contentType,
@@ -984,24 +985,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         reason,
         email,
       });
-      
+
       console.log('🎬 Content Request:', request.title, `(${request.requestCount} requests)`);
-      
+
       // Send email notification (don't wait for it)
-      sendContentRequestEmail(request).catch(err => 
+      sendContentRequestEmail(request).catch(err =>
         console.error('Failed to send content request email:', err)
       );
-      
-      res.json({ 
-        success: true, 
+
+      res.json({
+        success: true,
         message: 'Content request submitted successfully',
         requestCount: request.requestCount
       });
     } catch (error: any) {
       console.error('Error submitting content request:', error);
-      res.status(500).json({ 
-        success: false, 
-        message: 'Failed to submit content request' 
+      res.status(500).json({
+        success: false,
+        message: 'Failed to submit content request'
       });
     }
   });
@@ -1043,16 +1044,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/comments", async (req, res) => {
     try {
       const { episodeId, movieId, parentId, userName, comment } = req.body;
-      
+
       // Validate input
       if (!userName || !comment) {
         return res.status(400).json({ error: "userName and comment are required" });
       }
-      
+
       if (!episodeId && !movieId) {
         return res.status(400).json({ error: "Either episodeId or movieId is required" });
       }
-      
+
       const newComment = await storage.createComment({
         episodeId: episodeId || null,
         movieId: movieId || null,
@@ -1060,7 +1061,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         userName,
         comment,
       });
-      
+
       res.status(201).json(newComment);
     } catch (error) {
       res.status(500).json({ error: "Failed to create comment" });
@@ -1084,16 +1085,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { slug } = req.params;
       const post = await storage.getBlogPostBySlug(slug);
-      
+
       if (!post) {
         return res.status(404).json({ error: "Blog post not found" });
       }
-      
+
       // Only return published posts to public
       if (!post.published) {
         return res.status(404).json({ error: "Blog post not found" });
       }
-      
+
       res.json(post);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch blog post" });
@@ -1115,11 +1116,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const post = await storage.getBlogPostById(id);
-      
+
       if (!post) {
         return res.status(404).json({ error: "Blog post not found" });
       }
-      
+
       res.json(post);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch blog post" });
@@ -1162,6 +1163,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "Failed to delete blog post" });
+    }
+  });
+
+  // ========== NEWSLETTER SUBSCRIPTION ==========
+
+  const SUBSCRIBERS_FILE = path.join(__dirname, "..", "data", "subscribers.json");
+
+  // Subscribe to newsletter
+  app.post("/api/newsletter/subscribe", async (req, res) => {
+    try {
+      const { email } = req.body;
+
+      if (!email || !email.includes("@")) {
+        return res.status(400).json({ error: "Valid email required" });
+      }
+
+      // Read existing subscribers
+      let data = { subscribers: [] as any[] };
+      if (existsSync(SUBSCRIBERS_FILE)) {
+        data = JSON.parse(readFileSync(SUBSCRIBERS_FILE, "utf-8"));
+      }
+
+      // Check if already subscribed
+      const exists = data.subscribers.some((s: any) => s.email === email);
+      if (exists) {
+        return res.json({ success: true, message: "Already subscribed" });
+      }
+
+      // Add new subscriber
+      data.subscribers.push({
+        email,
+        subscribedAt: new Date().toISOString(),
+        source: "footer"
+      });
+
+      // Save to file
+      writeFileSync(SUBSCRIBERS_FILE, JSON.stringify(data, null, 2));
+
+      console.log(`📧 New newsletter subscriber: ${email}`);
+
+      res.json({ success: true, message: "Successfully subscribed!" });
+    } catch (error) {
+      console.error("Newsletter subscription error:", error);
+      res.status(500).json({ error: "Failed to subscribe" });
+    }
+  });
+
+  // Get subscriber count (admin only)
+  app.get("/api/admin/newsletter/subscribers", requireAdmin, async (_req, res) => {
+    try {
+      if (!existsSync(SUBSCRIBERS_FILE)) {
+        return res.json({ count: 0, subscribers: [] });
+      }
+      const data = JSON.parse(readFileSync(SUBSCRIBERS_FILE, "utf-8"));
+      res.json({
+        count: data.subscribers.length,
+        subscribers: data.subscribers
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch subscribers" });
     }
   });
 

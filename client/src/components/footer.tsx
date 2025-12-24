@@ -7,16 +7,44 @@ import { useToast } from "@/hooks/use-toast";
 
 export function Footer() {
   const [email, setEmail] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
-  const handleNewsletterSubmit = (e: React.FormEvent) => {
+  const handleNewsletterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (email) {
-      toast({
-        title: "Subscribed!",
-        description: "You've been added to our newsletter.",
+    if (!email) return;
+
+    setIsSubmitting(true);
+    try {
+      const response = await fetch("/api/newsletter/subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
       });
-      setEmail("");
+
+      const data = await response.json();
+
+      if (response.ok) {
+        toast({
+          title: "Subscribed!",
+          description: data.message || "You've been added to our newsletter.",
+        });
+        setEmail("");
+      } else {
+        toast({
+          title: "Error",
+          description: data.error || "Failed to subscribe",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to subscribe. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -219,8 +247,12 @@ export function Footer() {
                   required
                   data-testid="input-newsletter-email"
                 />
-                <Button type="submit" data-testid="button-newsletter-submit">
-                  Subscribe
+                <Button
+                  type="submit"
+                  data-testid="button-newsletter-submit"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? "..." : "Subscribe"}
                 </Button>
               </div>
             </form>
