@@ -1561,10 +1561,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 </tr>
                 ${latestBlogs.map((blog: any) => `
                 <tr>
-                  <td style="padding:12px 0;border-bottom:1px solid #2a2a2a;">
-                    <a href="https://streamvault.live/blog/${blog.slug}" style="text-decoration:none;">
-                      <h4 style="margin:0 0 6px 0;color:#ffffff;font-size:16px;font-weight:600;">${blog.title}</h4>
-                      <p style="margin:0;color:#888;font-size:13px;">${(blog.excerpt || '').substring(0, 100)}...</p>
+                  <td style="padding:12px 0;">
+                    <a href="https://streamvault.live/blog/${blog.slug}" style="text-decoration:none;display:block;">
+                      <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background:linear-gradient(135deg,#1a1a1a,#252525);border-radius:10px;overflow:hidden;">
+                        <tr>
+                          <td style="position:relative;">
+                            ${blog.backdropUrl ? `<img src="${blog.backdropUrl}" alt="${blog.title}" width="100%" height="120" style="display:block;object-fit:cover;opacity:0.6;">` : ''}
+                            <div style="padding:15px;${blog.backdropUrl ? 'margin-top:-60px;position:relative;' : ''}">
+                              <h4 style="margin:0 0 6px 0;color:#ffffff;font-size:16px;font-weight:600;text-shadow:0 2px 4px rgba(0,0,0,0.8);">${blog.title}</h4>
+                              <p style="margin:0;color:#ccc;font-size:12px;text-shadow:0 1px 2px rgba(0,0,0,0.8);">${(blog.excerpt || '').substring(0, 80)}...</p>
+                            </div>
+                          </td>
+                        </tr>
+                      </table>
                     </a>
                   </td>
                 </tr>
