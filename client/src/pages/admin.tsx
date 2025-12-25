@@ -2934,13 +2934,16 @@ function PushNotificationManager({ shows, movies }: { shows: Show[]; movies: Mov
               <div>
                 <label className="text-sm font-medium mb-1 block">Select Show</label>
                 <select
-                  value={selectedContentId || ''}
-                  onChange={(e) => setSelectedContentId(Number(e.target.value))}
+                  value={selectedContentId !== null ? String(selectedContentId) : ''}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setSelectedContentId(val ? Number(val) : null);
+                  }}
                   className="w-full p-2 bg-background border rounded-lg"
                 >
                   <option value="">-- Select a show --</option>
-                  {shows.slice(0, 50).map((show) => (
-                    <option key={show.id} value={show.id}>
+                  {shows.map((show) => (
+                    <option key={show.id} value={String(show.id)}>
                       {show.title} ({show.year})
                     </option>
                   ))}
@@ -2950,13 +2953,16 @@ function PushNotificationManager({ shows, movies }: { shows: Show[]; movies: Mov
               <div>
                 <label className="text-sm font-medium mb-1 block">Select Movie</label>
                 <select
-                  value={selectedContentId || ''}
-                  onChange={(e) => setSelectedContentId(Number(e.target.value))}
+                  value={selectedContentId !== null ? String(selectedContentId) : ''}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setSelectedContentId(val ? Number(val) : null);
+                  }}
                   className="w-full p-2 bg-background border rounded-lg"
                 >
                   <option value="">-- Select a movie --</option>
-                  {movies.slice(0, 50).map((movie) => (
-                    <option key={movie.id} value={movie.id}>
+                  {movies.map((movie) => (
+                    <option key={movie.id} value={String(movie.id)}>
                       {movie.title} ({movie.year})
                     </option>
                   ))}
@@ -2967,16 +2973,17 @@ function PushNotificationManager({ shows, movies }: { shows: Show[]; movies: Mov
                 <div>
                   <label className="text-sm font-medium mb-1 block">Select Show</label>
                   <select
-                    value={selectedShowId || ''}
+                    value={selectedShowId !== null ? String(selectedShowId) : ''}
                     onChange={(e) => {
-                      setSelectedShowId(Number(e.target.value));
+                      const val = e.target.value;
+                      setSelectedShowId(val ? Number(val) : null);
                       setSelectedContentId(null);
                     }}
                     className="w-full p-2 bg-background border rounded-lg"
                   >
                     <option value="">-- Select a show --</option>
-                    {shows.slice(0, 50).map((show) => (
-                      <option key={show.id} value={show.id}>
+                    {shows.map((show) => (
+                      <option key={show.id} value={String(show.id)}>
                         {show.title} ({show.year})
                       </option>
                     ))}
