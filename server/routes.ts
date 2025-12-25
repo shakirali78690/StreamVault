@@ -1348,6 +1348,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let notificationBody = body || "Check out what's new!";
       let notificationUrl = url || "https://streamvault.live";
       let notificationIcon = "https://streamvault.live/favicon.svg";
+      let notificationImage = ""; // Large banner image
 
       // If content type is specified, fetch content details
       if (type && contentId) {
@@ -1359,6 +1360,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             notificationBody = show.description?.substring(0, 100) + '...' || `Watch ${show.title} now!`;
             notificationUrl = `https://streamvault.live/show/${show.slug}`;
             notificationIcon = show.posterUrl || notificationIcon;
+            notificationImage = show.backdropUrl || show.posterUrl || '';
           }
         } else if (type === 'movie') {
           const movies = await storage.getAllMovies();
@@ -1368,6 +1370,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
             notificationBody = movie.description?.substring(0, 100) + '...' || `Watch ${movie.title} now!`;
             notificationUrl = `https://streamvault.live/movie/${movie.slug}`;
             notificationIcon = movie.posterUrl || notificationIcon;
+            notificationImage = movie.backdropUrl || movie.posterUrl || '';
+          }
+        } else if (type === 'episode') {
+          // For episodes, use the show's images
+          const shows = await storage.getAllShows();
+          const show = shows.find((s: any) => s.id === contentId);
+          if (show) {
+            notificationTitle = `📺 New Episode: ${show.title}`;
+            notificationBody = `A new episode is now available!`;
+            notificationUrl = `https://streamvault.live/show/${show.slug}`;
+            notificationIcon = show.posterUrl || notificationIcon;
+            notificationImage = show.backdropUrl || show.posterUrl || '';
           }
         }
       }
@@ -1376,6 +1390,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         title: notificationTitle,
         body: notificationBody,
         icon: notificationIcon,
+        image: notificationImage, // Large banner image
         badge: "https://streamvault.live/favicon.svg",
         url: notificationUrl,
         timestamp: Date.now()
