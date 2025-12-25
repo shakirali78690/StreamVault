@@ -1453,7 +1453,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Get blog posts
       const blogPosts = await storage.getAllBlogPosts();
-      const latestBlogs = blogPosts.filter((b: any) => b.featured).slice(0, 3) || blogPosts.slice(0, 3);
+      const featuredBlogs = blogPosts.filter((b: any) => b.featured).slice(0, 3);
+      const latestBlogs = featuredBlogs.length > 0 ? featuredBlogs : blogPosts.slice(0, 3);
 
       // Generate email HTML (simplified version)
       const generateContentRow = (items: any[], type: string) => {
