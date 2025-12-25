@@ -1561,7 +1561,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 </tr>
                 ${latestBlogs.map((blog: any) => {
         const blogType = blog.contentType || 'show';
-        const blogImage = blog.coverImage || '';
+        const blogImage = blog.featuredImage || '';
         return `
                 <tr>
                   <td style="padding:8px 0;">
