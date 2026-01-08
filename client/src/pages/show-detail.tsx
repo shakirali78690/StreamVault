@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRoute, Link, useLocation } from "wouter";
 import { Helmet } from "react-helmet-async";
-import { Play, Plus, Check, Star, Share2, ChevronLeft, Globe, ExternalLink, Building2 } from "lucide-react";
+import { Play, Plus, Check, Star, Share2, ChevronLeft, Globe, ExternalLink, Building2, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -373,6 +373,18 @@ export default function ShowDetail() {
                   <Share2 className="w-4 h-4 md:w-5 md:h-5" />
                   Share
                 </Button>
+                <Link href={`/create-room?type=show&id=${show?.id}`}>
+                  <Button
+                    size="default"
+                    variant="outline"
+                    className="gap-1.5 md:gap-2 text-sm md:text-base h-9 md:h-11 bg-gradient-to-r from-purple-600 to-pink-600 border-0 text-white hover:from-purple-700 hover:to-pink-700"
+                    data-testid="button-watch-together"
+                  >
+                    <Users className="w-4 h-4 md:w-5 md:h-5" />
+                    <span className="hidden sm:inline">Watch Together</span>
+                    <span className="sm:hidden">Party</span>
+                  </Button>
+                </Link>
               </div>
             </div>
           </div>

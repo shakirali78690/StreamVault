@@ -1,4 +1,4 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { HelmetProvider } from "react-helmet-async";
@@ -40,12 +40,18 @@ import Browse from "@/pages/browse";
 import ContinueWatching from "@/pages/continue-watching";
 import Blog from "@/pages/blog";
 import BlogPost from "@/pages/blog-post";
+import WatchTogether from "@/pages/watch-together";
+import CreateRoom from "@/pages/create-room";
 import NotFound from "@/pages/not-found";
 
 function Router() {
+  // Hide header/footer on watch-together routes
+  const [location] = useLocation();
+  const isWatchTogether = location.startsWith('/watch-together');
+
   return (
     <>
-      <Header />
+      {!isWatchTogether && <Header />}
       <main>
         <Switch>
           <Route path="/" component={Home} />
@@ -77,14 +83,18 @@ function Router() {
           <Route path="/continue-watching" component={ContinueWatching} />
           <Route path="/blog" component={Blog} />
           <Route path="/blog/:type/:slug" component={BlogPost} />
+          <Route path="/watch-together/:roomCode" component={WatchTogether} />
+          <Route path="/create-room" component={CreateRoom} />
           <Route component={NotFound} />
         </Switch>
       </main>
-      <div className="container mx-auto px-4">
-        <AdBanner />
-      </div>
-      <Footer />
-      <Chatbot />
+      {!isWatchTogether && (
+        <div className="container mx-auto px-4">
+          <AdBanner />
+        </div>
+      )}
+      {!isWatchTogether && <Footer />}
+      {!isWatchTogether && <Chatbot />}
       <InstallPrompt />
       <NotificationPrompt />
     </>

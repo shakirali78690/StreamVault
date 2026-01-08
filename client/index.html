@@ -2,6 +2,18 @@
 <html lang="en">
 
 <head>
+  <!-- Polyfill for Node.js globals required by simple-peer -->
+  <script>
+    if (typeof global === 'undefined') {
+      window.global = window;
+    }
+    if (typeof process === 'undefined') {
+      window.process = { env: {} };
+    }
+    if (typeof Buffer === 'undefined') {
+      window.Buffer = { isBuffer: () => false };
+    }
+  </script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />

@@ -1,0 +1,324 @@
+import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react';
+import { io, Socket } from 'socket.io-client';
+
+// Types
+export interface User {
+    id: string;
+    username: string;
+    isHost: boolean;
+    isMuted: boolean;
+}
+
+export interface VideoState {
+    isPlaying: boolean;
+    currentTime: number;
+    lastUpdate: number;
+}
+
+export interface ChatMessage {
+    id: string;
+    username: string;
+    message: string;
+    timestamp: Date;
+}
+
+export interface Reaction {
+    id: string;
+    username: string;
+    emoji: string;
+}
+
+export interface RoomInfo {
+    roomId: string;
+    roomCode: string;
+    contentType: 'show' | 'movie';
+    contentId: string;
+    episodeId?: string;
+    users: User[];
+    videoState: VideoState;
+    user: User;
+}
+
+interface WatchTogetherContextType {
+    socket: Socket | null;
+    isConnected: boolean;
+    roomInfo: RoomInfo | null;
+    users: User[];
+    speakingUsers: Set<string>;
+    messages: ChatMessage[];
+    reactions: Reaction[];
+    videoState: VideoState | null;
+    isHost: boolean;
+    currentUser: User | null;
+    error: string | null;
+    // Actions
+    createRoom: (contentType: 'show' | 'movie', contentId: string, username: string, episodeId?: string) => void;
+    joinRoom: (roomCode: string, username: string) => void;
+    leaveRoom: () => void;
+    sendMessage: (message: string) => void;
+    sendReaction: (emoji: string) => void;
+    videoPlay: (currentTime: number) => void;
+    videoPause: (currentTime: number) => void;
+    videoSeek: (currentTime: number) => void;
+    requestVideoState: () => void;
+    hostMuteUser: (targetUserId: string, isMuted: boolean) => void;
+    clearError: () => void;
+}
+
+const WatchTogetherContext = createContext<WatchTogetherContextType | null>(null);
+
+export function useWatchTogether() {
+    const context = useContext(WatchTogetherContext);
+    if (!context) {
+        throw new Error('useWatchTogether must be used within WatchTogetherProvider');
+    }
+    return context;
+}
+
+interface Props {
+    children: ReactNode;
+}
+
+export function WatchTogetherProvider({ children }: Props) {
+    const [socket, setSocket] = useState<Socket | null>(null);
+    const [isConnected, setIsConnected] = useState(false);
+    const [roomInfo, setRoomInfo] = useState<RoomInfo | null>(null);
+    const [users, setUsers] = useState<User[]>([]);
+    const [speakingUsers, setSpeakingUsers] = useState<Set<string>>(new Set());
+    const [messages, setMessages] = useState<ChatMessage[]>([]);
+    const [reactions, setReactions] = useState<Reaction[]>([]);
+    const [videoState, setVideoState] = useState<VideoState | null>(null);
+    const [currentUser, setCurrentUser] = useState<User | null>(null);
+    const [error, setError] = useState<string | null>(null);
+
+    const isHost = currentUser?.isHost ?? false;
+
+    // Initialize socket connection
+    useEffect(() => {
+        const socketUrl = typeof window !== 'undefined'
+            ? `${window.location.protocol}//${window.location.host}`
+            : '';
+
+        const newSocket = io(`${socketUrl}/watch-together`, {
+            path: '/watch-together-socket',
+            transports: ['websocket', 'polling']
+        });
+
+        newSocket.on('connect', () => {
+            console.log('🎬 Connected to Watch Together');
+            setIsConnected(true);
+        });
+
+        newSocket.on('disconnect', () => {
+            console.log('🎬 Disconnected from Watch Together');
+            setIsConnected(false);
+        });
+
+        // Room events
+        newSocket.on('room:created', (data: RoomInfo) => {
+            setRoomInfo(data);
+            setUsers([data.user]);
+            setCurrentUser(data.user);
+            setVideoState(data.videoState);
+            setMessages([]);
+            setError(null);
+        });
+
+        newSocket.on('room:joined', (data: RoomInfo) => {
+            setRoomInfo(data);
+            setUsers(data.users);
+            setCurrentUser(data.user);
+            setVideoState(data.videoState);
+            setMessages([]);
+            setError(null);
+        });
+
+        newSocket.on('room:user-joined', ({ user }: { user: User }) => {
+            setUsers(prev => [...prev, user]);
+            setMessages(prev => [...prev, {
+                id: `system-${Date.now()}`,
+                username: 'System',
+                message: `${user.username} joined the room`,
+                timestamp: new Date()
+            }]);
+        });
+
+        newSocket.on('room:user-left', ({ username }: { username: string }) => {
+            setUsers(prev => prev.filter(u => u.username !== username));
+            setMessages(prev => [...prev, {
+                id: `system-${Date.now()}`,
+                username: 'System',
+                message: `${username} left the room`,
+                timestamp: new Date()
+            }]);
+        });
+
+        newSocket.on('room:user-updated', ({ user }: { user: User }) => {
+            setUsers(prev => prev.map(u => u.id === user.id ? user : u));
+        });
+
+        newSocket.on('room:destroyed', ({ message }: { message: string }) => {
+            setRoomInfo(null);
+            setUsers([]);
+            setCurrentUser(null);
+            setVideoState(null);
+            setMessages([]);
+            setError(message);
+        });
+
+        newSocket.on('room:error', ({ message }: { message: string }) => {
+            setError(message);
+        });
+
+        // Video sync
+        newSocket.on('video:sync', (state: VideoState) => {
+            setVideoState(state);
+        });
+
+        // Chat
+        newSocket.on('chat:receive', (msg: ChatMessage) => {
+            setMessages(prev => [...prev, msg]);
+            // Play modern notification sound for messages from other users
+            if (msg.username !== 'System') {
+                try {
+                    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+
+                    // Create a modern "pop" sound
+                    const oscillator = audioContext.createOscillator();
+                    const gainNode = audioContext.createGain();
+
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioContext.destination);
+
+                    // Modern notification tone (like Discord)
+                    oscillator.frequency.setValueAtTime(830, audioContext.currentTime);
+                    oscillator.frequency.exponentialRampToValueAtTime(600, audioContext.currentTime + 0.08);
+
+                    oscillator.type = 'sine';
+
+                    // Quick fade in and out
+                    gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+                    gainNode.gain.linearRampToValueAtTime(0.3, audioContext.currentTime + 0.01);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.15);
+
+                    oscillator.start(audioContext.currentTime);
+                    oscillator.stop(audioContext.currentTime + 0.15);
+                } catch { }
+            }
+        });
+
+        // Reactions
+        newSocket.on('reaction:show', (reaction: Reaction) => {
+            setReactions(prev => [...prev, reaction]);
+            // Remove reaction after 3 seconds
+            setTimeout(() => {
+                setReactions(prev => prev.filter(r => r.id !== reaction.id));
+            }, 3000);
+        });
+
+        // Voice speaking state from other users
+        newSocket.on('voice:user-speaking', ({ userId, isSpeaking }: { userId: string; isSpeaking: boolean }) => {
+            setSpeakingUsers(prev => {
+                const newSet = new Set(prev);
+                if (isSpeaking) {
+                    newSet.add(userId);
+                } else {
+                    newSet.delete(userId);
+                }
+                return newSet;
+            });
+        });
+
+        setSocket(newSocket);
+
+        return () => {
+            newSocket.close();
+        };
+    }, []);
+
+    // Actions
+    const createRoom = useCallback((
+        contentType: 'show' | 'movie',
+        contentId: string,
+        username: string,
+        episodeId?: string
+    ) => {
+        socket?.emit('room:create', { contentType, contentId, username, episodeId });
+    }, [socket]);
+
+    const joinRoom = useCallback((roomCode: string, username: string) => {
+        socket?.emit('room:join', { roomCode: roomCode.toUpperCase(), username });
+    }, [socket]);
+
+    const leaveRoom = useCallback(() => {
+        socket?.emit('room:leave');
+        setRoomInfo(null);
+        setUsers([]);
+        setCurrentUser(null);
+        setVideoState(null);
+        setMessages([]);
+    }, [socket]);
+
+    const sendMessage = useCallback((message: string) => {
+        if (message.trim()) {
+            socket?.emit('chat:message', { message: message.trim() });
+        }
+    }, [socket]);
+
+    const sendReaction = useCallback((emoji: string) => {
+        socket?.emit('reaction:send', { emoji });
+    }, [socket]);
+
+    const videoPlay = useCallback((currentTime: number) => {
+        socket?.emit('video:play', { currentTime });
+    }, [socket]);
+
+    const videoPause = useCallback((currentTime: number) => {
+        socket?.emit('video:pause', { currentTime });
+    }, [socket]);
+
+    const videoSeek = useCallback((currentTime: number) => {
+        socket?.emit('video:seek', { currentTime });
+    }, [socket]);
+
+    const requestVideoState = useCallback(() => {
+        socket?.emit('video:request-state');
+    }, [socket]);
+
+    const clearError = useCallback(() => {
+        setError(null);
+    }, []);
+
+    const hostMuteUser = useCallback((targetUserId: string, isMuted: boolean) => {
+        socket?.emit('voice:host-mute', { targetUserId, isMuted });
+    }, [socket]);
+
+    return (
+        <WatchTogetherContext.Provider value={{
+            socket,
+            isConnected,
+            roomInfo,
+            users,
+            speakingUsers,
+            messages,
+            reactions,
+            videoState,
+            isHost,
+            currentUser,
+            error,
+            createRoom,
+            joinRoom,
+            leaveRoom,
+            sendMessage,
+            sendReaction,
+            videoPlay,
+            videoPause,
+            videoSeek,
+            requestVideoState,
+            hostMuteUser,
+            clearError
+        }}>
+            {children}
+        </WatchTogetherContext.Provider>
+    );
+}

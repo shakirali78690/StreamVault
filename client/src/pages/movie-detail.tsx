@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRoute, Link } from "wouter";
 import { Helmet } from "react-helmet-async";
-import { Play, Clock, Calendar, Star, Plus, Check, Share2, ChevronLeft, Globe, ExternalLink, Building2 } from "lucide-react";
+import { Play, Clock, Calendar, Star, Plus, Check, Share2, ChevronLeft, Globe, ExternalLink, Building2, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -338,6 +338,15 @@ export default function MovieDetail() {
                   <Share2 className="w-5 h-5" />
                   Share
                 </Button>
+                <Link href={`/create-room?type=movie&id=${movie?.id}`}>
+                  <Button
+                    size="lg"
+                    className="gap-2 bg-gradient-to-r from-purple-600 to-pink-600 border-0 text-white hover:from-purple-700 hover:to-pink-700"
+                  >
+                    <Users className="w-5 h-5" />
+                    Watch Together
+                  </Button>
+                </Link>
               </div>
             </div>
           </div>
