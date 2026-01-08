@@ -485,23 +485,22 @@ function WatchTogetherContent() {
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-1 lg:gap-2">
+                    <div className="flex items-center gap-2">
                         {/* Room Code */}
                         <Button
                             variant="outline"
                             size="sm"
                             onClick={copyRoomCode}
-                            className="font-mono text-xs lg:text-sm px-2 lg:px-3"
+                            className="font-mono"
                         >
-                            {copied ? <Check className="h-3 w-3 lg:h-4 lg:w-4 lg:mr-2" /> : <Copy className="h-3 w-3 lg:h-4 lg:w-4 lg:mr-2" />}
-                            <span className="hidden lg:inline">{roomInfo?.roomCode}</span>
-                            <span className="lg:hidden">{roomInfo?.roomCode?.slice(0, 4)}...</span>
+                            {copied ? <Check className="h-4 w-4 mr-2" /> : <Copy className="h-4 w-4 mr-2" />}
+                            {roomInfo?.roomCode}
                         </Button>
 
                         {/* Users Count */}
-                        <Button variant="ghost" size="sm" className="px-2 lg:px-3">
-                            <Users className="h-3 w-3 lg:h-4 lg:w-4 lg:mr-2" />
-                            <span className="text-xs lg:text-sm">{users.length}</span>
+                        <Button variant="ghost" size="sm">
+                            <Users className="h-4 w-4 mr-2" />
+                            {users.length}
                         </Button>
 
                         {/* Voice Chat Toggle */}
@@ -534,7 +533,7 @@ function WatchTogetherContent() {
                 </div>
             </header>
 
-            <div className="flex flex-col lg:flex-row h-[calc(100vh-65px)]">
+            <div className="flex h-[calc(100vh-65px)]">
                 {/* Main Content */}
                 <div className="flex-1 flex flex-col overflow-hidden">
                     {/* Video Player */}
@@ -563,13 +562,13 @@ function WatchTogetherContent() {
                     </div>
 
                     {/* Reaction Bar */}
-                    <div className="bg-card border-t border-border p-2 lg:p-4">
-                        <div className="flex items-center justify-center gap-1 lg:gap-2">
+                    <div className="bg-card border-t border-border p-4">
+                        <div className="flex items-center justify-center gap-2">
                             {REACTION_EMOJIS.map((emoji) => (
                                 <button
                                     key={emoji}
                                     onClick={() => sendReaction(emoji)}
-                                    className="text-lg lg:text-2xl hover:scale-125 transition-transform p-1 lg:p-2 rounded-lg hover:bg-accent"
+                                    className="text-2xl hover:scale-125 transition-transform p-2 rounded-lg hover:bg-accent"
                                 >
                                     {emoji}
                                 </button>
@@ -578,32 +577,16 @@ function WatchTogetherContent() {
                     </div>
                 </div>
 
-                {/* Chat Sidebar - Mobile overlay / Desktop side panel */}
+                {/* Chat Sidebar */}
                 {showChat && (
-                    <div className="fixed lg:relative inset-0 lg:inset-auto z-40 lg:z-0 lg:w-80 flex-shrink-0 bg-card lg:border-l border-border flex flex-col h-full pt-14 lg:pt-0">
-                        {/* Mobile Chat Header */}
-                        <div className="lg:hidden flex items-center justify-between p-3 border-b border-border bg-card">
-                            <h2 className="font-semibold flex items-center gap-2">
-                                <MessageCircle className="h-5 w-5" />
-                                Chat
-                            </h2>
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => setShowChat(false)}
-                                className="h-8 w-8"
-                            >
-                                <X className="h-5 w-5" />
-                            </Button>
-                        </div>
-
+                    <div className="w-80 flex-shrink-0 bg-card border-l border-border flex flex-col h-full">
                         {/* Users List */}
-                        <div className="p-3 lg:p-4 border-b border-border">
-                            <h3 className="font-semibold mb-2 flex items-center gap-2 text-sm lg:text-base">
+                        <div className="p-4 border-b border-border">
+                            <h3 className="font-semibold mb-2 flex items-center gap-2">
                                 <Users className="h-4 w-4" />
                                 Viewers ({users.length})
                             </h3>
-                            <div className="flex flex-wrap gap-1.5 lg:gap-2">
+                            <div className="flex flex-wrap gap-2">
                                 {users.map((user) => {
                                     // Check if user is speaking: for current user use local state, for others use context
                                     const isUserSpeaking = user.id === currentUser?.id
@@ -740,16 +723,16 @@ function WatchTogetherContent() {
                                         <Smile className="h-4 w-4" />
                                     </Button>
                                     {showEmojiPicker && (
-                                        <div className="absolute bottom-12 left-0 z-50 max-w-[calc(100vw-2rem)]">
+                                        <div className="absolute bottom-12 left-0 z-50">
                                             <EmojiPicker
                                                 onEmojiClick={(emojiData) => {
                                                     setChatMessage(prev => prev + emojiData.emoji);
                                                     setShowEmojiPicker(false);
                                                 }}
                                                 theme={Theme.DARK}
-                                                width={280}
-                                                height={300}
-                                                searchPlaceHolder="Search..."
+                                                width={300}
+                                                height={350}
+                                                searchPlaceHolder="Search emoji..."
                                                 skinTonesDisabled
                                                 previewConfig={{ showPreview: false }}
                                             />
