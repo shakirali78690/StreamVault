@@ -342,9 +342,32 @@ function WatchTogetherContent() {
         }
     }, [currentUser, socket]);
 
+    // Auto-rejoin on page load if we have saved credentials
+    useEffect(() => {
+        if (!isConnected || currentUser || !roomCode) return;
+
+        const savedUsername = localStorage.getItem('watch-together-username');
+        const savedRoom = localStorage.getItem('watch-together-room');
+
+        // If we have saved credentials for this room, auto-rejoin
+        if (savedUsername && savedRoom && savedRoom === roomCode) {
+            console.log('🔄 Auto-rejoining with saved credentials:', savedUsername);
+            setUsername(savedUsername);
+            // Small delay to ensure socket is ready
+            setTimeout(() => {
+                joinRoom(roomCode, savedUsername);
+                setShowJoinModal(false);
+            }, 500);
+        }
+    }, [isConnected, currentUser, roomCode, joinRoom]);
+
     // Handle join
     const handleJoin = () => {
         if (username.trim() && roomCode) {
+            // Save to localStorage for auto-rejoin on page refresh
+            localStorage.setItem('watch-together-username', username.trim());
+            localStorage.setItem('watch-together-room', roomCode);
+
             joinRoom(roomCode, username.trim());
             setShowJoinModal(false);
         }
@@ -352,6 +375,9 @@ function WatchTogetherContent() {
 
     // Handle leave
     const handleLeave = () => {
+        // Clear localStorage since user intentionally left
+        localStorage.removeItem('watch-together-username');
+        localStorage.removeItem('watch-together-room');
         leaveRoom();
         setLocation('/');
     };

@@ -63,6 +63,17 @@ A professional Netflix-inspired streaming platform for both TV shows and movies,
 - Session-based data storage
 - Fully mobile responsive
 
+### 🎬 **Watch Together (NEW!)**
+- **Real-time co-watching** - Watch shows/movies with friends
+- **Live chat** with emojis, GIFs (Tenor API), and file attachments
+- **Voice chat** - WebRTC-powered real-time audio communication
+- **Floating reactions** - React with emojis visible to all viewers
+- **Host controls** - Mute/unmute participants
+- **Session persistence** - Reconnect within 2-min grace period if disconnected
+- **Mobile landscape mode** - Optimized viewing experience
+- **Speaking indicators** - See who's talking in voice chat
+- **Room sharing** - Easy room code sharing via link
+
 ### 🛠️ **Tech Stack**
 - **Frontend:** React 18 + TypeScript
 - **Styling:** TailwindCSS + shadcn/ui
@@ -400,7 +411,18 @@ MIT License - feel free to use for personal or commercial projects
 
 ## 🎉 What's New
 
-### Latest Updates (v3.0) - December 2024
+### Latest Updates (v4.0) - January 2026
+- ✅ **Watch Together** - Real-time co-watching with friends
+- ✅ **Voice Chat** - WebRTC audio communication in watch rooms
+- ✅ **Live Chat** - Emojis, GIFs (Tenor API), file attachments
+- ✅ **Floating Reactions** - Emoji reactions visible to all viewers
+- ✅ **Host Controls** - Mute/unmute participants
+- ✅ **Session Persistence** - 2-min grace period for reconnection
+- ✅ **Speaking Indicators** - Visual feedback for active speakers
+- ✅ **Mobile Landscape Overlay** - Prompts users to rotate for better viewing
+- ✅ **Audio Autoplay Unlock** - Handles browser autoplay restrictions
+
+### Previous Updates (v3.0) - December 2024
 - ✅ **SEO Blog System** - Auto-generated rich blog articles for all content
 - ✅ **Production Companies** - Logos and official website backlinks
 - ✅ **External Links** - IMDb, Facebook, Twitter, Instagram buttons
@@ -505,6 +527,13 @@ Comprehensive show information with seasons, episodes, cast, and production comp
 SEO-optimized blog articles with trailers, cast info, trivia, and external links.
 
 ![Blog Article](./screenshots/blog-article.png)
+
+---
+
+### 🎬 Watch Together
+Real-time co-watching with friends featuring voice chat, live messaging with GIFs, reactions, and host controls.
+
+![Watch Together](./screenshots/watch-together.png)
 
 ---
 

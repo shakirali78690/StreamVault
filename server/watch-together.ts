@@ -192,14 +192,32 @@ export function setupWatchTogether(httpServer: HttpServer): Server {
                 return;
             }
 
-            // Check if this is a reconnection (same session ID already in room)
+            // Check if this is the HOST reconnecting (matches hostSessionId)
+            const isHostReconnecting = room.hostSessionId === data.sessionId;
+
+            if (isHostReconnecting) {
+                console.log(`🎬 Host reconnecting to room ${room.code} via join`);
+
+                // Cancel destroy timeout if pending
+                if (room.destroyTimeout) {
+                    clearTimeout(room.destroyTimeout);
+                    room.destroyTimeout = undefined;
+                    room.hostDisconnectedAt = undefined;
+                    console.log(`🎬 Cancelled room destruction for ${room.code}`);
+                }
+
+                // Update host's socket ID
+                room.hostId = socket.id;
+            }
+
+            // Check if this is a reconnection (same session ID already in room for non-host users)
             let existingUser: User | undefined;
-            room.users.forEach((user, odlSocketId) => {
+            room.users.forEach((user, oldSocketId) => {
                 if (user.sessionId === data.sessionId) {
                     existingUser = user;
                     // Remove old socket entry
-                    room.users.delete(odlSocketId);
-                    userToRoom.delete(odlSocketId);
+                    room.users.delete(oldSocketId);
+                    userToRoom.delete(oldSocketId);
                 }
             });
 
@@ -207,7 +225,7 @@ export function setupWatchTogether(httpServer: HttpServer): Server {
                 id: socket.id,
                 sessionId: data.sessionId,
                 username: data.username,
-                isHost: existingUser?.isHost || false,
+                isHost: isHostReconnecting || (existingUser?.isHost ?? false),
                 isMuted: existingUser?.isMuted || false
             };
 
@@ -230,7 +248,10 @@ export function setupWatchTogether(httpServer: HttpServer): Server {
             });
 
             // Notify others in room
-            if (existingUser) {
+            if (isHostReconnecting) {
+                console.log(`🎬 Host ${data.username} reconnected to room ${room.code}`);
+                socket.to(room.code).emit('room:host-reconnected', { user });
+            } else if (existingUser) {
                 console.log(`🎬 ${data.username} reconnected to room ${room.code}`);
                 socket.to(room.code).emit('room:user-reconnected', { user });
             } else {
