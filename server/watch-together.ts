@@ -14,6 +14,7 @@ interface VideoState {
     isPlaying: boolean;
     currentTime: number;
     lastUpdate: number;
+    playbackRate: number;
 }
 
 interface Room {
@@ -151,7 +152,8 @@ export function setupWatchTogether(httpServer: HttpServer): Server {
                 videoState: {
                     isPlaying: false,
                     currentTime: 0,
-                    lastUpdate: Date.now()
+                    lastUpdate: Date.now(),
+                    playbackRate: 1
                 },
                 createdAt: new Date()
             };
@@ -272,16 +274,22 @@ export function setupWatchTogether(httpServer: HttpServer): Server {
         // Video sync events (host only)
         socket.on('video:play', (data: { currentTime: number }) => {
             const roomCode = userToRoom.get(socket.id);
+            console.log('🎬 Server received video:play from', socket.id, 'roomCode:', roomCode, 'time:', data.currentTime);
             if (!roomCode) return;
             const room = rooms.get(roomCode);
-            if (!room || room.hostId !== socket.id) return;
+            if (!room || room.hostId !== socket.id) {
+                console.log('🎬 video:play rejected - room:', !!room, 'isHost:', room?.hostId === socket.id);
+                return;
+            }
 
             room.videoState = {
                 isPlaying: true,
                 currentTime: data.currentTime,
-                lastUpdate: Date.now()
+                lastUpdate: Date.now(),
+                playbackRate: room.videoState.playbackRate
             };
 
+            console.log('🎬 Broadcasting video:sync to room', roomCode, room.videoState);
             socket.to(roomCode).emit('video:sync', room.videoState);
         });
 
@@ -294,7 +302,8 @@ export function setupWatchTogether(httpServer: HttpServer): Server {
             room.videoState = {
                 isPlaying: false,
                 currentTime: data.currentTime,
-                lastUpdate: Date.now()
+                lastUpdate: Date.now(),
+                playbackRate: room.videoState.playbackRate
             };
 
             socket.to(roomCode).emit('video:sync', room.videoState);
@@ -307,6 +316,18 @@ export function setupWatchTogether(httpServer: HttpServer): Server {
             if (!room || room.hostId !== socket.id) return;
 
             room.videoState.currentTime = data.currentTime;
+            room.videoState.lastUpdate = Date.now();
+
+            socket.to(roomCode).emit('video:sync', room.videoState);
+        });
+
+        socket.on('video:playbackRate', (data: { rate: number }) => {
+            const roomCode = userToRoom.get(socket.id);
+            if (!roomCode) return;
+            const room = rooms.get(roomCode);
+            if (!room || room.hostId !== socket.id) return;
+
+            room.videoState.playbackRate = data.rate;
             room.videoState.lastUpdate = Date.now();
 
             socket.to(roomCode).emit('video:sync', room.videoState);

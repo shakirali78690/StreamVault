@@ -62,6 +62,7 @@ interface WatchTogetherContextType {
     videoPlay: (currentTime: number) => void;
     videoPause: (currentTime: number) => void;
     videoSeek: (currentTime: number) => void;
+    videoPlaybackRate: (rate: number) => void;
     requestVideoState: () => void;
     hostMuteUser: (targetUserId: string, isMuted: boolean) => void;
     clearError: () => void;
@@ -351,15 +352,23 @@ export function WatchTogetherProvider({ children }: Props) {
     }, [socket]);
 
     const videoPlay = useCallback((currentTime: number) => {
+        console.log('🎬 Context videoPlay - emitting video:play to server, time:', currentTime);
         socket?.emit('video:play', { currentTime });
     }, [socket]);
 
     const videoPause = useCallback((currentTime: number) => {
+        console.log('🎬 Context videoPause - emitting video:pause to server, time:', currentTime);
         socket?.emit('video:pause', { currentTime });
     }, [socket]);
 
     const videoSeek = useCallback((currentTime: number) => {
+        console.log('🎬 Context videoSeek - emitting video:seek to server, time:', currentTime);
         socket?.emit('video:seek', { currentTime });
+    }, [socket]);
+
+    const videoPlaybackRate = useCallback((rate: number) => {
+        console.log('🎬 Context videoPlaybackRate - emitting video:playbackRate to server, rate:', rate);
+        socket?.emit('video:playbackRate', { rate });
     }, [socket]);
 
     const requestVideoState = useCallback(() => {
@@ -397,6 +406,7 @@ export function WatchTogetherProvider({ children }: Props) {
             videoPlay,
             videoPause,
             videoSeek,
+            videoPlaybackRate,
             requestVideoState,
             hostMuteUser,
             clearError

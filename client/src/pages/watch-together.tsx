@@ -28,6 +28,7 @@ import { Input } from '@/components/ui/input';
 import { useWatchTogether, WatchTogetherProvider } from '@/contexts/watch-together-context';
 import { useVoiceChat } from '@/hooks/use-voice-chat';
 import EmojiPicker, { Theme } from 'emoji-picker-react';
+import { VideoPlayer, VideoPlayerRef } from '@/components/video-player';
 import type { Show, Movie, Episode } from '@shared/schema';
 
 // Emoji reactions
@@ -131,9 +132,13 @@ function WatchTogetherContent() {
         videoPlay,
         videoPause,
         videoSeek,
+        videoPlaybackRate,
         hostMuteUser,
         clearError
     } = useWatchTogether();
+
+    // Video player ref for sync control
+    const videoPlayerRef = useRef<VideoPlayerRef>(null);
 
     // Custom modal state for mute/unmute notifications
     const [showMuteNotification, setShowMuteNotification] = useState(false);
@@ -319,6 +324,10 @@ function WatchTogetherContent() {
             sessionStorage.removeItem('watchTogether_contentId');
             sessionStorage.removeItem('watchTogether_episodeId');
 
+            // Also clear auto-rejoin localStorage to prevent rejoining old room
+            localStorage.removeItem('watch-together-username');
+            localStorage.removeItem('watch-together-room');
+
             // Create the room
             setUsername(storedUsername);
             createRoom(contentType, contentId, storedUsername, episodeId || undefined);
@@ -357,7 +366,8 @@ function WatchTogetherContent() {
 
     // Auto-rejoin on page load if we have saved credentials
     useEffect(() => {
-        if (!isConnected || currentUser || !roomCode) return;
+        // Skip auto-rejoin if we're creating a new room
+        if (!isConnected || currentUser || !roomCode || roomCode === 'NEW') return;
 
         const savedUsername = localStorage.getItem('watch-together-username');
         const savedRoom = localStorage.getItem('watch-together-room');
@@ -373,6 +383,52 @@ function WatchTogetherContent() {
             }, 500);
         }
     }, [isConnected, currentUser, roomCode, joinRoom]);
+
+    // Video sync effect - listen for sync events from host and apply to player
+    useEffect(() => {
+        // Only attach listener for non-host viewers
+        if (!socket || isHost) return;
+
+        const handleVideoSync = (state: { isPlaying: boolean; currentTime: number; playbackRate: number }) => {
+            console.log('🎬 Received video sync:', state);
+
+            const player = videoPlayerRef.current;
+            if (!player) {
+                console.log('🎬 VideoPlayer ref not available yet');
+                return;
+            }
+
+            // Apply playback rate
+            if (state.playbackRate !== player.getPlaybackRate()) {
+                console.log('🎬 Applying playback rate:', state.playbackRate);
+                player.setPlaybackRate(state.playbackRate);
+            }
+
+            // Sync position if difference is more than 2 seconds
+            const currentTime = player.getCurrentTime();
+            if (Math.abs(currentTime - state.currentTime) > 2) {
+                console.log('🎬 Syncing position from', currentTime, 'to', state.currentTime);
+                player.seek(state.currentTime);
+            }
+
+            // Sync play/pause state
+            if (state.isPlaying && player.isPaused()) {
+                console.log('🎬 Playing video (sync)');
+                player.play();
+            } else if (!state.isPlaying && !player.isPaused()) {
+                console.log('🎬 Pausing video (sync)');
+                player.pause();
+            }
+        };
+
+        console.log('🎬 Attaching video:sync listener for viewer');
+        socket.on('video:sync', handleVideoSync);
+
+        return () => {
+            console.log('🎬 Removing video:sync listener');
+            socket.off('video:sync', handleVideoSync);
+        };
+    }, [socket, isHost]);
 
     // Handle join
     const handleJoin = () => {
@@ -667,21 +723,45 @@ function WatchTogetherContent() {
             <div className="flex h-[calc(100vh-65px)]">
                 {/* Main Content */}
                 <div className="flex-1 flex flex-col overflow-hidden">
-                    {/* Video Player */}
-                    <div className="flex-1 relative bg-black">
-                        {driveId ? (
-                            <iframe
-                                ref={videoRef}
-                                src={`https://drive.google.com/file/d/${driveId}/preview`}
+                    {/* Video Player - leave room for reaction bar (60px) */}
+                    <div className="relative bg-black flex items-center justify-center" style={{ height: 'calc(100% - 60px)' }}>
+                        <div className="w-full h-full max-h-full flex items-center justify-center">
+                            <VideoPlayer
+                                ref={videoPlayerRef}
+                                videoUrl={episode?.googleDriveUrl || movie?.googleDriveUrl}
                                 className="w-full h-full"
-                                allow="autoplay; encrypted-media"
-                                allowFullScreen
+                                isHost={isHost}
+                                syncMode={true}
+                                onPlay={() => {
+                                    console.log('🎬 onPlay handler called - isHost:', isHost);
+                                    if (isHost) {
+                                        const time = videoPlayerRef.current?.getCurrentTime() || 0;
+                                        console.log('🎬 Calling videoPlay with time:', time);
+                                        videoPlay(time);
+                                    }
+                                }}
+                                onPause={() => {
+                                    console.log('🎬 onPause handler called - isHost:', isHost);
+                                    if (isHost) {
+                                        const time = videoPlayerRef.current?.getCurrentTime() || 0;
+                                        console.log('🎬 Calling videoPause with time:', time);
+                                        videoPause(time);
+                                    }
+                                }}
+                                onSeek={(time) => {
+                                    console.log('🎬 onSeek handler called - isHost:', isHost, 'time:', time);
+                                    if (isHost) {
+                                        videoSeek(time);
+                                    }
+                                }}
+                                onPlaybackRateChange={(rate) => {
+                                    console.log('🎬 onPlaybackRateChange handler called - isHost:', isHost, 'rate:', rate);
+                                    if (isHost) {
+                                        videoPlaybackRate(rate);
+                                    }
+                                }}
                             />
-                        ) : (
-                            <div className="w-full h-full flex items-center justify-center">
-                                <p className="text-muted-foreground">No video available</p>
-                            </div>
-                        )}
+                        </div>
 
                         {/* Host indicator */}
                         {isHost && (
@@ -692,8 +772,8 @@ function WatchTogetherContent() {
                         )}
                     </div>
 
-                    {/* Reaction Bar */}
-                    <div className="bg-card border-t border-border p-4">
+                    {/* Reaction Bar - fixed height, never shrink */}
+                    <div className="bg-card border-t border-border p-4 flex-shrink-0">
                         <div className="flex items-center justify-center gap-2">
                             {REACTION_EMOJIS.map((emoji) => (
                                 <button

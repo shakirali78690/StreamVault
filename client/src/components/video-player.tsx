@@ -1,6 +1,17 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, forwardRef, useImperativeHandle } from 'react';
 import { Link } from 'wouter';
 import { Button } from '@/components/ui/button';
+
+// Export interface for external control
+export interface VideoPlayerRef {
+    play: () => void;
+    pause: () => void;
+    seek: (time: number) => void;
+    setPlaybackRate: (rate: number) => void;
+    getCurrentTime: () => number;
+    getPlaybackRate: () => number;
+    isPaused: () => boolean;
+}
 
 interface VideoPlayerProps {
     videoUrl: string | null | undefined;
@@ -8,7 +19,11 @@ interface VideoPlayerProps {
     onTimeUpdate?: (currentTime: number) => void;
     onPlay?: () => void;
     onPause?: () => void;
+    onSeek?: (time: number) => void;
+    onPlaybackRateChange?: (rate: number) => void;
     autoplay?: boolean;
+    isHost?: boolean; // If true, shows controls; if false, hide controls for viewers
+    syncMode?: boolean; // If true, disables local controls for non-hosts
 }
 
 // URL type detection helpers
@@ -56,26 +71,89 @@ declare global {
     }
 }
 
-// JW Player Wrapper Component
+// JW Player Wrapper Component with ref for external control
 interface JWPlayerWrapperProps {
     videoUrl: string;
     className?: string;
     onTimeUpdate?: (currentTime: number) => void;
     onPlay?: () => void;
     onPause?: () => void;
+    onSeek?: (time: number) => void;
+    onPlaybackRateChange?: (rate: number) => void;
     autoplay?: boolean;
+    isHost?: boolean;
+    syncMode?: boolean;
 }
 
-function JWPlayerWrapper({
+const JWPlayerWrapper = forwardRef<VideoPlayerRef, JWPlayerWrapperProps>(({
     videoUrl,
     className = '',
     onTimeUpdate,
     onPlay,
     onPause,
-    autoplay = false
-}: JWPlayerWrapperProps) {
+    onSeek,
+    onPlaybackRateChange,
+    autoplay = false,
+    isHost = true,
+    syncMode = false
+}, ref) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const playerIdRef = useRef<string>(`jwplayer-${Math.random().toString(36).substr(2, 9)}`);
+    const playerRef = useRef<any>(null);
+    const lastSeekTime = useRef<number>(0);
+
+    // Refs for callbacks to avoid stale closures
+    const callbacksRef = useRef({
+        onPlay,
+        onPause,
+        onSeek,
+        onPlaybackRateChange,
+        onTimeUpdate,
+        isHost,
+        syncMode
+    });
+
+    // Keep refs updated
+    callbacksRef.current = {
+        onPlay,
+        onPause,
+        onSeek,
+        onPlaybackRateChange,
+        onTimeUpdate,
+        isHost,
+        syncMode
+    };
+
+    // Expose control methods via ref
+    useImperativeHandle(ref, () => ({
+        play: () => {
+            console.log('🎬 VideoPlayer.play() called');
+            playerRef.current?.play();
+        },
+        pause: () => {
+            console.log('🎬 VideoPlayer.pause() called');
+            playerRef.current?.pause();
+        },
+        seek: (time: number) => {
+            console.log('🎬 VideoPlayer.seek() called:', time);
+            lastSeekTime.current = time;
+            playerRef.current?.seek(time);
+        },
+        setPlaybackRate: (rate: number) => {
+            console.log('🎬 VideoPlayer.setPlaybackRate() called:', rate);
+            playerRef.current?.setPlaybackRate(rate);
+        },
+        getCurrentTime: () => {
+            return playerRef.current?.getPosition?.() || 0;
+        },
+        getPlaybackRate: () => {
+            return playerRef.current?.getPlaybackRate?.() || 1;
+        },
+        isPaused: () => {
+            const state = playerRef.current?.getState?.();
+            return state !== 'playing';
+        }
+    }));
 
     useEffect(() => {
         if (!containerRef.current || !window.jwplayer) {
@@ -90,62 +168,107 @@ function JWPlayerWrapper({
             file: videoUrl,
             width: '100%',
             height: '100%',
-            aspectratio: '16:9',
             autostart: autoplay,
-            controls: true,
+            controls: true, // Always show controls, but we'll handle sync via events
             primary: 'html5',
-            stretching: 'uniform',
-            playbackRateControls: true, // Enable speed selector
-            playbackRates: [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2], // Speed options
+            stretching: 'fill',
+            playbackRateControls: true,
+            playbackRates: [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2],
             displaytitle: false,
             displaydescription: false,
-            cast: {}, // Enable casting if available
             skin: {
                 name: 'seven'
             }
         });
 
-        // Attach event listeners
-        if (onTimeUpdate) {
-            player.on('time', (e: { position: number }) => {
-                onTimeUpdate(e.position);
-            });
-        }
-        if (onPlay) {
-            player.on('play', onPlay);
-        }
-        if (onPause) {
-            player.on('pause', onPause);
-        }
+        playerRef.current = player;
+
+        // Attach event listeners using refs to avoid stale closures
+        player.on('time', (e: { position: number }) => {
+            callbacksRef.current.onTimeUpdate?.(e.position);
+        });
+
+        // Only emit control events if host or not in sync mode
+        player.on('play', () => {
+            const { isHost, syncMode, onPlay } = callbacksRef.current;
+            console.log('🎬 JW Player play event - isHost:', isHost, 'syncMode:', syncMode);
+            if (isHost || !syncMode) {
+                onPlay?.();
+            }
+        });
+
+        player.on('pause', () => {
+            const { isHost, syncMode, onPause } = callbacksRef.current;
+            console.log('🎬 JW Player pause event - isHost:', isHost, 'syncMode:', syncMode);
+            if (isHost || !syncMode) {
+                onPause?.();
+            }
+        });
+
+        player.on('seek', (e: { offset: number; position: number }) => {
+            const { isHost, syncMode, onSeek } = callbacksRef.current;
+            console.log('🎬 JW Player seek event:', e.offset, '- isHost:', isHost);
+            // Only emit if this is a user-initiated seek (not a sync seek)
+            if ((isHost || !syncMode) && Math.abs(e.offset - lastSeekTime.current) > 1) {
+                onSeek?.(e.offset);
+            }
+        });
+
+        player.on('playbackRateChanged', (e: { playbackRate: number }) => {
+            const { isHost, syncMode, onPlaybackRateChange } = callbacksRef.current;
+            console.log('🎬 JW Player playbackRate changed:', e.playbackRate, '- isHost:', isHost);
+            if (isHost || !syncMode) {
+                onPlaybackRateChange?.(e.playbackRate);
+            }
+        });
 
         return () => {
-            // Cleanup player on unmount
+            playerRef.current = null;
             try {
                 window.jwplayer(playerId).remove();
             } catch (e) {
                 // Player may already be destroyed
             }
         };
-    }, [videoUrl, autoplay, onTimeUpdate, onPlay, onPause]);
+    }, [videoUrl, autoplay, isHost, syncMode]);
 
     return (
-        <div className={`w-full h-full ${className}`}>
-            <div id={playerIdRef.current} ref={containerRef}></div>
+        <div className={`w-full h-full ${className}`} style={{ position: 'relative' }}>
+            <div
+                id={playerIdRef.current}
+                ref={containerRef}
+                style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+            ></div>
         </div>
     );
-}
+});
 
-export function VideoPlayer({
+export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(({
     videoUrl,
     className = '',
     onTimeUpdate,
     onPlay,
     onPause,
-    autoplay = false
-}: VideoPlayerProps) {
-    const videoRef = useRef<HTMLVideoElement>(null);
+    onSeek,
+    onPlaybackRateChange,
+    autoplay = false,
+    isHost = true,
+    syncMode = false
+}, ref) => {
+    const jwPlayerRef = useRef<VideoPlayerRef>(null);
     const [playerType, setPlayerType] = useState<'drive' | 'jwplayer' | 'direct' | 'embed' | 'none'>('none');
     const [processedUrl, setProcessedUrl] = useState<string | null>(null);
+
+    // Forward ref to internal player
+    useImperativeHandle(ref, () => ({
+        play: () => jwPlayerRef.current?.play(),
+        pause: () => jwPlayerRef.current?.pause(),
+        seek: (time: number) => jwPlayerRef.current?.seek(time),
+        setPlaybackRate: (rate: number) => jwPlayerRef.current?.setPlaybackRate(rate),
+        getCurrentTime: () => jwPlayerRef.current?.getCurrentTime() || 0,
+        getPlaybackRate: () => jwPlayerRef.current?.getPlaybackRate() || 1,
+        isPaused: () => jwPlayerRef.current?.isPaused() ?? true
+    }));
 
     useEffect(() => {
         if (!videoUrl) {
@@ -205,26 +328,6 @@ export function VideoPlayer({
             setProcessedUrl(videoUrl);
         }
     }, [videoUrl]);
-
-    // Handle direct video events
-    useEffect(() => {
-        const video = videoRef.current;
-        if (!video || playerType !== 'direct') return;
-
-        const handleTimeUpdate = () => onTimeUpdate?.(video.currentTime);
-        const handlePlay = () => onPlay?.();
-        const handlePause = () => onPause?.();
-
-        video.addEventListener('timeupdate', handleTimeUpdate);
-        video.addEventListener('play', handlePlay);
-        video.addEventListener('pause', handlePause);
-
-        return () => {
-            video.removeEventListener('timeupdate', handleTimeUpdate);
-            video.removeEventListener('play', handlePlay);
-            video.removeEventListener('pause', handlePause);
-        };
-    }, [playerType, onTimeUpdate, onPlay, onPause]);
 
     // Render placeholder when no video available
     if (playerType === 'none' || !processedUrl) {
@@ -294,12 +397,17 @@ export function VideoPlayer({
     if (playerType === 'direct') {
         return (
             <JWPlayerWrapper
+                ref={jwPlayerRef}
                 videoUrl={processedUrl!}
                 className={className}
                 onTimeUpdate={onTimeUpdate}
                 onPlay={onPlay}
                 onPause={onPause}
+                onSeek={onSeek}
+                onPlaybackRateChange={onPlaybackRateChange}
                 autoplay={autoplay}
+                isHost={isHost}
+                syncMode={syncMode}
             />
         );
     }
@@ -315,6 +423,6 @@ export function VideoPlayer({
             scrolling="no"
         />
     );
-}
+});
 
 export default VideoPlayer;
