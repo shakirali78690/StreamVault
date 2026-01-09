@@ -137,6 +137,9 @@ export function WatchTogetherProvider({ children }: Props) {
             setVideoState(data.videoState);
             setMessages([]);
             setError(null);
+            // Save to localStorage for auto-rejoin
+            localStorage.setItem('watch-together-username', data.user.username);
+            localStorage.setItem('watch-together-room', data.roomCode);
         });
 
         newSocket.on('room:joined', (data: RoomInfo) => {
@@ -146,6 +149,11 @@ export function WatchTogetherProvider({ children }: Props) {
             setVideoState(data.videoState);
             setMessages([]);
             setError(null);
+            setHostDisconnected(false);
+            setReconnectCountdown(null);
+            // Save to localStorage for auto-rejoin
+            localStorage.setItem('watch-together-username', data.user.username);
+            localStorage.setItem('watch-together-room', data.roomCode);
         });
 
         newSocket.on('room:user-joined', ({ user }: { user: User }) => {
