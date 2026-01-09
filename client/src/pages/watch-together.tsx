@@ -262,6 +262,13 @@ function WatchTogetherContent() {
         setIsLoadingGifs(false);
     };
 
+    // Load trending GIFs when GIF picker opens
+    useEffect(() => {
+        if (showGifPicker && gifs.length === 0 && !gifSearch) {
+            searchGifs('trending');
+        }
+    }, [showGifPicker]);
+
     // Fetch all shows to find by ID (API doesn't support direct ID lookup)
     const { data: allShows } = useQuery<Show[]>({
         queryKey: ['/api/shows'],
