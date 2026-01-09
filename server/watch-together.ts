@@ -4,6 +4,7 @@ import { Server, Socket } from 'socket.io';
 // Types
 interface User {
     id: string;
+    sessionId: string; // Persistent session ID for reconnection
     username: string;
     isHost: boolean;
     isMuted: boolean;
@@ -19,12 +20,15 @@ interface Room {
     id: string;
     code: string;
     hostId: string;
+    hostSessionId: string; // Host's session ID for reconnection
     contentType: 'show' | 'movie';
     contentId: string;
     episodeId?: string;
     users: Map<string, User>;
     videoState: VideoState;
     createdAt: Date;
+    hostDisconnectedAt?: number; // Timestamp when host disconnected (for grace period)
+    destroyTimeout?: NodeJS.Timeout; // Timeout to destroy room after host disconnect
 }
 
 interface ChatMessage {
@@ -37,6 +41,10 @@ interface ChatMessage {
 // In-memory room storage
 const rooms = new Map<string, Room>();
 const userToRoom = new Map<string, string>(); // socketId -> roomCode
+const sessionToRoom = new Map<string, string>(); // sessionId -> roomCode (for reconnection)
+
+// Host reconnection grace period (2 minutes)
+const HOST_GRACE_PERIOD_MS = 2 * 60 * 1000;
 
 // Generate 6-character room code
 function generateRoomCode(): string {
@@ -72,7 +80,60 @@ export function setupWatchTogether(httpServer: HttpServer): Server {
             contentId: string;
             episodeId?: string;
             username: string;
+            sessionId: string;
         }) => {
+            // Check if user already has an active room with this session
+            const existingRoomCode = sessionToRoom.get(data.sessionId);
+            if (existingRoomCode) {
+                const existingRoom = rooms.get(existingRoomCode);
+                if (existingRoom && existingRoom.hostSessionId === data.sessionId) {
+                    // Host reconnecting - restore their session
+                    console.log(`🎬 Host reconnecting to room ${existingRoomCode}`);
+
+                    // Cancel destroy timeout if pending
+                    if (existingRoom.destroyTimeout) {
+                        clearTimeout(existingRoom.destroyTimeout);
+                        existingRoom.destroyTimeout = undefined;
+                        existingRoom.hostDisconnectedAt = undefined;
+                    }
+
+                    // Update host's socket ID
+                    const oldHostId = existingRoom.hostId;
+                    existingRoom.hostId = socket.id;
+
+                    // Update user entry
+                    existingRoom.users.delete(oldHostId);
+                    const user: User = {
+                        id: socket.id,
+                        sessionId: data.sessionId,
+                        username: data.username,
+                        isHost: true,
+                        isMuted: false
+                    };
+                    existingRoom.users.set(socket.id, user);
+
+                    userToRoom.set(socket.id, existingRoomCode);
+                    socket.join(existingRoomCode);
+
+                    // Send room info to reconnecting host
+                    socket.emit('room:joined', {
+                        roomId: existingRoom.id,
+                        roomCode: existingRoom.code,
+                        contentType: existingRoom.contentType,
+                        contentId: existingRoom.contentId,
+                        episodeId: existingRoom.episodeId,
+                        users: Array.from(existingRoom.users.values()),
+                        videoState: existingRoom.videoState,
+                        user
+                    });
+
+                    // Notify others that host reconnected
+                    socket.to(existingRoomCode).emit('room:host-reconnected', { user });
+                    console.log(`🎬 Host ${data.username} reconnected to room ${existingRoomCode}`);
+                    return;
+                }
+            }
+
             let code = generateRoomCode();
             while (rooms.has(code)) {
                 code = generateRoomCode();
@@ -82,6 +143,7 @@ export function setupWatchTogether(httpServer: HttpServer): Server {
                 id: generateId(),
                 code,
                 hostId: socket.id,
+                hostSessionId: data.sessionId,
                 contentType: data.contentType,
                 contentId: data.contentId,
                 episodeId: data.episodeId,
@@ -96,6 +158,7 @@ export function setupWatchTogether(httpServer: HttpServer): Server {
 
             const user: User = {
                 id: socket.id,
+                sessionId: data.sessionId,
                 username: data.username,
                 isHost: true,
                 isMuted: false
@@ -104,6 +167,7 @@ export function setupWatchTogether(httpServer: HttpServer): Server {
             room.users.set(socket.id, user);
             rooms.set(code, room);
             userToRoom.set(socket.id, code);
+            sessionToRoom.set(data.sessionId, code);
 
             socket.join(code);
             socket.emit('room:created', {
@@ -120,7 +184,7 @@ export function setupWatchTogether(httpServer: HttpServer): Server {
         });
 
         // Join an existing room
-        socket.on('room:join', (data: { roomCode: string; username: string }) => {
+        socket.on('room:join', (data: { roomCode: string; username: string; sessionId: string }) => {
             const room = rooms.get(data.roomCode.toUpperCase());
 
             if (!room) {
@@ -128,15 +192,28 @@ export function setupWatchTogether(httpServer: HttpServer): Server {
                 return;
             }
 
+            // Check if this is a reconnection (same session ID already in room)
+            let existingUser: User | undefined;
+            room.users.forEach((user, odlSocketId) => {
+                if (user.sessionId === data.sessionId) {
+                    existingUser = user;
+                    // Remove old socket entry
+                    room.users.delete(odlSocketId);
+                    userToRoom.delete(odlSocketId);
+                }
+            });
+
             const user: User = {
                 id: socket.id,
+                sessionId: data.sessionId,
                 username: data.username,
-                isHost: false,
-                isMuted: false
+                isHost: existingUser?.isHost || false,
+                isMuted: existingUser?.isMuted || false
             };
 
             room.users.set(socket.id, user);
             userToRoom.set(socket.id, room.code);
+            sessionToRoom.set(data.sessionId, room.code);
 
             socket.join(room.code);
 
@@ -153,9 +230,13 @@ export function setupWatchTogether(httpServer: HttpServer): Server {
             });
 
             // Notify others in room
-            socket.to(room.code).emit('room:user-joined', { user });
-
-            console.log(`🎬 ${data.username} joined room ${room.code}`);
+            if (existingUser) {
+                console.log(`🎬 ${data.username} reconnected to room ${room.code}`);
+                socket.to(room.code).emit('room:user-reconnected', { user });
+            } else {
+                console.log(`🎬 ${data.username} joined room ${room.code}`);
+                socket.to(room.code).emit('room:user-joined', { user });
+            }
         });
 
         // Leave room
@@ -340,18 +421,45 @@ export function setupWatchTogether(httpServer: HttpServer): Server {
             userToRoom.delete(socket.id);
             socket.leave(roomCode);
 
-            // If host left, destroy the room
-            if (wasHost) {
-                watchNamespace.to(roomCode).emit('room:destroyed', {
-                    message: 'Host has ended the session'
+            // If host left, start grace period instead of immediately destroying
+            if (wasHost && user) {
+                console.log(`🎬 Host disconnected from room ${roomCode}, starting ${HOST_GRACE_PERIOD_MS / 1000}s grace period`);
+
+                room.hostDisconnectedAt = Date.now();
+
+                // Notify others that host disconnected (but room still active)
+                watchNamespace.to(roomCode).emit('room:host-disconnected', {
+                    message: 'Host disconnected. Waiting for reconnection...',
+                    gracePeriodMs: HOST_GRACE_PERIOD_MS
                 });
-                rooms.delete(roomCode);
-                console.log(`🎬 Room ${roomCode} destroyed (host left)`);
+
+                // Set timeout to destroy room if host doesn't reconnect
+                room.destroyTimeout = setTimeout(() => {
+                    // Check if host reconnected
+                    if (room.hostDisconnectedAt) {
+                        watchNamespace.to(roomCode).emit('room:destroyed', {
+                            message: 'Host did not reconnect in time'
+                        });
+
+                        // Clean up session mappings for all users
+                        room.users.forEach(u => {
+                            sessionToRoom.delete(u.sessionId);
+                        });
+                        sessionToRoom.delete(room.hostSessionId);
+
+                        rooms.delete(roomCode);
+                        console.log(`🎬 Room ${roomCode} destroyed (host didn't reconnect)`);
+                    }
+                }, HOST_GRACE_PERIOD_MS);
+
             } else if (user) {
+                // Non-host user left - just notify others
                 socket.to(roomCode).emit('room:user-left', {
                     userId: socket.id,
                     username: user.username
                 });
+                // Clean up their session mapping
+                sessionToRoom.delete(user.sessionId);
             }
         }
     });

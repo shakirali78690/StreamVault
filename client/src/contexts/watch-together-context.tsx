@@ -51,6 +51,8 @@ interface WatchTogetherContextType {
     isHost: boolean;
     currentUser: User | null;
     error: string | null;
+    hostDisconnected: boolean;
+    reconnectCountdown: number | null;
     // Actions
     createRoom: (contentType: 'show' | 'movie', contentId: string, username: string, episodeId?: string) => void;
     joinRoom: (roomCode: string, username: string) => void;
@@ -90,8 +92,21 @@ export function WatchTogetherProvider({ children }: Props) {
     const [videoState, setVideoState] = useState<VideoState | null>(null);
     const [currentUser, setCurrentUser] = useState<User | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [hostDisconnected, setHostDisconnected] = useState(false);
+    const [reconnectCountdown, setReconnectCountdown] = useState<number | null>(null);
 
     const isHost = currentUser?.isHost ?? false;
+
+    // Generate or retrieve session ID from localStorage
+    const getSessionId = (): string => {
+        const storageKey = 'watch-together-session-id';
+        let sessionId = localStorage.getItem(storageKey);
+        if (!sessionId) {
+            sessionId = `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            localStorage.setItem(storageKey, sessionId);
+        }
+        return sessionId;
+    };
 
     // Initialize socket connection
     useEffect(() => {
@@ -170,6 +185,66 @@ export function WatchTogetherProvider({ children }: Props) {
             setError(message);
         });
 
+        // Host disconnected - show waiting message
+        newSocket.on('room:host-disconnected', ({ message, gracePeriodMs }: { message: string; gracePeriodMs: number }) => {
+            setHostDisconnected(true);
+            setReconnectCountdown(Math.floor(gracePeriodMs / 1000));
+            setMessages(prev => [...prev, {
+                id: `system-${Date.now()}`,
+                username: 'System',
+                message: message,
+                timestamp: new Date()
+            }]);
+
+            // Start countdown timer
+            const interval = setInterval(() => {
+                setReconnectCountdown(prev => {
+                    if (prev && prev > 1) {
+                        return prev - 1;
+                    } else {
+                        clearInterval(interval);
+                        return null;
+                    }
+                });
+            }, 1000);
+        });
+
+        // Host reconnected - clear warning
+        newSocket.on('room:host-reconnected', ({ user }: { user: User }) => {
+            setHostDisconnected(false);
+            setReconnectCountdown(null);
+            setUsers(prev => {
+                const exists = prev.some(u => u.id === user.id);
+                if (exists) {
+                    return prev.map(u => u.id === user.id ? user : u);
+                }
+                return [...prev, user];
+            });
+            setMessages(prev => [...prev, {
+                id: `system-${Date.now()}`,
+                username: 'System',
+                message: `Host reconnected`,
+                timestamp: new Date()
+            }]);
+        });
+
+        // User reconnected
+        newSocket.on('room:user-reconnected', ({ user }: { user: User }) => {
+            setUsers(prev => {
+                const exists = prev.some(u => u.id === user.id);
+                if (exists) {
+                    return prev.map(u => u.id === user.id ? user : u);
+                }
+                return [...prev, user];
+            });
+            setMessages(prev => [...prev, {
+                id: `system-${Date.now()}`,
+                username: 'System',
+                message: `${user.username} reconnected`,
+                timestamp: new Date()
+            }]);
+        });
+
         // Video sync
         newSocket.on('video:sync', (state: VideoState) => {
             setVideoState(state);
@@ -243,11 +318,13 @@ export function WatchTogetherProvider({ children }: Props) {
         username: string,
         episodeId?: string
     ) => {
-        socket?.emit('room:create', { contentType, contentId, username, episodeId });
+        const sessionId = getSessionId();
+        socket?.emit('room:create', { contentType, contentId, username, episodeId, sessionId });
     }, [socket]);
 
     const joinRoom = useCallback((roomCode: string, username: string) => {
-        socket?.emit('room:join', { roomCode: roomCode.toUpperCase(), username });
+        const sessionId = getSessionId();
+        socket?.emit('room:join', { roomCode: roomCode.toUpperCase(), username, sessionId });
     }, [socket]);
 
     const leaveRoom = useCallback(() => {
@@ -306,6 +383,8 @@ export function WatchTogetherProvider({ children }: Props) {
             isHost,
             currentUser,
             error,
+            hostDisconnected,
+            reconnectCountdown,
             createRoom,
             joinRoom,
             leaveRoom,
