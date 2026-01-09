@@ -217,16 +217,14 @@ export function WatchTogetherProvider({ children }: Props) {
             }, 1000);
         });
 
-        // Host reconnected - clear warning
+        // Host reconnected - clear warning and replace old host entry
         newSocket.on('room:host-reconnected', ({ user }: { user: User }) => {
             setHostDisconnected(false);
             setReconnectCountdown(null);
+            // Remove any existing entries with same username and add the new one
             setUsers(prev => {
-                const exists = prev.some(u => u.id === user.id);
-                if (exists) {
-                    return prev.map(u => u.id === user.id ? user : u);
-                }
-                return [...prev, user];
+                const filtered = prev.filter(u => u.username !== user.username);
+                return [...filtered, user];
             });
             setMessages(prev => [...prev, {
                 id: `system-${Date.now()}`,
@@ -236,14 +234,12 @@ export function WatchTogetherProvider({ children }: Props) {
             }]);
         });
 
-        // User reconnected
+        // User reconnected - replace old entry
         newSocket.on('room:user-reconnected', ({ user }: { user: User }) => {
+            // Remove any existing entries with same username and add the new one
             setUsers(prev => {
-                const exists = prev.some(u => u.id === user.id);
-                if (exists) {
-                    return prev.map(u => u.id === user.id ? user : u);
-                }
-                return [...prev, user];
+                const filtered = prev.filter(u => u.username !== user.username);
+                return [...filtered, user];
             });
             setMessages(prev => [...prev, {
                 id: `system-${Date.now()}`,
