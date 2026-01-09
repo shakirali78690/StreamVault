@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CommentsSection } from "@/components/comments-section";
+import { VideoPlayer } from "@/components/video-player";
 import { Helmet } from "react-helmet-async";
 import type { Movie } from "@shared/schema";
 
@@ -120,34 +121,7 @@ export default function WatchMovie() {
           {/* Video Player */}
           <div className="bg-card rounded-lg overflow-hidden shadow-lg">
             <div className="aspect-video bg-black">
-              {driveId ? (
-                <iframe
-                  src={`https://drive.google.com/file/d/${driveId}/preview?autoplay=0&controls=1&modestbranding=1`}
-                  className="w-full h-full border-0"
-                  allowFullScreen
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  title={movie.title}
-                  style={{ border: 'none' }}
-                />
-              ) : (
-                <div className="w-full h-full flex flex-col items-center justify-center text-white p-8 text-center">
-                  <div className="mb-6">
-                    <svg className="w-20 h-20 mx-auto mb-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" />
-                      <line x1="4" y1="4" x2="20" y2="20" strokeLinecap="round" strokeWidth={2} />
-                    </svg>
-                    <h3 className="text-2xl font-bold mb-2">Movie Not Available</h3>
-                    <p className="text-muted-foreground mb-6">
-                      This movie is not available yet. We're working on adding it!
-                    </p>
-                  </div>
-                  <Link href="/request">
-                    <Button variant="default" size="lg" className="gap-2">
-                      Request This Movie
-                    </Button>
-                  </Link>
-                </div>
-              )}
+              <VideoPlayer videoUrl={movie.googleDriveUrl} />
             </div>
 
             {/* Movie Info Below Player */}
