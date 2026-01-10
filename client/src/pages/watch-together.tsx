@@ -13,6 +13,7 @@ import {
     X,
     Smile,
     ChevronLeft,
+    ChevronRight,
     Crown,
     Mic,
     MicOff,
@@ -21,7 +22,10 @@ import {
     Image,
     Video,
     Music,
-    Smartphone
+    Smartphone,
+    SkipBack,
+    SkipForward,
+    List
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -134,6 +138,7 @@ function WatchTogetherContent() {
         videoSeek,
         videoPlaybackRate,
         hostMuteUser,
+        changeContent,
         clearError
     } = useWatchTogether();
 
@@ -730,8 +735,8 @@ function WatchTogetherContent() {
             <div className="flex h-[calc(100vh-65px)]">
                 {/* Main Content */}
                 <div className="flex-1 flex flex-col overflow-hidden">
-                    {/* Video Player - leave room for reaction bar (60px) */}
-                    <div className="relative bg-black flex items-center justify-center" style={{ height: 'calc(100% - 60px)' }}>
+                    {/* Video Player - fills available space */}
+                    <div className="flex-1 relative bg-black flex items-center justify-center min-h-0">
                         <div className="w-full h-full max-h-full flex items-center justify-center">
                             <VideoPlayer
                                 ref={videoPlayerRef}
@@ -779,20 +784,75 @@ function WatchTogetherContent() {
                         )}
                     </div>
 
-                    {/* Reaction Bar - fixed height, never shrink */}
-                    <div className="bg-card border-t border-border p-4 flex-shrink-0">
-                        <div className="flex items-center justify-center gap-2">
-                            {REACTION_EMOJIS.map((emoji) => (
-                                <button
-                                    key={emoji}
-                                    onClick={() => sendReaction(emoji)}
-                                    className="text-2xl hover:scale-125 transition-transform p-2 rounded-lg hover:bg-accent"
+                    {/* Episode Selector Bar - Host Only (for shows) */}
+                    {isHost && roomInfo?.contentType === 'show' && episodes && episodes.length > 1 && (
+                        <div className="bg-card/95 backdrop-blur border-t border-border px-4 py-2 flex-shrink-0">
+                            <div className="flex items-center justify-center gap-4">
+                                {/* Previous Episode */}
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                        const currentEpIndex = episodes.findIndex(ep => ep.id === roomInfo?.episodeId);
+                                        if (currentEpIndex > 0) {
+                                            const prevEp = episodes[currentEpIndex - 1];
+                                            changeContent(prevEp.id, roomInfo?.contentId, 'show');
+                                        }
+                                    }}
+                                    disabled={!episodes || episodes.findIndex(ep => ep.id === roomInfo?.episodeId) <= 0}
+                                    className="flex items-center gap-1"
                                 >
-                                    {emoji}
-                                </button>
-                            ))}
+                                    <SkipBack className="h-4 w-4" />
+                                    <span className="hidden sm:inline">Previous</span>
+                                </Button>
+
+                                {/* Current Episode Info */}
+                                <div className="flex items-center gap-2 px-3 py-1 bg-muted/50 rounded-lg">
+                                    <span className="text-sm font-medium text-primary">
+                                        S{episode?.season}E{episode?.episodeNumber}
+                                    </span>
+                                    <span className="text-sm text-muted-foreground max-w-[200px] truncate hidden sm:inline">
+                                        {episode?.title}
+                                    </span>
+                                </div>
+
+                                {/* Next Episode */}
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                        const currentEpIndex = episodes.findIndex(ep => ep.id === roomInfo?.episodeId);
+                                        if (currentEpIndex < episodes.length - 1) {
+                                            const nextEp = episodes[currentEpIndex + 1];
+                                            changeContent(nextEp.id, roomInfo?.contentId, 'show');
+                                        }
+                                    }}
+                                    disabled={!episodes || episodes.findIndex(ep => ep.id === roomInfo?.episodeId) >= episodes.length - 1}
+                                    className="flex items-center gap-1"
+                                >
+                                    <span className="hidden sm:inline">Next</span>
+                                    <SkipForward className="h-4 w-4" />
+                                </Button>
+
+                                {/* Episode Dropdown */}
+                                <select
+                                    value={episode?.id || ''}
+                                    onChange={(e) => {
+                                        if (e.target.value) {
+                                            changeContent(e.target.value, roomInfo?.contentId, 'show');
+                                        }
+                                    }}
+                                    className="bg-muted text-foreground text-sm rounded-lg px-2 py-1 border border-border cursor-pointer hover:bg-muted/80 transition-colors"
+                                >
+                                    {episodes?.map((ep) => (
+                                        <option key={ep.id} value={ep.id}>
+                                            S{ep.season}E{ep.episodeNumber}: {ep.title}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
                         </div>
-                    </div>
+                    )}
                 </div>
 
                 {/* Chat Sidebar */}
@@ -927,6 +987,21 @@ function WatchTogetherContent() {
                                     )}
                                 </div>
                             )}
+
+                            {/* Reaction Emojis - above input, no visible container */}
+                            <div className="flex items-center justify-center gap-1 py-1">
+                                {REACTION_EMOJIS.map((emoji) => (
+                                    <button
+                                        key={emoji}
+                                        type="button"
+                                        onClick={() => sendReaction(emoji)}
+                                        className="text-lg hover:scale-125 transition-transform p-1 rounded hover:bg-accent/50"
+                                        title={`React with ${emoji}`}
+                                    >
+                                        {emoji}
+                                    </button>
+                                ))}
+                            </div>
 
                             <div className="flex gap-1 items-center">
                                 {/* Emoji Button */}

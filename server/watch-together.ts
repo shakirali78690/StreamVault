@@ -343,6 +343,49 @@ export function setupWatchTogether(httpServer: HttpServer): Server {
             socket.emit('video:sync', room.videoState);
         });
 
+        // Change content (episode/movie) - host only
+        socket.on('video:change-content', (data: { episodeId?: string; contentId?: string; contentType?: 'show' | 'movie' }) => {
+            const roomCode = userToRoom.get(socket.id);
+            console.log('🎬 Server received video:change-content from', socket.id, 'data:', data);
+            if (!roomCode) return;
+            const room = rooms.get(roomCode);
+            if (!room || room.hostId !== socket.id) {
+                console.log('🎬 video:change-content rejected - not host');
+                return;
+            }
+
+            // Update room content
+            if (data.episodeId) {
+                room.episodeId = data.episodeId;
+            }
+            if (data.contentId) {
+                room.contentId = data.contentId;
+            }
+            if (data.contentType) {
+                room.contentType = data.contentType;
+            }
+
+            // Reset video state for new content
+            room.videoState = {
+                isPlaying: false,
+                currentTime: 0,
+                lastUpdate: Date.now(),
+                playbackRate: 1
+            };
+
+            // Broadcast content change to all users including host
+            const contentChangeData = {
+                episodeId: room.episodeId,
+                contentId: room.contentId,
+                contentType: room.contentType,
+                videoState: room.videoState
+            };
+
+            console.log('🎬 Broadcasting content:changed to room', roomCode, contentChangeData);
+            io.of('/watch-together').to(roomCode).emit('content:changed', contentChangeData);
+        });
+
+
         // Chat messages
         socket.on('chat:message', (data: { message: string }) => {
             const roomCode = userToRoom.get(socket.id);

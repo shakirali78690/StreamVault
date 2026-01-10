@@ -65,6 +65,7 @@ interface WatchTogetherContextType {
     videoPlaybackRate: (rate: number) => void;
     requestVideoState: () => void;
     hostMuteUser: (targetUserId: string, isMuted: boolean) => void;
+    changeContent: (episodeId?: string, contentId?: string, contentType?: 'show' | 'movie') => void;
     clearError: () => void;
 }
 
@@ -255,6 +256,23 @@ export function WatchTogetherProvider({ children }: Props) {
             setVideoState(state);
         });
 
+        // Content changed (host changed episode/movie)
+        newSocket.on('content:changed', (data: { episodeId?: string; contentId?: string; contentType?: 'show' | 'movie'; videoState: VideoState }) => {
+            console.log('🎬 Content changed received:', data);
+            // Update roomInfo with new content
+            setRoomInfo(prev => {
+                if (!prev) return prev;
+                return {
+                    ...prev,
+                    episodeId: data.episodeId,
+                    contentId: data.contentId || prev.contentId,
+                    contentType: data.contentType || prev.contentType
+                };
+            });
+            // Reset video state
+            setVideoState(data.videoState);
+        });
+
         // Chat
         newSocket.on('chat:receive', (msg: ChatMessage) => {
             setMessages(prev => [...prev, msg]);
@@ -383,6 +401,12 @@ export function WatchTogetherProvider({ children }: Props) {
         socket?.emit('voice:host-mute', { targetUserId, isMuted });
     }, [socket]);
 
+    // Change content (episode/movie) in room
+    const changeContent = useCallback((episodeId?: string, contentId?: string, contentType?: 'show' | 'movie') => {
+        console.log('🎬 Context changeContent - emitting video:change-content', { episodeId, contentId, contentType });
+        socket?.emit('video:change-content', { episodeId, contentId, contentType });
+    }, [socket]);
+
     return (
         <WatchTogetherContext.Provider value={{
             socket,
@@ -409,6 +433,7 @@ export function WatchTogetherProvider({ children }: Props) {
             videoPlaybackRate,
             requestVideoState,
             hostMuteUser,
+            changeContent,
             clearError
         }}>
             {children}
