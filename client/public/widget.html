@@ -19,15 +19,16 @@
             align-items: center;
             justify-content: center;
             min-height: 100vh;
+            overflow: hidden;
         }
 
         /* StreamVault 300x250 Widget - Works on light and dark backgrounds */
         .streamvault-widget {
-            width: 300px;
-            height: 250px;
+            width: 294px;
+            height: 244px;
             background: #141414;
-            border-radius: 16px;
-            overflow: visible;
+            border-radius: 14px;
+            overflow: hidden;
             position: relative;
             font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
             cursor: pointer;
@@ -134,9 +135,9 @@
         /* Feature badges */
         .widget-features {
             display: flex;
-            gap: 8px;
-            margin-bottom: 14px;
-            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 12px;
+            flex-wrap: nowrap;
             justify-content: center;
         }
 
@@ -144,11 +145,12 @@
             background: rgba(220, 38, 38, 0.15);
             border: 1px solid rgba(220, 38, 38, 0.4);
             color: #ff6b6b;
-            font-size: 11px;
-            padding: 6px 12px;
-            border-radius: 20px;
+            font-size: 10px;
+            padding: 5px 8px;
+            border-radius: 16px;
             animation: fadeInUp 0.5s ease forwards;
             opacity: 0;
+            white-space: nowrap;
         }
 
         .feature-badge:nth-child(1) {
