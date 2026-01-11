@@ -2289,6 +2289,263 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============================================
+  // Site Analytics - Track visitors and content
+  // ============================================
+
+  interface PageView {
+    timestamp: Date;
+    path: string;
+    referrer: string;
+    userAgent: string;
+    sessionId: string;
+    ip: string;
+  }
+
+  interface WatchEvent {
+    timestamp: Date;
+    contentType: 'show' | 'movie';
+    contentId: string;
+    contentTitle: string;
+    episodeId?: string;
+    duration: number; // seconds watched
+    sessionId: string;
+  }
+
+  const siteAnalytics = {
+    pageViews: [] as PageView[],
+    watchEvents: [] as WatchEvent[],
+    activeSessions: new Map<string, { lastSeen: Date; pages: number }>()
+  };
+
+  // Clean up old sessions every 5 minutes
+  setInterval(() => {
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+    siteAnalytics.activeSessions.forEach((data, sessionId) => {
+      if (data.lastSeen < fiveMinutesAgo) {
+        siteAnalytics.activeSessions.delete(sessionId);
+      }
+    });
+  }, 60 * 1000);
+
+  // Track page view
+  app.post("/api/analytics/pageview", (req, res) => {
+    try {
+      const { path, sessionId } = req.body;
+      const referrer = req.headers.referer || req.body.referrer || "direct";
+      const userAgent = req.headers["user-agent"] || "unknown";
+      const ip = (req.headers["x-forwarded-for"] || req.socket.remoteAddress || "unknown") as string;
+
+      siteAnalytics.pageViews.push({
+        timestamp: new Date(),
+        path: path || "/",
+        referrer: referrer as string,
+        userAgent: userAgent as string,
+        sessionId: sessionId || "anonymous",
+        ip: ip.split(",")[0].trim()
+      });
+
+      // Update active session
+      const session = siteAnalytics.activeSessions.get(sessionId) || { lastSeen: new Date(), pages: 0 };
+      session.lastSeen = new Date();
+      session.pages++;
+      siteAnalytics.activeSessions.set(sessionId, session);
+
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to track pageview" });
+    }
+  });
+
+  // Track watch event
+  app.post("/api/analytics/watch", (req, res) => {
+    try {
+      const { contentType, contentId, contentTitle, episodeId, duration, sessionId } = req.body;
+
+      siteAnalytics.watchEvents.push({
+        timestamp: new Date(),
+        contentType,
+        contentId,
+        contentTitle,
+        episodeId,
+        duration: duration || 0,
+        sessionId: sessionId || "anonymous"
+      });
+
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to track watch" });
+    }
+  });
+
+  // Get site analytics (admin only)
+  app.get("/api/analytics/site", requireAdmin, async (req, res) => {
+    try {
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+      const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+      // Page view stats
+      const todayViews = siteAnalytics.pageViews.filter(p => p.timestamp >= today).length;
+      const weekViews = siteAnalytics.pageViews.filter(p => p.timestamp >= weekAgo).length;
+      const monthViews = siteAnalytics.pageViews.filter(p => p.timestamp >= monthAgo).length;
+      const totalViews = siteAnalytics.pageViews.length;
+
+      // Unique visitors (by sessionId)
+      const todayVisitors = new Set(siteAnalytics.pageViews.filter(p => p.timestamp >= today).map(p => p.sessionId)).size;
+      const weekVisitors = new Set(siteAnalytics.pageViews.filter(p => p.timestamp >= weekAgo).map(p => p.sessionId)).size;
+      const totalVisitors = new Set(siteAnalytics.pageViews.map(p => p.sessionId)).size;
+
+      // Active users (sessions in last 5 mins)
+      const activeUsers = siteAnalytics.activeSessions.size;
+
+      // Popular pages
+      const pageCounts: Record<string, number> = {};
+      siteAnalytics.pageViews.forEach(p => {
+        pageCounts[p.path] = (pageCounts[p.path] || 0) + 1;
+      });
+      const popularPages = Object.entries(pageCounts)
+        .sort(([, a], [, b]) => b - a)
+        .slice(0, 10)
+        .map(([path, views]) => ({ path, views }));
+
+      // Traffic sources
+      const sourceCounts: Record<string, number> = {};
+      siteAnalytics.pageViews.forEach(p => {
+        try {
+          if (p.referrer === "direct" || !p.referrer) {
+            sourceCounts["Direct"] = (sourceCounts["Direct"] || 0) + 1;
+          } else {
+            const url = new URL(p.referrer);
+            const domain = url.hostname.replace("www.", "");
+            sourceCounts[domain] = (sourceCounts[domain] || 0) + 1;
+          }
+        } catch {
+          sourceCounts["Direct"] = (sourceCounts["Direct"] || 0) + 1;
+        }
+      });
+      const trafficSources = Object.entries(sourceCounts)
+        .sort(([, a], [, b]) => b - a)
+        .slice(0, 10)
+        .map(([source, visits]) => ({ source, visits }));
+
+      // Device stats
+      const deviceCounts = { mobile: 0, desktop: 0, tablet: 0 };
+      siteAnalytics.pageViews.forEach(p => {
+        const ua = p.userAgent.toLowerCase();
+        if (ua.includes("mobile") || ua.includes("android")) {
+          deviceCounts.mobile++;
+        } else if (ua.includes("tablet") || ua.includes("ipad")) {
+          deviceCounts.tablet++;
+        } else {
+          deviceCounts.desktop++;
+        }
+      });
+
+      // Browser stats
+      const browserCounts: Record<string, number> = {};
+      siteAnalytics.pageViews.forEach(p => {
+        const ua = p.userAgent;
+        let browser = "Other";
+        if (ua.includes("Chrome") && !ua.includes("Edg")) browser = "Chrome";
+        else if (ua.includes("Firefox")) browser = "Firefox";
+        else if (ua.includes("Safari") && !ua.includes("Chrome")) browser = "Safari";
+        else if (ua.includes("Edg")) browser = "Edge";
+        browserCounts[browser] = (browserCounts[browser] || 0) + 1;
+      });
+
+      // Watch stats - top content
+      const showWatchCounts: Record<string, { title: string; watches: number; duration: number }> = {};
+      const movieWatchCounts: Record<string, { title: string; watches: number; duration: number }> = {};
+
+      siteAnalytics.watchEvents.forEach(w => {
+        if (w.contentType === "show") {
+          if (!showWatchCounts[w.contentId]) {
+            showWatchCounts[w.contentId] = { title: w.contentTitle, watches: 0, duration: 0 };
+          }
+          showWatchCounts[w.contentId].watches++;
+          showWatchCounts[w.contentId].duration += w.duration;
+        } else {
+          if (!movieWatchCounts[w.contentId]) {
+            movieWatchCounts[w.contentId] = { title: w.contentTitle, watches: 0, duration: 0 };
+          }
+          movieWatchCounts[w.contentId].watches++;
+          movieWatchCounts[w.contentId].duration += w.duration;
+        }
+      });
+
+      const topShows = Object.entries(showWatchCounts)
+        .sort(([, a], [, b]) => b.watches - a.watches)
+        .slice(0, 10)
+        .map(([id, data]) => ({ id, ...data }));
+
+      const topMovies = Object.entries(movieWatchCounts)
+        .sort(([, a], [, b]) => b.watches - a.watches)
+        .slice(0, 10)
+        .map(([id, data]) => ({ id, ...data }));
+
+      // Total watch time
+      const totalWatchTime = siteAnalytics.watchEvents.reduce((sum, w) => sum + w.duration, 0);
+
+      // Daily views for chart (last 7 days)
+      const dailyViews: { date: string; views: number; visitors: number }[] = [];
+      for (let i = 6; i >= 0; i--) {
+        const date = new Date(today.getTime() - i * 24 * 60 * 60 * 1000);
+        const nextDate = new Date(date.getTime() + 24 * 60 * 60 * 1000);
+        const dayViews = siteAnalytics.pageViews.filter(
+          p => p.timestamp >= date && p.timestamp < nextDate
+        );
+        dailyViews.push({
+          date: date.toISOString().split("T")[0],
+          views: dayViews.length,
+          visitors: new Set(dayViews.map(p => p.sessionId)).size
+        });
+      }
+
+      // Hourly activity (last 24 hours)
+      const hourlyActivity: { hour: number; views: number }[] = [];
+      const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      for (let h = 0; h < 24; h++) {
+        const hourViews = siteAnalytics.pageViews.filter(p => {
+          if (p.timestamp < dayAgo) return false;
+          return p.timestamp.getHours() === h;
+        }).length;
+        hourlyActivity.push({ hour: h, views: hourViews });
+      }
+
+      // Recent activity
+      const recentPageViews = siteAnalytics.pageViews
+        .slice(-20)
+        .reverse()
+        .map(p => ({
+          timestamp: p.timestamp,
+          path: p.path,
+          referrer: p.referrer.substring(0, 50)
+        }));
+
+      res.json({
+        overview: {
+          pageViews: { today: todayViews, week: weekViews, month: monthViews, total: totalViews },
+          visitors: { today: todayVisitors, week: weekVisitors, total: totalVisitors },
+          activeUsers,
+          totalWatchTimeHours: Math.round(totalWatchTime / 3600 * 10) / 10
+        },
+        dailyViews,
+        hourlyActivity,
+        popularPages,
+        trafficSources,
+        devices: deviceCounts,
+        browsers: browserCounts,
+        topShows,
+        topMovies,
+        recentPageViews
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get analytics" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;

@@ -95,6 +95,9 @@ export default function AdminPage() {
             <p className="text-muted-foreground">Manage your StreamVault content</p>
           </div>
           <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setLocation('/admin/analytics')}>
+              📈 Site Analytics
+            </Button>
             <Button variant="outline" onClick={() => setLocation('/admin/widget')}>
               📊 Widget Analytics
             </Button>

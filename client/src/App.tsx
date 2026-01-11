@@ -43,6 +43,8 @@ import BlogPost from "@/pages/blog-post";
 import WatchTogether from "@/pages/watch-together";
 import CreateRoom from "@/pages/create-room";
 import WidgetDashboard from "@/pages/widget-dashboard";
+import SiteAnalytics from "@/pages/site-analytics";
+import { AnalyticsTracker } from "@/components/analytics-tracker";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -65,6 +67,7 @@ function Router() {
           <Route path="/watchlist" component={Watchlist} />
           <Route path="/admin/login" component={AdminLogin} />
           <Route path="/admin/widget" component={WidgetDashboard} />
+          <Route path="/admin/analytics" component={SiteAnalytics} />
           <Route path="/admin" component={Admin} />
           <Route path="/privacy" component={Privacy} />
           <Route path="/about" component={About} />
@@ -111,6 +114,7 @@ function App() {
           <TooltipProvider>
             <Toaster />
             <AdBlockDetector />
+            <AnalyticsTracker />
             <Router />
           </TooltipProvider>
         </ThemeProvider>
