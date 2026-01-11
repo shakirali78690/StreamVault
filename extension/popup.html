@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StreamVault Watch Together</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            width: 320px;
+            min-height: 200px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #141414;
+            color: #fafafa;
+        }
+
+        .container {
+            padding: 20px;
+        }
+
+        .header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .logo {
+            width: 32px;
+            height: 32px;
+            background: #DC2626;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .logo svg {
+            width: 18px;
+            height: 18px;
+            fill: white;
+        }
+
+        .title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            margin-bottom: 16px;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #666;
+        }
+
+        .status-dot.connected {
+            background: #22c55e;
+            box-shadow: 0 0 8px rgba(34, 197, 94, 0.5);
+        }
+
+        .status-text {
+            font-size: 14px;
+            color: #aaa;
+        }
+
+        .status-text.connected {
+            color: #22c55e;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        label {
+            display: block;
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 6px;
+        }
+
+        input {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid #333;
+            border-radius: 8px;
+            background: #1a1a1a;
+            color: #fafafa;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        input:focus {
+            border-color: #DC2626;
+        }
+
+        input::placeholder {
+            color: #555;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: #DC2626;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #ef4444;
+        }
+
+        .btn-secondary {
+            background: #333;
+            color: #ccc;
+            margin-top: 8px;
+        }
+
+        .btn-secondary:hover {
+            background: #444;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .host-toggle {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+
+        .toggle {
+            position: relative;
+            width: 44px;
+            height: 24px;
+        }
+
+        .toggle input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: #333;
+            border-radius: 24px;
+            transition: 0.3s;
+        }
+
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background: white;
+            border-radius: 50%;
+            transition: 0.3s;
+        }
+
+        .toggle input:checked+.toggle-slider {
+            background: #DC2626;
+        }
+
+        .toggle input:checked+.toggle-slider:before {
+            transform: translateX(20px);
+        }
+
+        .toggle-label {
+            font-size: 14px;
+        }
+
+        .footer {
+            margin-top: 20px;
+            padding-top: 16px;
+            border-top: 1px solid #333;
+            font-size: 12px;
+            color: #666;
+            text-align: center;
+        }
+
+        .footer a {
+            color: #DC2626;
+            text-decoration: none;
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">
+                <svg viewBox="0 0 24 24">
+                    <polygon points="5,3 19,12 5,21" />
+                </svg>
+            </div>
+            <span class="title">Watch Together</span>
+        </div>
+
+        <div class="status">
+            <div class="status-dot" id="statusDot"></div>
+            <span class="status-text" id="statusText">Disconnected</span>
+        </div>
+
+        <div id="connectForm">
+            <div class="form-group">
+                <label>Room Code</label>
+                <input type="text" id="roomCode" placeholder="Enter room code from StreamVault">
+            </div>
+
+            <div class="host-toggle">
+                <label class="toggle">
+                    <input type="checkbox" id="isHost">
+                    <span class="toggle-slider"></span>
+                </label>
+                <span class="toggle-label">I am the host</span>
+            </div>
+
+            <button class="btn btn-primary" id="joinBtn">Join Room</button>
+        </div>
+
+        <div id="connectedView" class="hidden">
+            <div class="form-group">
+                <label>Connected Room</label>
+                <input type="text" id="currentRoom" readonly>
+            </div>
+
+            <button class="btn btn-secondary" id="leaveBtn">Leave Room</button>
+        </div>
+
+        <div class="footer">
+            <a href="https://streamvault.live" target="_blank">streamvault.live</a>
+        </div>
+    </div>
+
+    <script src="popup.js"></script>
+</body>
+
+</html>

@@ -254,6 +254,14 @@ export function WatchTogetherProvider({ children }: Props) {
         // Video sync
         newSocket.on('video:sync', (state: VideoState) => {
             setVideoState(state);
+            // Broadcast to extension for Google Drive video sync
+            window.postMessage({
+                source: 'streamvault-page',
+                type: 'VIDEO_SYNC',
+                action: state.isPlaying ? 'play' : 'pause',
+                time: state.currentTime,
+                playbackRate: 1
+            }, '*');
         });
 
         // Content changed (host changed episode/movie)
