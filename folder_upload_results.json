@@ -1,0 +1,52 @@
+{
+  "success": true,
+  "identifier": "lost-in-space-s01-720p",
+  "details_url": "https://archive.org/details/lost-in-space-s01-720p",
+  "embed_url": "https://archive.org/embed/lost-in-space-s01-720p",
+  "total_files": 10,
+  "uploaded": 10,
+  "failed": 0,
+  "videos": [
+    {
+      "filename": "Lost.in.Space.S01E01.mkv",
+      "video_url": "https://archive.org/download/lost-in-space-s01-720p/Lost.in.Space.S01E01.mkv"
+    },
+    {
+      "filename": "Lost.in.Space.S01E010.mkv",
+      "video_url": "https://archive.org/download/lost-in-space-s01-720p/Lost.in.Space.S01E010.mkv"
+    },
+    {
+      "filename": "Lost.in.Space.S01E02.mkv",
+      "video_url": "https://archive.org/download/lost-in-space-s01-720p/Lost.in.Space.S01E02.mkv"
+    },
+    {
+      "filename": "Lost.in.Space.S01E03.mkv",
+      "video_url": "https://archive.org/download/lost-in-space-s01-720p/Lost.in.Space.S01E03.mkv"
+    },
+    {
+      "filename": "Lost.in.Space.S01E04.mkv",
+      "video_url": "https://archive.org/download/lost-in-space-s01-720p/Lost.in.Space.S01E04.mkv"
+    },
+    {
+      "filename": "Lost.in.Space.S01E05.mkv",
+      "video_url": "https://archive.org/download/lost-in-space-s01-720p/Lost.in.Space.S01E05.mkv"
+    },
+    {
+      "filename": "Lost.in.Space.S01E06.mkv",
+      "video_url": "https://archive.org/download/lost-in-space-s01-720p/Lost.in.Space.S01E06.mkv"
+    },
+    {
+      "filename": "Lost.in.Space.S01E07.mkv",
+      "video_url": "https://archive.org/download/lost-in-space-s01-720p/Lost.in.Space.S01E07.mkv"
+    },
+    {
+      "filename": "Lost.in.Space.S01E08.mkv",
+      "video_url": "https://archive.org/download/lost-in-space-s01-720p/Lost.in.Space.S01E08.mkv"
+    },
+    {
+      "filename": "Lost.in.Space.S01E09.mkv",
+      "video_url": "https://archive.org/download/lost-in-space-s01-720p/Lost.in.Space.S01E09.mkv"
+    }
+  ],
+  "failed_files": []
+}
