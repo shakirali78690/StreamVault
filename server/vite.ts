@@ -72,7 +72,7 @@ export function serveStatic(app: Express) {
 
   console.log(`[Static] Serving static files from: ${distPath}`);
   console.log(`[Static] Directory exists: ${fs.existsSync(distPath)}`);
-  
+
   if (!fs.existsSync(distPath)) {
     throw new Error(
       `Could not find the build directory: ${distPath}, make sure to build the client first`,
@@ -108,14 +108,14 @@ export function serveStatic(app: Express) {
     console.log(`[Catch-all] Original URL: ${req.originalUrl}`);
     console.log(`[Catch-all] Base URL: ${req.baseUrl}`);
     console.log(`[Catch-all] User-Agent: ${req.headers['user-agent']}`);
-    
+
     // If this is an asset request that reached here, it means the file doesn't exist
     // Return 404 instead of serving index.html
     if (req.path.startsWith('/assets/')) {
       console.log(`[Catch-all] Asset not found: ${req.path}`);
       return res.status(404).send('Asset not found');
     }
-    
+
     // Helper function to escape HTML
     const escapeHtml = (str: string) => str
       .replace(/&/g, '&amp;')
@@ -132,7 +132,7 @@ export function serveStatic(app: Express) {
       html = html.replace(/<meta name="title"[^>]*>/g, '');
       html = html.replace(/<meta name="description"[^>]*>/g, '');
       html = html.replace(/<title>.*?<\/title>/g, '');
-      
+
       // Inject new meta tags
       html = html.replace('</head>', `${metaTags}\n  </head>`);
       res.setHeader('Content-Type', 'text/html');
@@ -141,22 +141,22 @@ export function serveStatic(app: Express) {
 
     const indexPath = path.resolve(distPath, "index.html");
     const requestPath = req.originalUrl.split('?')[0]; // Get path without query params
-    
+
     console.log(`[Meta Tags] Checking path: ${requestPath}`);
-    
+
     // Handle show detail pages
     const showMatch = requestPath.match(/^\/show\/([^\/]+)/);
     if (showMatch) {
       const slug = showMatch[1];
       console.log(`[Meta Tags] Show page: ${slug}`);
-      
+
       import('./storage.js').then(({ storage }) => {
         storage.getShowBySlug(slug).then(show => {
           if (show) {
             console.log(`[Meta Tags] Found show: ${show.title}`);
             console.log(`[Meta Tags] Poster URL: ${show.posterUrl}`);
             console.log(`[Meta Tags] Backdrop URL: ${show.backdropUrl}`);
-            
+
             let html = fs.readFileSync(indexPath, 'utf-8');
             const title = escapeHtml(show.title);
             const description = escapeHtml(show.description.slice(0, 200));
@@ -198,28 +198,28 @@ export function serveStatic(app: Express) {
       const slug = watchMatch[1];
       const season = req.query.season as string;
       const episode = req.query.episode as string;
-      
+
       if (season && episode) {
         console.log(`[Meta Tags] Episode page: ${slug} S${season}E${episode}`);
-        
+
         import('./storage.js').then(({ storage }) => {
           storage.getShowBySlug(slug).then(show => {
             if (show) {
               storage.getEpisodesByShowId(show.id).then(allEpisodes => {
-              const episodeData = allEpisodes.find((e: any) => 
-                e.showId === show.id && 
-                e.season === parseInt(season) && 
-                e.episodeNumber === parseInt(episode)
-              );
-              
-              if (episodeData) {
-                let html = fs.readFileSync(indexPath, 'utf-8');
-                const title = escapeHtml(`${show.title} S${season}E${episode}: ${episodeData.title}`);
-                const description = escapeHtml(episodeData.description?.slice(0, 200) || show.description.slice(0, 200));
-                const url = `https://streamvault.live/watch/${slug}?season=${season}&episode=${episode}`;
-                const image = episodeData.thumbnailUrl || show.backdropUrl;
+                const episodeData = allEpisodes.find((e: any) =>
+                  e.showId === show.id &&
+                  e.season === parseInt(season) &&
+                  e.episodeNumber === parseInt(episode)
+                );
 
-                const metaTags = `
+                if (episodeData) {
+                  let html = fs.readFileSync(indexPath, 'utf-8');
+                  const title = escapeHtml(`${show.title} S${season}E${episode}: ${episodeData.title}`);
+                  const description = escapeHtml(episodeData.description?.slice(0, 200) || show.description.slice(0, 200));
+                  const url = `https://streamvault.live/watch/${slug}?season=${season}&episode=${episode}`;
+                  const image = episodeData.thumbnailUrl || show.backdropUrl;
+
+                  const metaTags = `
     <meta property="og:title" content="${title} - StreamVault">
     <meta property="og:description" content="${description}">
     <meta property="og:image" content="${image}">
@@ -229,10 +229,10 @@ export function serveStatic(app: Express) {
     <meta name="twitter:image" content="${image}">
     <title>${title} - StreamVault</title>`;
 
-                injectMetaAndServe(html, metaTags);
-              } else {
-                res.sendFile(indexPath);
-              }
+                  injectMetaAndServe(html, metaTags);
+                } else {
+                  res.sendFile(indexPath);
+                }
               }).catch(() => res.sendFile(indexPath));
             } else {
               res.sendFile(indexPath);
@@ -248,7 +248,7 @@ export function serveStatic(app: Express) {
     if (movieMatch) {
       const slug = movieMatch[1];
       console.log(`[Meta Tags] Movie page: ${slug}`);
-      
+
       import('./storage.js').then(({ storage }) => {
         storage.getAllMovies().then(movies => {
           const movie = movies.find((m: any) => m.slug === slug);
@@ -283,7 +283,7 @@ export function serveStatic(app: Express) {
     if (blogMovieMatch) {
       const slug = blogMovieMatch[1];
       console.log(`[Meta Tags] Blog movie page: ${slug}`);
-      
+
       import('./storage.js').then(({ storage }) => {
         storage.getAllMovies().then(movies => {
           const movie = movies.find((m: any) => m.slug === slug);
@@ -318,7 +318,7 @@ export function serveStatic(app: Express) {
     if (blogShowMatch) {
       const slug = blogShowMatch[1];
       console.log(`[Meta Tags] Blog show page: ${slug}`);
-      
+
       import('./storage.js').then(({ storage }) => {
         storage.getShowBySlug(slug).then(show => {
           if (show) {
@@ -352,7 +352,7 @@ export function serveStatic(app: Express) {
     if (watchMovieMatch) {
       const slug = watchMovieMatch[1];
       console.log(`[Meta Tags] Movie watch page: ${slug}`);
-      
+
       import('./storage.js').then(({ storage }) => {
         storage.getAllMovies().then(movies => {
           const movie = movies.find((m: any) => m.slug === slug);
@@ -379,6 +379,38 @@ export function serveStatic(app: Express) {
           }
         }).catch(() => res.sendFile(indexPath));
       }).catch(() => res.sendFile(indexPath));
+      return;
+    }
+
+    // Handle watch-together pages
+    const watchTogetherMatch = requestPath.match(/^\/watch-together\/([^\/]+)/);
+    if (watchTogetherMatch) {
+      const roomCode = watchTogetherMatch[1];
+      console.log(`[Meta Tags] Watch Together page: ${roomCode}`);
+
+      let html = fs.readFileSync(indexPath, 'utf-8');
+      const title = roomCode === 'NEW' ? 'Create Watch Party' : `Watch Together - Room ${roomCode}`;
+      const description = 'Join a synchronized watch party and enjoy movies and TV shows together with friends! Chat, react with emojis, and use voice chat in real-time.';
+      const url = `https://streamvault.live/watch-together/${roomCode}`;
+      const image = 'https://streamvault.live/og-watch-together.png';
+
+      const metaTags = `
+    <meta property="og:title" content="${title} | StreamVault">
+    <meta property="og:description" content="${description}">
+    <meta property="og:image" content="${image}">
+    <meta property="og:image:width" content="1024">
+    <meta property="og:image:height" content="1024">
+    <meta property="og:url" content="${url}">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="StreamVault">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="${title} | StreamVault">
+    <meta name="twitter:description" content="${description}">
+    <meta name="twitter:image" content="${image}">
+    <meta name="description" content="${description}">
+    <title>${title} | StreamVault</title>`;
+
+      injectMetaAndServe(html, metaTags);
       return;
     }
 
