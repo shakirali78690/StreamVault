@@ -539,6 +539,18 @@ function WatchTogetherContent() {
             <div className="min-h-screen bg-gradient-to-b from-background via-background to-black flex items-center justify-center p-4">
                 <Helmet>
                     <title>Join Watch Party | StreamVault</title>
+                    <meta name="description" content="Join a synchronized watch party and enjoy movies and TV shows together with friends in real-time. Chat, react, and use voice chat while watching!" />
+                    <link rel="canonical" href="https://streamvault.live/watch-together" />
+                    <meta property="og:type" content="website" />
+                    <meta property="og:title" content="Watch Together - StreamVault Watch Party" />
+                    <meta property="og:description" content="Sync up with friends and watch movies or TV shows together in real-time. Chat, react with emojis, and use voice chat!" />
+                    <meta property="og:image" content="https://streamvault.live/og-watch-together.png" />
+                    <meta property="og:url" content="https://streamvault.live/watch-together" />
+                    <meta property="og:site_name" content="StreamVault" />
+                    <meta name="twitter:card" content="summary_large_image" />
+                    <meta name="twitter:title" content="Watch Together - StreamVault Watch Party" />
+                    <meta name="twitter:description" content="Sync up with friends and watch movies or TV shows together in real-time!" />
+                    <meta name="twitter:image" content="https://streamvault.live/og-watch-together.png" />
                 </Helmet>
                 <div className="bg-card border border-border rounded-2xl p-8 max-w-md w-full">
                     <h1 className="text-3xl font-bold mb-2 text-center">🎬 Watch Together</h1>
@@ -576,6 +588,18 @@ function WatchTogetherContent() {
         <div className="min-h-screen bg-gradient-to-b from-background via-background to-black">
             <Helmet>
                 <title>Watch Together: {title} | StreamVault</title>
+                <meta name="description" content={`Watch ${title} together with friends in a synchronized watch party. Chat, react, and enjoy together!`} />
+                <link rel="canonical" href={`https://streamvault.live/watch-together/${roomInfo?.roomCode}`} />
+                <meta property="og:type" content="website" />
+                <meta property="og:title" content={`Watch ${title} Together - StreamVault Party`} />
+                <meta property="og:description" content={`Join this watch party and enjoy ${title} with friends in real-time sync!`} />
+                <meta property="og:image" content="https://streamvault.live/og-watch-together.png" />
+                <meta property="og:url" content={`https://streamvault.live/watch-together/${roomInfo?.roomCode}`} />
+                <meta property="og:site_name" content="StreamVault" />
+                <meta name="twitter:card" content="summary_large_image" />
+                <meta name="twitter:title" content={`Watch ${title} Together`} />
+                <meta name="twitter:description" content={`Join this watch party for ${title}!`} />
+                <meta name="twitter:image" content="https://streamvault.live/og-watch-together.png" />
             </Helmet>
 
             {/* Landscape Mode Hint Overlay for Mobile */}
