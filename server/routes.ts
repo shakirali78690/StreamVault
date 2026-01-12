@@ -2120,46 +2120,98 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`📹 Proxying video: ${videoUrl}`);
 
-      // Use https module for proper streaming
-      const protocol = videoUrl.startsWith('https') ? https : http;
-
-      const requestOptions = {
-        headers: {
+      try {
+        // Build headers to mimic browser request
+        const headers: Record<string, string> = {
           'Referer': 'https://www.worthcrete.com/',
           'Origin': 'https://www.worthcrete.com',
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Accept': '*/*',
-          'Accept-Language': 'en-US,en;q=0.5',
-          ...(req.headers.range && { 'Range': req.headers.range })
-        }
-      };
+          'Accept': 'video/mp4,video/webm,video/*,*/*;q=0.9',
+          'Accept-Encoding': 'identity',
+          'Accept-Language': 'en-US,en;q=0.9',
+          'Connection': 'keep-alive',
+          'Sec-Fetch-Dest': 'video',
+          'Sec-Fetch-Mode': 'no-cors',
+          'Sec-Fetch-Site': 'same-origin',
+          'Sec-Ch-Ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+          'Sec-Ch-Ua-Mobile': '?0',
+          'Sec-Ch-Ua-Platform': '"Windows"',
+        };
 
-      protocol.get(videoUrl, requestOptions, (proxyRes: any) => {
-        console.log(`📹 Proxy response: ${proxyRes.statusCode}`);
+        // Forward range header if present
+        if (req.headers.range) {
+          headers['Range'] = req.headers.range as string;
+        }
 
-        // Forward status and headers
-        res.status(proxyRes.statusCode);
+        const fetchResponse = await fetch(videoUrl, {
+          method: 'GET',
+          headers,
+          redirect: 'follow',
+        });
 
-        if (proxyRes.headers['content-type']) {
-          res.setHeader('Content-Type', proxyRes.headers['content-type']);
+        console.log(`📹 Proxy response: ${fetchResponse.status}`);
+
+        if (!fetchResponse.ok && fetchResponse.status !== 206) {
+          return res.status(fetchResponse.status).json({
+            error: 'Video source unavailable',
+            status: fetchResponse.status
+          });
         }
-        if (proxyRes.headers['content-length']) {
-          res.setHeader('Content-Length', proxyRes.headers['content-length']);
+
+        // Forward headers
+        res.status(fetchResponse.status);
+
+        const contentType = fetchResponse.headers.get('content-type');
+        if (contentType) {
+          res.setHeader('Content-Type', contentType);
         }
-        if (proxyRes.headers['content-range']) {
-          res.setHeader('Content-Range', proxyRes.headers['content-range']);
+
+        const contentLength = fetchResponse.headers.get('content-length');
+        if (contentLength) {
+          res.setHeader('Content-Length', contentLength);
         }
-        if (proxyRes.headers['accept-ranges']) {
-          res.setHeader('Accept-Ranges', proxyRes.headers['accept-ranges']);
+
+        const contentRange = fetchResponse.headers.get('content-range');
+        if (contentRange) {
+          res.setHeader('Content-Range', contentRange);
         }
+
+        const acceptRanges = fetchResponse.headers.get('accept-ranges');
+        if (acceptRanges) {
+          res.setHeader('Accept-Ranges', acceptRanges);
+        }
+
         res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Cache-Control', 'public, max-age=3600');
 
-        // Pipe the response
-        proxyRes.pipe(res);
-      }).on('error', (err: any) => {
-        console.error("❌ Video proxy error:", err.message);
-        res.status(500).json({ error: "Proxy failed", details: err.message });
-      });
+        // Stream the response body
+        if (fetchResponse.body) {
+          const reader = fetchResponse.body.getReader();
+
+          const pump = async () => {
+            try {
+              while (true) {
+                const { done, value } = await reader.read();
+                if (done) {
+                  res.end();
+                  break;
+                }
+                res.write(Buffer.from(value));
+              }
+            } catch (streamError) {
+              console.error('Stream error:', streamError);
+              res.end();
+            }
+          };
+
+          pump();
+        } else {
+          res.end();
+        }
+      } catch (fetchError: any) {
+        console.error('❌ Fetch error:', fetchError.message);
+        res.status(500).json({ error: 'Proxy failed', details: fetchError.message });
+      }
     } catch (error: any) {
       console.error("❌ Video proxy error:", error.message);
       res.status(500).json({ error: "Proxy failed", details: error.message });
