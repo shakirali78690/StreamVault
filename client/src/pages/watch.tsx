@@ -10,6 +10,7 @@ import { VideoPlayer } from "@/components/video-player";
 import { Helmet } from "react-helmet-async";
 import type { Show, Episode } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
+import { trackWatch } from "@/components/analytics-tracker";
 
 export default function Watch() {
   const [, params] = useRoute("/watch/:slug");
@@ -69,6 +70,9 @@ export default function Watch() {
         progress: 0,
         lastWatched: new Date().toISOString(),
       });
+
+      // Track watch event for analytics
+      trackWatch('show', show.id, show.title, currentEpisodeData.id, currentEpisodeData.duration ? currentEpisodeData.duration * 60 : 0);
     }
 
     return () => {

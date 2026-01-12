@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useRoute, Link } from "wouter";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { ChevronLeft, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -9,10 +9,12 @@ import { CommentsSection } from "@/components/comments-section";
 import { VideoPlayer } from "@/components/video-player";
 import { Helmet } from "react-helmet-async";
 import type { Movie } from "@shared/schema";
+import { trackWatch } from "@/components/analytics-tracker";
 
 export default function WatchMovie() {
   const [, params] = useRoute("/watch-movie/:slug");
   const slug = params?.slug;
+  const watchTracked = useRef(false);
 
   const { data: movie } = useQuery<Movie>({
     queryKey: [`/api/movies/${slug}`],
@@ -22,6 +24,17 @@ export default function WatchMovie() {
   const { data: allMovies } = useQuery<Movie[]>({
     queryKey: ["/api/movies"],
   });
+
+  // Track watch event for analytics
+  useEffect(() => {
+    if (movie && !watchTracked.current) {
+      watchTracked.current = true;
+      trackWatch('movie', movie.id, movie.title, undefined, movie.duration ? movie.duration * 60 : 0);
+    }
+    return () => {
+      watchTracked.current = false;
+    };
+  }, [movie?.id]);
 
   // Set Media Session metadata for browser controls
   useEffect(() => {
