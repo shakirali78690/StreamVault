@@ -13,6 +13,13 @@ export interface VideoPlayerRef {
     isPaused: () => boolean;
 }
 
+interface SubtitleTrack {
+    file: string;
+    label: string;
+    kind: 'captions' | 'subtitles';
+    default?: boolean;
+}
+
 interface VideoPlayerProps {
     videoUrl: string | null | undefined;
     className?: string;
@@ -24,6 +31,7 @@ interface VideoPlayerProps {
     autoplay?: boolean;
     isHost?: boolean; // If true, shows controls; if false, hide controls for viewers
     syncMode?: boolean; // If true, disables local controls for non-hosts
+    subtitleTracks?: SubtitleTrack[]; // External subtitle tracks to load
 }
 
 // URL type detection helpers
@@ -97,6 +105,7 @@ interface JWPlayerWrapperProps {
     autoplay?: boolean;
     isHost?: boolean;
     syncMode?: boolean;
+    subtitleTracks?: SubtitleTrack[];
 }
 
 const JWPlayerWrapper = forwardRef<VideoPlayerRef, JWPlayerWrapperProps>(({
@@ -109,7 +118,8 @@ const JWPlayerWrapper = forwardRef<VideoPlayerRef, JWPlayerWrapperProps>(({
     onPlaybackRateChange,
     autoplay = false,
     isHost = true,
-    syncMode = false
+    syncMode = false,
+    subtitleTracks = []
 }, ref) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const playerIdRef = useRef<string>(`jwplayer-${Math.random().toString(36).substr(2, 9)}`);
@@ -204,16 +214,23 @@ const JWPlayerWrapper = forwardRef<VideoPlayerRef, JWPlayerWrapperProps>(({
                 windowColor: '#000000',
                 windowOpacity: 0
             },
-            // Add a placeholder track to ensure CC button is always visible
-            // JW Player will show the button when tracks array exists
-            tracks: [
-                {
-                    file: 'data:text/vtt,WEBVTT',
-                    label: 'No Subtitles Available',
-                    kind: 'captions',
-                    'default': false
-                }
-            ],
+            // Add subtitle tracks - use provided tracks or fallback to placeholder
+            // JW Player will show the CC button when tracks array exists
+            tracks: subtitleTracks.length > 0
+                ? subtitleTracks.map((track, index) => ({
+                    file: track.file,
+                    label: track.label,
+                    kind: track.kind,
+                    'default': index === 0 // First track is default
+                }))
+                : [
+                    {
+                        file: 'data:text/vtt,WEBVTT',
+                        label: 'No Subtitles Available',
+                        kind: 'captions',
+                        'default': false
+                    }
+                ],
             // Show captions button in controlbar even if no tracks (allows user to toggle if available)
             renderCaptionsNatively: false,
             skin: {
@@ -270,7 +287,7 @@ const JWPlayerWrapper = forwardRef<VideoPlayerRef, JWPlayerWrapperProps>(({
                 // Player may already be destroyed
             }
         };
-    }, [videoUrl, autoplay, isHost, syncMode]);
+    }, [videoUrl, autoplay, isHost, syncMode, subtitleTracks.length]); // Added subtitleTracks.length to reinit when subs loaded
 
     return (
         <div className={`w-full h-full ${className}`} style={{ position: 'relative' }}>
@@ -293,7 +310,8 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(({
     onPlaybackRateChange,
     autoplay = false,
     isHost = true,
-    syncMode = false
+    syncMode = false,
+    subtitleTracks = []
 }, ref) => {
     const jwPlayerRef = useRef<VideoPlayerRef>(null);
     const [playerType, setPlayerType] = useState<'drive' | 'jwplayer' | 'direct' | 'embed' | 'none'>('none');
@@ -448,6 +466,7 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(({
                 autoplay={autoplay}
                 isHost={isHost}
                 syncMode={syncMode}
+                subtitleTracks={subtitleTracks}
             />
         );
     }

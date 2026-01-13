@@ -32,6 +32,17 @@ export default function Watch() {
     enabled: !!show?.id,
   });
 
+  // Fetch blog posts to get IMDB links for subtitles
+  const { data: blogPosts = [] } = useQuery<any[]>({
+    queryKey: ["/api/blog"],
+    enabled: !!show?.id,
+  });
+
+  // Find matching blog post for this show to get external links
+  const blogPost = show ? blogPosts.find(
+    (post) => post.contentId === show.id || post.slug === show.slug
+  ) : null;
+
   const currentEpisodeData = episodes?.find(
     (ep) => ep.season === currentSeason && ep.episodeNumber === currentEpisode
   );
@@ -57,6 +68,84 @@ export default function Watch() {
   // State for Next Episode button (only for direct video/JWPlayer)
   const [showNextEpisode, setShowNextEpisode] = useState(false);
   const [secondsRemaining, setSecondsRemaining] = useState(0);
+
+  // State for subtitle tracks
+  const [subtitleTracks, setSubtitleTracks] = useState<Array<{
+    file: string;
+    label: string;
+    kind: 'captions' | 'subtitles';
+    default?: boolean;
+  }>>([]);
+
+  // Fetch subtitles when episode loads
+  useEffect(() => {
+    const fetchSubtitles = async () => {
+      if (!show || !currentEpisodeData || !blogPost) return;
+
+      try {
+        // Parse IMDB ID from blog post external links
+        const externalLinks = blogPost.externalLinks
+          ? (typeof blogPost.externalLinks === 'string'
+            ? JSON.parse(blogPost.externalLinks)
+            : blogPost.externalLinks)
+          : null;
+
+        const imdbLink = externalLinks?.imdb;
+        if (!imdbLink) {
+          console.log('No IMDB link found for subtitle search');
+          return;
+        }
+
+        // Extract just the IMDB ID (tt1234567) from the link
+        const imdbMatch = imdbLink.match(/tt\d+/);
+        if (!imdbMatch) {
+          console.log('Invalid IMDB ID format');
+          return;
+        }
+
+        console.log(`🔍 Fetching subtitles for ${imdbMatch[0]} S${currentSeason}E${currentEpisode}`);
+
+        const response = await fetch(
+          `/api/subtitles/search?imdbId=${imdbMatch[0]}&season=${currentSeason}&episode=${currentEpisode}&language=en`
+        );
+
+        if (!response.ok) {
+          console.error('Subtitle search failed');
+          return;
+        }
+
+        const data = await response.json();
+
+        if (data.subtitles && data.subtitles.length > 0) {
+          console.log(`✅ Found ${data.subtitles.length} subtitles`);
+
+          // Language code to full name mapping
+          const langNames: Record<string, string> = {
+            'en': 'English', 'es': 'Spanish', 'fr': 'French', 'de': 'German',
+            'it': 'Italian', 'pt': 'Portuguese', 'ru': 'Russian', 'ja': 'Japanese',
+            'ko': 'Korean', 'zh': 'Chinese', 'ar': 'Arabic', 'hi': 'Hindi',
+            'tr': 'Turkish', 'pl': 'Polish', 'nl': 'Dutch', 'sv': 'Swedish'
+          };
+
+          // Convert to VideoPlayer format (use first 10 subtitles)
+          const tracks = data.subtitles.slice(0, 10).map((sub: any, index: number) => ({
+            file: sub.downloadUrl,
+            label: langNames[sub.lang] || sub.language || sub.lang || 'Unknown',
+            kind: 'subtitles' as const,
+            default: index === 0
+          }));
+
+          setSubtitleTracks(tracks);
+        } else {
+          console.log('No subtitles found');
+        }
+      } catch (error) {
+        console.error('Error fetching subtitles:', error);
+      }
+    };
+
+    fetchSubtitles();
+  }, [show?.id, currentEpisodeData?.id, currentSeason, currentEpisode, blogPost]);
 
   // Helper to check if URL is a direct video (JWPlayer compatible)
   const isDirectVideoUrl = (url: string | undefined): boolean => {
@@ -222,6 +311,7 @@ export default function Watch() {
                 ref={videoPlayerRef}
                 videoUrl={videoUrl}
                 onTimeUpdate={handleTimeUpdate}
+                subtitleTracks={subtitleTracks}
               />
 
               {/* Netflix-style Next Episode Button with Progress Bar - Only for direct video players */}

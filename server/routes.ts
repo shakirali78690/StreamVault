@@ -11,6 +11,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { setupSitemaps } from "./sitemap";
 import { sendContentRequestEmail, sendIssueReportEmail } from "./email-service";
+import { searchSubtitles, downloadSubtitle, getCachedSubtitle } from "./subtitle-service";
 import webpush from "web-push";
 
 // Helper to convert ReadableStream to async iterable for Node.js
@@ -2217,6 +2218,95 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Proxy failed", details: error.message });
     }
   });
+
+  // ============================================
+  // Subtitle API - Wyzie Subs Integration
+  // ============================================
+
+  // Search for subtitles by IMDB ID
+  app.get("/api/subtitles/search", async (req, res) => {
+    try {
+      const imdbId = req.query.imdbId as string;
+      const season = req.query.season ? parseInt(req.query.season as string) : undefined;
+      const episode = req.query.episode ? parseInt(req.query.episode as string) : undefined;
+      const language = (req.query.language as string) || 'en';
+
+      if (!imdbId) {
+        return res.status(400).json({ error: "imdbId parameter required" });
+      }
+
+      console.log(`🔍 Subtitle search: imdbId=${imdbId}, season=${season}, episode=${episode}, lang=${language}`);
+
+      const result = await searchSubtitles(imdbId, season, episode, language);
+
+      // Transform results to include download URLs
+      const subtitles = result.subtitles.map(sub => ({
+        ...sub,
+        downloadUrl: `/api/subtitles/download?url=${encodeURIComponent(sub.url)}`
+      }));
+
+      res.json({ subtitles, error: result.error });
+    } catch (error: any) {
+      console.error("❌ Subtitle search error:", error.message);
+      res.status(500).json({ error: "Search failed", details: error.message });
+    }
+  });
+
+  // Download and serve a subtitle file (with caching)
+  app.get("/api/subtitles/download", async (req, res) => {
+    try {
+      const subtitleUrl = req.query.url as string;
+
+      if (!subtitleUrl) {
+        return res.status(400).json({ error: "url parameter required" });
+      }
+
+      console.log(`⬇️ Subtitle download request: ${subtitleUrl}`);
+
+      const cachedPath = await downloadSubtitle(subtitleUrl);
+
+      if (!cachedPath) {
+        return res.status(404).json({ error: "Subtitle not found or download failed" });
+      }
+
+      // Set headers for VTT file
+      res.setHeader('Content-Type', 'text/vtt');
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 1 day
+
+      // Send the file
+      const fs = await import('fs');
+      const content = fs.readFileSync(cachedPath, 'utf-8');
+      res.send(content);
+    } catch (error: any) {
+      console.error("❌ Subtitle download error:", error.message);
+      res.status(500).json({ error: "Download failed", details: error.message });
+    }
+  });
+
+  // Serve cached subtitle file by hash
+  app.get("/api/subtitles/file/:hash", async (req, res) => {
+    try {
+      const hash = req.params.hash;
+      const cachedPath = getCachedSubtitle(hash);
+
+      if (!cachedPath) {
+        return res.status(404).json({ error: "Subtitle not found in cache" });
+      }
+
+      res.setHeader('Content-Type', 'text/vtt');
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+
+      const fs = await import('fs');
+      const content = fs.readFileSync(cachedPath, 'utf-8');
+      res.send(content);
+    } catch (error: any) {
+      console.error("❌ Subtitle file error:", error.message);
+      res.status(500).json({ error: "File read failed", details: error.message });
+    }
+  });
+
   // ============================================
   // Widget Analytics - Track clicks from WorthCrete
   // ============================================
