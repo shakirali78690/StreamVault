@@ -68,23 +68,13 @@ function getNewContent(data, daysBack) {
     return createdAt >= cutoffDate;
   }).slice(0, 6);
 
-  const newAnime = (data.anime || []).filter(anime => {
-    const createdAt = new Date(anime.createdAt || 0);
-    return createdAt >= cutoffDate;
-  }).slice(0, 6);
-
-  return { newShows, newMovies, newAnime };
+  return { newShows, newMovies };
 }
 
 function generateContentCard(item, type) {
-  let url;
-  if (type === 'show') {
-    url = `https://streamvault.live/show/${item.slug}`;
-  } else if (type === 'anime') {
-    url = `https://streamvault.live/anime/${item.slug}`;
-  } else {
-    url = `https://streamvault.live/movie/${item.slug}`;
-  }
+  const url = type === 'show'
+    ? `https://streamvault.live/show/${item.slug}`
+    : `https://streamvault.live/movie/${item.slug}`;
 
   return `
     <td style="width: 180px; padding: 8px; vertical-align: top;">
@@ -107,7 +97,7 @@ function generateContentCard(item, type) {
   `;
 }
 
-function generateEmailHTML(newShows, newMovies, newAnime = []) {
+function generateEmailHTML(newShows, newMovies) {
   // Generate show cards in rows of 3
   let showsHTML = '';
   if (newShows.length > 0) {
@@ -152,29 +142,7 @@ function generateEmailHTML(newShows, newMovies, newAnime = []) {
     `;
   }
 
-  // Generate anime cards in rows of 3
-  let animeHTML = '';
-  if (newAnime.length > 0) {
-    animeHTML = `
-      <div style="margin: 30px 0;">
-        <h2 style="color: #fff; font-size: 20px; margin: 0 0 20px 0; padding-left: 10px; border-left: 4px solid #ff6b9d;">
-          🎌 New Anime
-        </h2>
-        <table cellpadding="0" cellspacing="0" border="0" width="100%">
-          <tr>
-            ${newAnime.slice(0, 3).map(anime => generateContentCard(anime, 'anime')).join('')}
-          </tr>
-          ${newAnime.length > 3 ? `
-          <tr>
-            ${newAnime.slice(3, 6).map(anime => generateContentCard(anime, 'anime')).join('')}
-          </tr>
-          ` : ''}
-        </table>
-      </div>
-    `;
-  }
-
-  const totalNew = newShows.length + newMovies.length + newAnime.length;
+  const totalNew = newShows.length + newMovies.length;
 
   return `
 <!DOCTYPE html>
@@ -216,7 +184,6 @@ function generateEmailHTML(newShows, newMovies, newAnime = []) {
       
       ${showsHTML}
       ${moviesHTML}
-      ${animeHTML}
       
       ${totalNew === 0 ? `
         <div style="text-align: center; padding: 50px 20px; background: rgba(255,255,255,0.03); border-radius: 16px; margin: 20px 0;">
@@ -305,22 +272,19 @@ async function main() {
   }
 
   const data = JSON.parse(fs.readFileSync(DATA_FILE, 'utf-8'));
-  const { newShows, newMovies, newAnime } = getNewContent(data, DAYS_BACK);
+  const { newShows, newMovies } = getNewContent(data, DAYS_BACK);
 
   console.log(`📺 New shows (last ${DAYS_BACK} days): ${newShows.length}`);
   console.log(`🎬 New movies (last ${DAYS_BACK} days): ${newMovies.length}`);
-  console.log(`🎌 New anime (last ${DAYS_BACK} days): ${newAnime.length}`);
 
-  const totalNew = newShows.length + newMovies.length + newAnime.length;
-
-  if (totalNew === 0) {
+  if (newShows.length === 0 && newMovies.length === 0) {
     console.log('\n⚠️  No new content to send. Sending reminder email anyway...');
   }
 
   // Generate email
-  const emailHTML = generateEmailHTML(newShows, newMovies, newAnime);
-  const subject = totalNew > 0
-    ? `🎬 ${totalNew} New Titles on StreamVault This Week!`
+  const emailHTML = generateEmailHTML(newShows, newMovies);
+  const subject = newShows.length + newMovies.length > 0
+    ? `🎬 ${newShows.length + newMovies.length} New Titles on StreamVault This Week!`
     : '📺 StreamVault Weekly Update';
 
   console.log(`\n📤 Sending emails...`);
