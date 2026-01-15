@@ -37,6 +37,7 @@ import AnimeDetail from "@/pages/anime-detail";
 import WatchAnime from "@/pages/watch-anime";
 import BrowseShows from "@/pages/browse-shows";
 import BrowseMovies from "@/pages/browse-movies";
+import BrowseAnime from "@/pages/browse-anime";
 import Trending from "@/pages/trending";
 import Sitemap from "@/pages/sitemap";
 import Browse from "@/pages/browse";
@@ -88,6 +89,7 @@ function Router() {
           <Route path="/movies" component={Movies} />
           <Route path="/browse/shows" component={BrowseShows} />
           <Route path="/browse/movies" component={BrowseMovies} />
+          <Route path="/browse/anime" component={BrowseAnime} />
           <Route path="/trending" component={Trending} />
           <Route path="/sitemap" component={Sitemap} />
           <Route path="/browse" component={Browse} />

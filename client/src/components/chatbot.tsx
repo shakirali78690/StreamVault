@@ -1,26 +1,49 @@
 import { useState, useRef, useEffect } from "react";
-import { MessageCircle, X, Send, Loader2, Sparkles, Star, Clock, TrendingUp, Film, Tv, Shuffle, Play } from "lucide-react";
+import { MessageCircle, X, Send, Loader2, Sparkles, Star, Clock, TrendingUp, Film, Tv, Shuffle, Play, Mic, MicOff, Volume2, Info, ExternalLink, PlayCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useQuery } from "@tanstack/react-query";
-import type { Show, Movie, Episode } from "@shared/schema";
-import { Link } from "wouter";
+import type { Show, Movie, Episode, Anime } from "@shared/schema";
+import { Link, useLocation } from "wouter";
+
+interface ContentLink {
+  title: string;
+  slug: string;
+  type: 'show' | 'movie' | 'anime';
+  rating?: string;
+  year?: number;
+  poster?: string;
+  description?: string;
+  cast?: string;
+  seasons?: number;
+  episodes?: number;
+  trailerUrl?: string;
+  duration?: string;
+}
 
 interface Message {
   id: string;
   text: string;
   isBot: boolean;
   suggestions?: string[];
-  showLinks?: Array<{ title: string; slug: string; type: 'show' | 'movie'; rating?: string; year?: number; poster?: string; description?: string }>;
+  showLinks?: ContentLink[];
   quickActions?: Array<{ label: string; icon: string; action: string }>;
 }
 
 interface ConversationContext {
   lastGenre?: string;
-  lastType?: 'show' | 'movie';
+  lastType?: 'show' | 'movie' | 'anime';
   lastRecommendedTitle?: string;
+  lastResults?: ContentLink[];
+  lastQuery?: string;
   searchHistory: string[];
   recommendedIds: string[];
+}
+
+interface UserPreferences {
+  favoriteGenres: Record<string, number>;
+  preferredType: 'show' | 'movie' | 'anime' | null;
+  clickedContent: string[];
 }
 
 export function Chatbot() {
@@ -28,18 +51,18 @@ export function Chatbot() {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "1",
-      text: "👋 Hey there! I'm Vault, your personal streaming assistant. I can help you discover amazing content!\n\nTry asking me things like:\n• \"Recommend something like Breaking Bad\"\n• \"What's a good horror movie?\"\n• \"Surprise me with something good\"",
+      text: "👋 Hey! I'm **Vault AI**, your streaming assistant!\n\n🎤 **Voice**: Tap the mic to speak\n🎬 **Play**: Say \"Play Breaking Bad\"\n🎌 **Anime**: I know anime too!\n\nWhat are you in the mood for?",
       isBot: true,
       suggestions: [
         "🎲 Surprise me",
         "🔥 What's hot?",
-        "🎬 Top rated movies",
-        "📺 Popular shows",
+        "🎌 Top anime",
+        "📺 Continue watching",
       ],
       quickActions: [
         { label: "Random Pick", icon: "🎲", action: "surprise" },
         { label: "Trending", icon: "🔥", action: "trending" },
-        { label: "Top Rated", icon: "⭐", action: "top-rated" },
+        { label: "Anime", icon: "🎌", action: "anime" },
       ],
     },
   ]);
@@ -49,8 +72,19 @@ export function Chatbot() {
     searchHistory: [],
     recommendedIds: [],
     lastRecommendedTitle: undefined,
+    lastResults: undefined,
+    lastQuery: undefined,
+  });
+  const [isListening, setIsListening] = useState(false);
+  const [userPrefs, setUserPrefs] = useState<UserPreferences>(() => {
+    try {
+      const stored = localStorage.getItem('chatbot-preferences');
+      return stored ? JSON.parse(stored) : { favoriteGenres: {}, preferredType: null, clickedContent: [] };
+    } catch { return { favoriteGenres: {}, preferredType: null, clickedContent: [] }; }
   });
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const recognitionRef = useRef<any>(null);
+  const [, navigate] = useLocation();
 
   const { data: shows } = useQuery<Show[]>({
     queryKey: ["/api/shows"],
@@ -64,6 +98,43 @@ export function Chatbot() {
     queryKey: ["/api/episodes"],
   });
 
+  const { data: anime } = useQuery<Anime[]>({
+    queryKey: ["/api/anime"],
+  });
+
+  // Get watch history from localStorage
+  const getWatchHistory = (): Array<{ title: string; slug: string; type: string; lastWatched: number }> => {
+    try {
+      const stored = localStorage.getItem('continue-watching');
+      if (!stored) return [];
+      const parsed = JSON.parse(stored);
+      return Object.values(parsed).sort((a: any, b: any) => b.lastWatched - a.lastWatched).slice(0, 5) as any;
+    } catch { return []; }
+  };
+
+  // Save user preferences
+  const savePrefs = (prefs: UserPreferences) => {
+    setUserPrefs(prefs);
+    try { localStorage.setItem('chatbot-preferences', JSON.stringify(prefs)); } catch { }
+  };
+
+  // Track genre preference
+  const trackGenre = (genre: string) => {
+    const newPrefs = { ...userPrefs };
+    newPrefs.favoriteGenres[genre] = (newPrefs.favoriteGenres[genre] || 0) + 1;
+    savePrefs(newPrefs);
+  };
+
+  // Track content click
+  const trackClick = (slug: string, type: 'show' | 'movie' | 'anime') => {
+    const newPrefs = { ...userPrefs };
+    if (!newPrefs.clickedContent.includes(slug)) {
+      newPrefs.clickedContent = [...newPrefs.clickedContent.slice(-20), slug];
+    }
+    newPrefs.preferredType = type;
+    savePrefs(newPrefs);
+  };
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
@@ -76,16 +147,16 @@ export function Chatbot() {
   const fuzzyMatch = (text: string, query: string): number => {
     const lowerText = text.toLowerCase();
     const lowerQuery = query.toLowerCase();
-    
+
     if (lowerText === lowerQuery) return 100;
     if (lowerText.includes(lowerQuery)) return 80;
     if (lowerText.startsWith(lowerQuery)) return 90;
-    
+
     // Check word matches
     const textWords = lowerText.split(/\s+/);
     const queryWords = lowerQuery.split(/\s+/);
     let matchScore = 0;
-    
+
     for (const qWord of queryWords) {
       for (const tWord of textWords) {
         if (tWord.includes(qWord) || qWord.includes(tWord)) {
@@ -93,25 +164,34 @@ export function Chatbot() {
         }
       }
     }
-    
+
     return matchScore;
   };
 
   const findShows = (query: string, limit = 5): Show[] => {
-    if (!shows) return [];
-    
+    if (!shows || !query.trim()) return [];
+    const lowerQuery = query.toLowerCase().trim();
+
     const scored = shows.map(show => {
-      const titleScore = fuzzyMatch(show.title, query);
-      const genreScore = fuzzyMatch(show.genres || '', query) * 0.5;
-      const castScore = fuzzyMatch(show.cast || '', query) * 0.3;
-      const descScore = fuzzyMatch(show.description || '', query) * 0.2;
-      
+      const lowerTitle = show.title.toLowerCase();
+
+      // Heavy boost for title matches
+      let titleScore = 0;
+      if (lowerTitle === lowerQuery) titleScore = 200; // Exact match
+      else if (lowerTitle.includes(lowerQuery)) titleScore = 150; // Contains query
+      else if (lowerQuery.includes(lowerTitle)) titleScore = 120; // Query contains title
+      else titleScore = fuzzyMatch(show.title, query);
+
+      // Lower weights for other fields
+      const genreScore = fuzzyMatch(show.genres || '', query) * 0.3;
+      const castScore = fuzzyMatch(show.cast || '', query) * 0.2;
+
       return {
         show,
-        score: titleScore + genreScore + castScore + descScore
+        score: titleScore + genreScore + castScore
       };
     });
-    
+
     return scored
       .filter(s => s.score > 10)
       .sort((a, b) => b.score - a.score)
@@ -120,20 +200,28 @@ export function Chatbot() {
   };
 
   const findMovies = (query: string, limit = 5): Movie[] => {
-    if (!movies) return [];
-    
+    if (!movies || !query.trim()) return [];
+    const lowerQuery = query.toLowerCase().trim();
+
     const scored = movies.map(movie => {
-      const titleScore = fuzzyMatch(movie.title, query);
-      const genreScore = fuzzyMatch(movie.genres || '', query) * 0.5;
-      const castScore = fuzzyMatch(movie.cast || '', query) * 0.3;
-      const descScore = fuzzyMatch(movie.description || '', query) * 0.2;
-      
+      const lowerTitle = movie.title.toLowerCase();
+
+      // Heavy boost for title matches
+      let titleScore = 0;
+      if (lowerTitle === lowerQuery) titleScore = 200;
+      else if (lowerTitle.includes(lowerQuery)) titleScore = 150;
+      else if (lowerQuery.includes(lowerTitle)) titleScore = 120;
+      else titleScore = fuzzyMatch(movie.title, query);
+
+      const genreScore = fuzzyMatch(movie.genres || '', query) * 0.3;
+      const castScore = fuzzyMatch(movie.cast || '', query) * 0.2;
+
       return {
         movie,
-        score: titleScore + genreScore + castScore + descScore
+        score: titleScore + genreScore + castScore
       };
     });
-    
+
     return scored
       .filter(m => m.score > 10)
       .sort((a, b) => b.score - a.score)
@@ -141,15 +229,44 @@ export function Chatbot() {
       .map(m => m.movie);
   };
 
-  // Get similar content based on genres
-  const getSimilarContent = (title: string): (Show | Movie)[] => {
-    const allContent = [...(shows || []), ...(movies || [])];
+  const findAnime = (query: string, limit = 5): Anime[] => {
+    if (!anime || !query.trim()) return [];
+    const lowerQuery = query.toLowerCase().trim();
+
+    const scored = anime.map(item => {
+      const lowerTitle = item.title.toLowerCase();
+
+      // Heavy boost for title matches
+      let titleScore = 0;
+      if (lowerTitle === lowerQuery) titleScore = 200;
+      else if (lowerTitle.includes(lowerQuery)) titleScore = 150;
+      else if (lowerQuery.includes(lowerTitle)) titleScore = 120;
+      else titleScore = fuzzyMatch(item.title, query);
+
+      const genreScore = fuzzyMatch(item.genres || '', query) * 0.3;
+
+      return {
+        item,
+        score: titleScore + genreScore
+      };
+    });
+
+    return scored
+      .filter(a => a.score > 10)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit)
+      .map(a => a.item);
+  };
+
+  // Get similar content based on genres (now includes anime)
+  const getSimilarContent = (title: string): (Show | Movie | Anime)[] => {
+    const allContent = [...(shows || []), ...(movies || []), ...(anime || [])];
     const source = allContent.find(c => c.title.toLowerCase().includes(title.toLowerCase()));
-    
+
     if (!source) return [];
-    
+
     const sourceGenres = source.genres?.toLowerCase().split(',').map(g => g.trim()) || [];
-    
+
     return allContent
       .filter(c => c.id !== source.id)
       .map(c => {
@@ -163,47 +280,49 @@ export function Chatbot() {
       .map(c => c.content);
   };
 
-  // Get random recommendation
-  const getRandomPick = (): (Show | Movie) | null => {
-    const allContent = [...(shows || []), ...(movies || [])];
+  // Get random recommendation (now includes anime)
+  const getRandomPick = (): (Show | Movie | Anime) | null => {
+    const allContent = [...(shows || []), ...(movies || []), ...(anime || [])];
     const highRated = allContent.filter(c => parseFloat(c.imdbRating || '0') >= 7.5);
     if (highRated.length === 0) return null;
     return highRated[Math.floor(Math.random() * highRated.length)];
   };
 
-  // Get top rated content
-  const getTopRated = (type?: 'show' | 'movie', limit = 5): (Show | Movie)[] => {
-    let content: (Show | Movie)[] = [];
-    
+  // Get top rated content (now includes anime)
+  const getTopRated = (type?: 'show' | 'movie' | 'anime', limit = 5): (Show | Movie | Anime)[] => {
+    let content: (Show | Movie | Anime)[] = [];
+
     if (type === 'movie') {
       content = [...(movies || [])];
     } else if (type === 'show') {
       content = [...(shows || [])];
+    } else if (type === 'anime') {
+      content = [...(anime || [])];
     } else {
-      content = [...(shows || []), ...(movies || [])];
+      content = [...(shows || []), ...(movies || []), ...(anime || [])];
     }
-    
+
     return content
       .sort((a, b) => parseFloat(b.imdbRating || '0') - parseFloat(a.imdbRating || '0'))
       .slice(0, limit);
   };
 
-  // Get content by mood/vibe
-  const getByMood = (mood: string): (Show | Movie)[] => {
+  // Get content by mood/vibe (now includes anime)
+  const getByMood = (mood: string): (Show | Movie | Anime)[] => {
     const moodGenres: Record<string, string[]> = {
-      'happy': ['comedy', 'animation', 'family'],
+      'happy': ['comedy', 'animation', 'family', 'slice of life'],
       'sad': ['drama', 'romance'],
-      'excited': ['action', 'thriller', 'adventure'],
-      'scared': ['horror', 'mystery', 'thriller'],
-      'romantic': ['romance', 'drama'],
-      'thoughtful': ['documentary', 'drama', 'mystery'],
-      'relaxed': ['comedy', 'animation', 'family'],
-      'adventurous': ['action', 'adventure', 'sci-fi', 'fantasy'],
+      'excited': ['action', 'thriller', 'adventure', 'shonen'],
+      'scared': ['horror', 'mystery', 'thriller', 'psychological'],
+      'romantic': ['romance', 'drama', 'shoujo'],
+      'thoughtful': ['documentary', 'drama', 'mystery', 'seinen'],
+      'relaxed': ['comedy', 'animation', 'family', 'iyashikei'],
+      'adventurous': ['action', 'adventure', 'sci-fi', 'fantasy', 'isekai'],
     };
-    
+
     const genres = moodGenres[mood.toLowerCase()] || [];
-    const allContent = [...(shows || []), ...(movies || [])];
-    
+    const allContent = [...(shows || []), ...(movies || []), ...(anime || [])];
+
     return allContent
       .filter(c => {
         const cGenres = c.genres?.toLowerCase() || '';
@@ -213,22 +332,35 @@ export function Chatbot() {
       .slice(0, 5);
   };
 
-  // Helper to check if item is a movie
-  const isMovie = (item: Show | Movie): item is Movie => {
-    return 'googleDriveUrl' in item;
+  // Type guards
+  const isMovie = (item: Show | Movie | Anime): item is Movie => {
+    return 'googleDriveUrl' in item && !('episodes' in item);
   };
 
-  // Format content for display
-  const formatContent = (items: (Show | Movie)[]): Array<{ title: string; slug: string; type: 'show' | 'movie'; rating?: string; year?: number; poster?: string; description?: string }> => {
-    return items.map(item => ({
-      title: item.title,
-      slug: item.slug,
-      type: isMovie(item) ? 'movie' as const : 'show' as const,
-      rating: item.imdbRating || undefined,
-      year: item.year,
-      poster: item.posterUrl || undefined,
-      description: item.description?.slice(0, 80) || undefined,
-    }));
+  const isAnime = (item: Show | Movie | Anime): item is Anime => {
+    return 'episodes' in item && 'malId' in item;
+  };
+
+  // Format content for display with enhanced details
+  const formatContent = (items: (Show | Movie | Anime)[]): ContentLink[] => {
+    return items.map(item => {
+      let type: 'show' | 'movie' | 'anime' = 'show';
+      if (isAnime(item)) type = 'anime';
+      else if (isMovie(item)) type = 'movie';
+
+      return {
+        title: item.title,
+        slug: item.slug,
+        type,
+        rating: item.imdbRating || undefined,
+        year: item.year,
+        poster: item.posterUrl || undefined,
+        description: item.description?.slice(0, 80) || undefined,
+        cast: item.cast?.split(',').slice(0, 3).join(', ') || undefined,
+        duration: isMovie(item) && item.duration ? `${item.duration}m` : undefined,
+        trailerUrl: (item as any).trailerUrl || undefined,
+      };
+    });
   };
 
   // Parse markdown-like text to render bold
@@ -261,8 +393,173 @@ export function Chatbot() {
         id: Date.now().toString(),
         text: "🎭 Pick a genre to explore:",
         isBot: true,
-        suggestions: ["Action", "Comedy", "Drama", "Horror", "Romance", "Sci-Fi", "Thriller", "Animation"],
+        suggestions: ["Action", "Comedy", "Drama", "Horror", "Romance", "Sci-Fi", "Thriller", "Animation", "Anime"],
       };
+    }
+
+    // ===== ANIME SPECIFIC =====
+    if (
+      lowerMessage.includes("anime") ||
+      lowerMessage.includes("shonen") ||
+      lowerMessage.includes("isekai") ||
+      lowerMessage.includes("manga")
+    ) {
+      const matchedAnime = findAnime(userMessage.replace(/anime|recommend|best|good|top/gi, '').trim(), 5);
+
+      if (matchedAnime.length > 0) {
+        const results = formatContent(matchedAnime);
+        setContext(prev => ({ ...prev, lastResults: results, lastType: 'anime' }));
+        return {
+          id: Date.now().toString(),
+          text: `🎌 Found ${matchedAnime.length} anime for you:`,
+          isBot: true,
+          showLinks: results,
+          suggestions: ["More anime", "Top rated anime", "🎲 Surprise me"],
+        };
+      }
+
+      // Show top anime if no specific match
+      const topAnime = getTopRated('anime', 5);
+      if (topAnime.length > 0) {
+        trackGenre('anime');
+        return {
+          id: Date.now().toString(),
+          text: "🎌 Here are some great anime to watch:",
+          isBot: true,
+          showLinks: formatContent(topAnime),
+          suggestions: ["Action anime", "Romance anime", "Fantasy anime"],
+        };
+      }
+    }
+
+    // ===== STREAMING/PLAY COMMANDS =====
+    const playMatch = lowerMessage.match(/(?:play|watch|start|resume|continue)\s+(.+)/i);
+    if (playMatch) {
+      const query = playMatch[1].replace(/the|movie|show|anime|episode/gi, '').trim();
+
+      // Check for specific episode pattern
+      const epMatch = query.match(/(.+?)\s*(?:s|season)?\s*(\d+)\s*(?:e|ep|episode)?\s*(\d+)/i);
+      if (epMatch) {
+        const showName = epMatch[1].trim();
+        const season = parseInt(epMatch[2]);
+        const ep = parseInt(epMatch[3]);
+        const foundShow = shows?.find(s => s.title.toLowerCase().includes(showName.toLowerCase()));
+        if (foundShow) {
+          navigate(`/watch/${foundShow.slug}?season=${season}&episode=${ep}`);
+          return {
+            id: Date.now().toString(),
+            text: `▶️ Starting ${foundShow.title} S${season}E${ep}...`,
+            isBot: true,
+            suggestions: ["Next episode", "🎲 Surprise me"],
+          };
+        }
+      }
+
+      // Find content to play
+      const found = [...findShows(query, 1), ...findMovies(query, 1), ...findAnime(query, 1)][0];
+      if (found) {
+        const type = isAnime(found) ? 'anime' : isMovie(found) ? 'movie' : 'show';
+        const url = type === 'movie' ? `/watch-movie/${found.slug}` : type === 'anime' ? `/watch-anime/${found.slug}` : `/watch/${found.slug}`;
+        navigate(url);
+        return {
+          id: Date.now().toString(),
+          text: `▶️ Starting "${found.title}"...`,
+          isBot: true,
+          suggestions: ["Similar content", "🎲 Surprise me"],
+        };
+      }
+    }
+
+    // ===== CONTINUE WATCHING =====
+    if (
+      lowerMessage.includes("continue") ||
+      lowerMessage.includes("resume") ||
+      lowerMessage.includes("what was i watching") ||
+      lowerMessage.includes("watch history")
+    ) {
+      const history = getWatchHistory();
+      if (history.length > 0) {
+        const historyLinks: ContentLink[] = history.map(h => ({
+          title: h.title,
+          slug: h.slug,
+          type: h.type as 'show' | 'movie' | 'anime',
+        }));
+        return {
+          id: Date.now().toString(),
+          text: "📺 Continue where you left off:",
+          isBot: true,
+          showLinks: historyLinks,
+          suggestions: ["🎲 Surprise me", "Top rated", "Browse genres"],
+        };
+      }
+      return {
+        id: Date.now().toString(),
+        text: "You haven't watched anything yet! Let me help you get started:",
+        isBot: true,
+        suggestions: ["🎲 Surprise me", "🔥 What's trending", "Top rated"],
+      };
+    }
+
+    // ===== TELL ME ABOUT / DETAILS =====
+    const aboutMatch = lowerMessage.match(/(?:tell me about|info about|details about|what is|what's|about)\s+(.+)/i);
+    if (aboutMatch) {
+      const query = aboutMatch[1].replace(/['"]/g, '').trim();
+      const allContent = [...(shows || []), ...(movies || []), ...(anime || [])];
+      const found = allContent.find(c => c.title.toLowerCase().includes(query.toLowerCase()));
+
+      if (found) {
+        const type = isAnime(found) ? 'anime' : isMovie(found) ? 'movie' : 'show';
+        const typeEmoji = type === 'anime' ? '🎌' : type === 'movie' ? '🎬' : '📺';
+
+        // Build detailed info
+        let details = `${typeEmoji} **${found.title}** (${found.year})\n\n`;
+        if (found.imdbRating) details += `⭐ **Rating:** ${found.imdbRating}/10\n`;
+        if (found.genres) details += `🎭 **Genres:** ${found.genres}\n`;
+        if (isMovie(found) && found.duration) details += `⏱️ **Duration:** ${found.duration} min\n`;
+        if (!isMovie(found) && !isAnime(found) && (found as any).seasons) details += `📺 **Seasons:** ${(found as any).seasons}\n`;
+        if (found.cast) details += `👥 **Cast:** ${found.cast.split(',').slice(0, 5).join(', ')}\n`;
+        details += `\n📖 ${found.description?.slice(0, 200)}...`;
+
+        setContext(prev => ({ ...prev, lastRecommendedTitle: found.title, lastResults: formatContent([found]) }));
+
+        return {
+          id: Date.now().toString(),
+          text: details,
+          isBot: true,
+          showLinks: [{
+            title: `▶️ Watch ${found.title}`,
+            slug: found.slug,
+            type,
+            poster: found.posterUrl || undefined,
+            rating: found.imdbRating || undefined,
+          }],
+          suggestions: ["Similar to this", `Play ${found.title}`, "🎲 Surprise me"],
+        };
+      }
+    }
+
+    // ===== MULTI-TURN: Play/Select from last results =====  
+    if (context.lastResults && context.lastResults.length > 0) {
+      const numMatch = lowerMessage.match(/(?:the\s+)?(first|second|third|fourth|fifth|1st|2nd|3rd|4th|5th|\d+)(?:\s+one)?/i);
+      if (numMatch || lowerMessage === "play it" || lowerMessage === "watch it") {
+        let index = 0;
+        if (numMatch) {
+          const numWord = numMatch[1].toLowerCase();
+          const numMap: Record<string, number> = { 'first': 0, '1st': 0, 'second': 1, '2nd': 1, 'third': 2, '3rd': 2, 'fourth': 3, '4th': 3, 'fifth': 4, '5th': 4 };
+          index = numMap[numWord] !== undefined ? numMap[numWord] : (parseInt(numWord) - 1) || 0;
+        }
+        const selected = context.lastResults[index];
+        if (selected) {
+          const url = selected.type === 'movie' ? `/watch-movie/${selected.slug}` : selected.type === 'anime' ? `/watch-anime/${selected.slug}` : `/watch/${selected.slug}`;
+          navigate(url);
+          return {
+            id: Date.now().toString(),
+            text: `▶️ Playing "${selected.title}"...`,
+            isBot: true,
+            suggestions: ["Similar content", "🎲 Surprise me"],
+          };
+        }
+      }
     }
 
     // ===== HELP / PLAYBACK ISSUES (moved up for priority) =====
@@ -354,7 +651,7 @@ export function Chatbot() {
         }
       }
       const similar = getSimilarContent(title);
-      
+
       if (similar.length > 0) {
         setContext(prev => ({ ...prev, lastRecommendedTitle: title }));
         return {
@@ -380,7 +677,7 @@ export function Chatbot() {
     if (foundMood || lowerMessage.includes("mood") || lowerMessage.includes("feel like")) {
       const mood = foundMood || 'excited';
       const moodContent = getByMood(mood);
-      
+
       if (moodContent.length > 0) {
         const emoji = { happy: '😊', sad: '😢', excited: '🔥', scared: '😱', romantic: '💕', thoughtful: '🤔', relaxed: '😌', adventurous: '🗺️' }[mood] || '🎬';
         return {
@@ -402,7 +699,7 @@ export function Chatbot() {
     ) {
       const type = lowerMessage.includes("movie") ? 'movie' : lowerMessage.includes("show") ? 'show' : undefined;
       const topRated = getTopRated(type, 5);
-      
+
       if (topRated.length > 0) {
         const label = type === 'movie' ? 'movies' : type === 'show' ? 'shows' : 'titles';
         return {
@@ -425,7 +722,7 @@ export function Chatbot() {
       const trendingShows = shows?.filter(s => s.trending).slice(0, 3) || [];
       const trendingMovies = movies?.filter(m => m.trending).slice(0, 2) || [];
       const combined = [...trendingShows, ...trendingMovies];
-      
+
       if (combined.length > 0) {
         return {
           id: Date.now().toString(),
@@ -443,23 +740,23 @@ export function Chatbot() {
       const showName = episodeMatch[1].trim();
       const season = parseInt(episodeMatch[2]);
       const episode = parseInt(episodeMatch[3]);
-      
-      const foundShow = shows?.find(s => 
+
+      const foundShow = shows?.find(s =>
         s.title.toLowerCase().includes(showName.toLowerCase())
       );
-      
+
       if (foundShow) {
         // Find the specific episode to get its thumbnail
-        const foundEpisode = episodes?.find(ep => 
-          ep.showId === foundShow.id && 
-          ep.season === season && 
+        const foundEpisode = episodes?.find(ep =>
+          ep.showId === foundShow.id &&
+          ep.season === season &&
           ep.episodeNumber === episode
         );
-        
+
         const episodeThumbnail = foundEpisode?.thumbnailUrl || foundShow.backdropUrl || foundShow.posterUrl;
         const episodeTitle = foundEpisode?.title || `Episode ${episode}`;
         const episodeDescription = foundEpisode?.description?.slice(0, 100) || '';
-        
+
         return {
           id: Date.now().toString(),
           text: `🎬 Found it! Click to watch ${foundShow.title} S${season}E${episode}:`,
@@ -500,7 +797,7 @@ export function Chatbot() {
           })
           .sort((a, b) => parseFloat(b.imdbRating || '0') - parseFloat(a.imdbRating || '0'))
           .slice(0, 5);
-        
+
         if (genreContent.length > 0) {
           const emoji = { action: '💥', comedy: '😂', drama: '🎭', horror: '👻', romance: '💕', scifi: '🚀', fantasy: '✨', crime: '🔍', documentary: '📹', animation: '🎨' }[genre] || '🎬';
           return {
@@ -517,7 +814,7 @@ export function Chatbot() {
     // ===== MOVIES SPECIFICALLY =====
     if (lowerMessage.includes("movie") || lowerMessage.includes("film")) {
       const matchedMovies = findMovies(userMessage.replace(/movie|film/gi, '').trim(), 5);
-      
+
       if (matchedMovies.length > 0) {
         return {
           id: Date.now().toString(),
@@ -527,7 +824,7 @@ export function Chatbot() {
           suggestions: ["Top rated movies", "🎲 Random movie", "Browse shows"],
         };
       }
-      
+
       // Show top movies if no specific match
       const topMovies = getTopRated('movie', 5);
       return {
@@ -542,7 +839,7 @@ export function Chatbot() {
     // ===== SHOWS SPECIFICALLY =====
     if (lowerMessage.includes("show") || lowerMessage.includes("series") || lowerMessage.includes("tv")) {
       const matchedShows = findShows(userMessage.replace(/show|series|tv/gi, '').trim(), 5);
-      
+
       if (matchedShows.length > 0) {
         return {
           id: Date.now().toString(),
@@ -552,7 +849,7 @@ export function Chatbot() {
           suggestions: ["Top rated shows", "🎲 Random show", "Browse movies"],
         };
       }
-      
+
       const topShows = getTopRated('show', 5);
       return {
         id: Date.now().toString(),
@@ -566,7 +863,7 @@ export function Chatbot() {
     // ===== GENERAL SEARCH =====
     const matchedShows = findShows(userMessage, 3);
     const matchedMovies = findMovies(userMessage, 3);
-    
+
     if (matchedShows.length > 0 || matchedMovies.length > 0) {
       const combined = [...matchedShows, ...matchedMovies].slice(0, 5);
       return {
@@ -637,6 +934,39 @@ export function Chatbot() {
     handleSend(suggestion);
   };
 
+  // Voice recognition using Web Speech API
+  const toggleVoice = () => {
+    if (isListening) {
+      recognitionRef.current?.stop();
+      setIsListening(false);
+      return;
+    }
+
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      handleSend("Voice input is not supported in this browser. Please use Chrome or Edge.");
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'en-US';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    recognition.onstart = () => setIsListening(true);
+    recognition.onend = () => setIsListening(false);
+    recognition.onerror = () => setIsListening(false);
+
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      setInput(transcript);
+      handleSend(transcript);
+    };
+
+    recognitionRef.current = recognition;
+    recognition.start();
+  };
+
   if (!isOpen) {
     return (
       <div className="fixed bottom-6 right-6 z-[100]" style={{ position: 'fixed', bottom: '24px', right: '24px' }}>
@@ -653,14 +983,14 @@ export function Chatbot() {
   }
 
   return (
-    <div 
+    <div
       className="w-[calc(100vw-2rem)] sm:w-96 max-w-[400px] h-[600px] max-h-[80vh] rounded-2xl shadow-2xl flex flex-col z-[100] animate-in slide-in-from-bottom-5 duration-300 relative"
       style={{ position: 'fixed', bottom: '24px', right: '24px' }}
     >
       {/* Animated glowing border effect - Siri-style */}
       <div className="absolute -inset-[3px] rounded-2xl chatbot-glow bg-gradient-to-r from-red-500 via-red-400 to-red-600" />
       <div className="absolute -inset-[2px] rounded-2xl overflow-hidden">
-        <div 
+        <div
           className="absolute w-[200%] h-[200%] top-[-50%] left-[-50%]"
           style={{
             background: 'conic-gradient(from 0deg, #ef4444, #dc2626, #f87171, #dc2626, #ef4444)',
@@ -670,189 +1000,202 @@ export function Chatbot() {
       </div>
       {/* Main container */}
       <div className="relative bg-background rounded-2xl flex flex-col h-full overflow-hidden border border-red-500/20">
-      {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-border bg-gradient-to-r from-primary to-primary/80 text-primary-foreground rounded-t-2xl">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-primary-foreground/20 flex items-center justify-center">
-            <Sparkles className="h-5 w-5" />
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b border-border bg-gradient-to-r from-primary to-primary/80 text-primary-foreground rounded-t-2xl">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-primary-foreground/20 flex items-center justify-center">
+              <Sparkles className="h-5 w-5" />
+            </div>
+            <div>
+              <h3 className="font-semibold">Vault AI</h3>
+              <p className="text-xs opacity-90 flex items-center gap-1">
+                <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
+                Online • Ready to help
+              </p>
+            </div>
           </div>
-          <div>
-            <h3 className="font-semibold">Vault AI</h3>
-            <p className="text-xs opacity-90 flex items-center gap-1">
-              <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
-              Online • Ready to help
-            </p>
-          </div>
-        </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setIsOpen(false)}
-          className="h-8 w-8 text-primary-foreground hover:bg-primary-foreground/20"
-          data-testid="button-close-chatbot"
-        >
-          <X className="h-4 w-4" />
-        </Button>
-      </div>
-
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3 chatbot-messages scroll-smooth">
-        {messages.map((message, msgIdx) => (
-          <div
-            key={message.id}
-            className={`flex ${message.isBot ? "justify-start" : "justify-end"} animate-in fade-in slide-in-from-bottom-2 duration-300`}
-            style={{ animationDelay: msgIdx === messages.length - 1 ? '0ms' : '0ms' }}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setIsOpen(false)}
+            className="h-8 w-8 text-primary-foreground hover:bg-primary-foreground/20"
+            data-testid="button-close-chatbot"
           >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+
+        {/* Messages */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-3 chatbot-messages scroll-smooth">
+          {messages.map((message, msgIdx) => (
             <div
-              className={`max-w-[85%] rounded-2xl p-3.5 shadow-sm ${
-                message.isBot
+              key={message.id}
+              className={`flex ${message.isBot ? "justify-start" : "justify-end"} animate-in fade-in slide-in-from-bottom-2 duration-300`}
+              style={{ animationDelay: msgIdx === messages.length - 1 ? '0ms' : '0ms' }}
+            >
+              <div
+                className={`max-w-[85%] rounded-2xl p-3.5 shadow-sm ${message.isBot
                   ? "bg-muted/80 backdrop-blur-sm text-foreground rounded-tl-sm"
                   : "bg-gradient-to-br from-primary to-primary/90 text-primary-foreground rounded-tr-sm"
-              }`}
-            >
-              <p className="text-sm whitespace-pre-line leading-relaxed">{renderText(message.text)}</p>
+                  }`}
+              >
+                <p className="text-sm whitespace-pre-line leading-relaxed">{renderText(message.text)}</p>
 
-              {/* Show/Movie links with poster thumbnails */}
-              {message.showLinks && message.showLinks.length > 0 && (
-                <div className="mt-3 space-y-2">
-                  {message.showLinks.map((item, idx) => {
-                    // Handle different URL formats
-                    let href;
-                    if (item.type === 'movie') {
-                      href = `/movie/${item.slug}`;
-                    } else if (item.slug.includes('?season=')) {
-                      href = `/watch/${item.slug}`;
-                    } else {
-                      href = `/show/${item.slug}`;
-                    }
-                    
-                    return (
-                      <Link key={item.slug} href={href}>
-                        <div
-                          className="group bg-background/80 backdrop-blur-sm hover:bg-accent/80 rounded-xl border border-border/50 cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:shadow-lg hover:border-primary/30 overflow-hidden animate-in fade-in slide-in-from-bottom-2"
-                          style={{ animationDelay: `${idx * 50}ms`, animationFillMode: 'both' }}
-                          onClick={() => setIsOpen(false)}
-                        >
-                          <div className="flex gap-3 p-2">
-                            {/* Poster thumbnail */}
-                            <div className="relative w-12 h-16 rounded-lg overflow-hidden shrink-0 bg-muted shadow-sm">
-                              {item.poster ? (
-                                <img 
-                                  src={item.poster} 
-                                  alt={item.title}
-                                  className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
-                                  loading="lazy"
-                                />
-                              ) : (
-                                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-primary/5">
-                                  {item.type === 'movie' ? (
-                                    <Film className="w-5 h-5 text-muted-foreground" />
-                                  ) : (
-                                    <Tv className="w-5 h-5 text-muted-foreground" />
-                                  )}
-                                </div>
-                              )}
-                              {/* Play overlay on hover */}
-                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
-                                <Play className="w-4 h-4 text-white fill-white" />
-                              </div>
-                            </div>
-                            
-                            {/* Content info */}
-                            <div className="flex-1 min-w-0 py-0.5">
-                              <div className="flex items-start justify-between gap-2">
-                                <h4 className="font-medium text-sm text-foreground truncate leading-tight">
-                                  {item.title}
-                                </h4>
-                                {item.rating && (
-                                  <div className="flex items-center gap-0.5 shrink-0 bg-yellow-500/10 px-1.5 py-0.5 rounded-md">
-                                    <Star className="w-3 h-3 text-yellow-500 fill-yellow-500" />
-                                    <span className="text-xs font-medium text-yellow-600 dark:text-yellow-400">{item.rating}</span>
+                {/* Show/Movie links with poster thumbnails */}
+                {message.showLinks && message.showLinks.length > 0 && (
+                  <div className="mt-3 space-y-2">
+                    {message.showLinks.map((item, idx) => {
+                      // Handle different URL formats including anime
+                      let href;
+                      if (item.type === 'movie') {
+                        href = `/movie/${item.slug}`;
+                      } else if (item.type === 'anime') {
+                        href = `/anime/${item.slug}`;
+                      } else if (item.slug.includes('?season=')) {
+                        href = `/watch/${item.slug}`;
+                      } else {
+                        href = `/show/${item.slug}`;
+                      }
+
+                      return (
+                        <Link key={item.slug} href={href}>
+                          <div
+                            className="group bg-background/80 backdrop-blur-sm hover:bg-accent/80 rounded-xl border border-border/50 cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:shadow-lg hover:border-primary/30 overflow-hidden animate-in fade-in slide-in-from-bottom-2"
+                            style={{ animationDelay: `${idx * 50}ms`, animationFillMode: 'both' }}
+                            onClick={() => setIsOpen(false)}
+                          >
+                            <div className="flex gap-3 p-2">
+                              {/* Poster thumbnail */}
+                              <div className="relative w-12 h-16 rounded-lg overflow-hidden shrink-0 bg-muted shadow-sm">
+                                {item.poster ? (
+                                  <img
+                                    src={item.poster}
+                                    alt={item.title}
+                                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
+                                    loading="lazy"
+                                  />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-primary/5">
+                                    {item.type === 'movie' ? (
+                                      <Film className="w-5 h-5 text-muted-foreground" />
+                                    ) : (
+                                      <Tv className="w-5 h-5 text-muted-foreground" />
+                                    )}
                                   </div>
                                 )}
+                                {/* Play overlay on hover */}
+                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
+                                  <Play className="w-4 h-4 text-white fill-white" />
+                                </div>
                               </div>
-                              <div className="flex items-center gap-2 mt-1">
-                                <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-primary/10 text-primary font-medium">
-                                  {item.type}
-                                </span>
-                                {item.year && (
-                                  <span className="text-xs text-muted-foreground">{item.year}</span>
+
+                              {/* Content info */}
+                              <div className="flex-1 min-w-0 py-0.5">
+                                <div className="flex items-start justify-between gap-2">
+                                  <h4 className="font-medium text-sm text-foreground truncate leading-tight">
+                                    {item.title}
+                                  </h4>
+                                  {item.rating && (
+                                    <div className="flex items-center gap-0.5 shrink-0 bg-yellow-500/10 px-1.5 py-0.5 rounded-md">
+                                      <Star className="w-3 h-3 text-yellow-500 fill-yellow-500" />
+                                      <span className="text-xs font-medium text-yellow-600 dark:text-yellow-400">{item.rating}</span>
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2 mt-1">
+                                  <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-primary/10 text-primary font-medium">
+                                    {item.type}
+                                  </span>
+                                  {item.year && (
+                                    <span className="text-xs text-muted-foreground">{item.year}</span>
+                                  )}
+                                </div>
+                                {item.description && (
+                                  <p className="text-[11px] text-muted-foreground mt-1 line-clamp-2 leading-tight">
+                                    {item.description}...
+                                  </p>
                                 )}
                               </div>
-                              {item.description && (
-                                <p className="text-[11px] text-muted-foreground mt-1 line-clamp-2 leading-tight">
-                                  {item.description}...
-                                </p>
-                              )}
                             </div>
                           </div>
-                        </div>
-                      </Link>
-                    );
-                  })}
-                </div>
-              )}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
 
-              {/* Suggestions */}
-              {message.suggestions && message.suggestions.length > 0 && (
-                <div className="mt-3 flex flex-wrap gap-1.5">
-                  {message.suggestions.map((suggestion, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => handleSuggestionClick(suggestion)}
-                      className="text-xs bg-background/80 hover:bg-primary hover:text-primary-foreground px-3 py-1.5 rounded-full border border-border/50 transition-all duration-200 hover:scale-105 hover:shadow-sm animate-in fade-in slide-in-from-bottom-1"
-                      style={{ animationDelay: `${idx * 30}ms`, animationFillMode: 'both' }}
-                    >
-                      {suggestion}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        ))}
-
-        {isTyping && (
-          <div className="flex justify-start animate-in fade-in slide-in-from-bottom-2 duration-300">
-            <div className="bg-muted rounded-lg p-3 flex items-center gap-2">
-              <div className="flex gap-1">
-                <span className="w-2 h-2 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
-                <span className="w-2 h-2 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
-                <span className="w-2 h-2 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                {/* Suggestions */}
+                {message.suggestions && message.suggestions.length > 0 && (
+                  <div className="mt-3 flex flex-wrap gap-1.5">
+                    {message.suggestions.map((suggestion, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => handleSuggestionClick(suggestion)}
+                        className="text-xs bg-background/80 hover:bg-primary hover:text-primary-foreground px-3 py-1.5 rounded-full border border-border/50 transition-all duration-200 hover:scale-105 hover:shadow-sm animate-in fade-in slide-in-from-bottom-1"
+                        style={{ animationDelay: `${idx * 30}ms`, animationFillMode: 'both' }}
+                      >
+                        {suggestion}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
-              <span className="text-xs text-muted-foreground">Vault is thinking...</span>
             </div>
-          </div>
-        )}
-        <div ref={messagesEndRef} />
-      </div>
+          ))}
 
-      {/* Input */}
-      <div className="p-4 border-t border-border/50 bg-background/50 backdrop-blur-sm rounded-b-2xl">
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            handleSend();
-          }}
-          className="flex gap-2"
-        >
-          <Input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask me anything..."
-            className="flex-1 rounded-full bg-muted/50 border-border/50 focus:border-primary/50 transition-colors"
-            data-testid="input-chatbot"
-          />
-          <Button 
-            type="submit" 
-            size="icon" 
-            className="rounded-full h-10 w-10 shrink-0 transition-transform hover:scale-105"
-            data-testid="button-send-message"
+          {isTyping && (
+            <div className="flex justify-start animate-in fade-in slide-in-from-bottom-2 duration-300">
+              <div className="bg-muted rounded-lg p-3 flex items-center gap-2">
+                <div className="flex gap-1">
+                  <span className="w-2 h-2 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                  <span className="w-2 h-2 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                  <span className="w-2 h-2 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                </div>
+                <span className="text-xs text-muted-foreground">Vault is thinking...</span>
+              </div>
+            </div>
+          )}
+          <div ref={messagesEndRef} />
+        </div>
+
+        {/* Input */}
+        <div className="p-4 border-t border-border/50 bg-background/50 backdrop-blur-sm rounded-b-2xl">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSend();
+            }}
+            className="flex gap-2"
           >
-            <Send className="h-4 w-4" />
-          </Button>
-        </form>
-      </div>
+            <Input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder={isListening ? "🎤 Listening..." : "Ask me anything or try voice..."}
+              className={`flex-1 rounded-full bg-muted/50 border-border/50 focus:border-primary/50 transition-colors ${isListening ? 'border-red-500 animate-pulse' : ''}`}
+              data-testid="input-chatbot"
+              disabled={isListening}
+            />
+            <Button
+              type="button"
+              size="icon"
+              variant={isListening ? "destructive" : "outline"}
+              className={`rounded-full h-10 w-10 shrink-0 transition-all ${isListening ? 'animate-pulse' : 'hover:scale-105'}`}
+              onClick={toggleVoice}
+              title={isListening ? "Stop listening" : "Voice input"}
+            >
+              {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+            </Button>
+            <Button
+              type="submit"
+              size="icon"
+              className="rounded-full h-10 w-10 shrink-0 transition-transform hover:scale-105"
+              data-testid="button-send-message"
+              disabled={isListening}
+            >
+              <Send className="h-4 w-4" />
+            </Button>
+          </form>
+        </div>
       </div>
     </div>
   );
