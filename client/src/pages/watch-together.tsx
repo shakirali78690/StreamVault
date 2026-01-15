@@ -928,7 +928,7 @@ function WatchTogetherContent() {
             {isFullscreen && (
                 <button
                     onClick={toggleFullscreen}
-                    className="fixed top-4 left-4 z-[9999] w-12 h-12 rounded-full bg-black/60 backdrop-blur-md border border-white/20 flex items-center justify-center text-white hover:bg-black/80 transition-all shadow-xl hover:scale-110"
+                    className="fixed top-4 right-4 z-[9999] w-12 h-12 rounded-full bg-black/60 backdrop-blur-md border border-white/20 flex items-center justify-center text-white hover:bg-black/80 transition-all shadow-xl hover:scale-110"
                     title="Exit Fullscreen"
                 >
                     <Minimize className="h-5 w-5" />
