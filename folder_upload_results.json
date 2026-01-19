@@ -1,39 +1,59 @@
 {
   "success": true,
-  "identifier": "movies-streamvault.live",
-  "details_url": "https://archive.org/details/movies-streamvault.live",
-  "embed_url": "https://archive.org/embed/movies-streamvault.live",
-  "total_files": 7,
-  "uploaded": 7,
+  "identifier": "can-this-love-be-translated-streamvault.live",
+  "details_url": "https://archive.org/details/can-this-love-be-translated-streamvault.live",
+  "embed_url": "https://archive.org/embed/can-this-love-be-translated-streamvault.live",
+  "total_files": 12,
+  "uploaded": 12,
   "failed": 0,
   "videos": [
     {
-      "filename": "Ballerina.2025.mp4",
-      "video_url": "https://archive.org/download/movies-streamvault.live/Ballerina.2025.mp4"
+      "filename": "Can.This.Love.Be.Translated.S01E01.mp4",
+      "video_url": "https://archive.org/download/can-this-love-be-translated-streamvault.live/Can.This.Love.Be.Translated.S01E01.mp4"
     },
     {
-      "filename": "F1.2025.mp4",
-      "video_url": "https://archive.org/download/movies-streamvault.live/F1.2025.mp4"
+      "filename": "Can.This.Love.Be.Translated.S01E010.mp4",
+      "video_url": "https://archive.org/download/can-this-love-be-translated-streamvault.live/Can.This.Love.Be.Translated.S01E010.mp4"
     },
     {
-      "filename": "Fight or flight.mp4",
-      "video_url": "https://archive.org/download/movies-streamvault.live/Fight or flight.mp4"
+      "filename": "Can.This.Love.Be.Translated.S01E011.mp4",
+      "video_url": "https://archive.org/download/can-this-love-be-translated-streamvault.live/Can.This.Love.Be.Translated.S01E011.mp4"
     },
     {
-      "filename": "How.to.Train.Your.Dragon.2025.mp4",
-      "video_url": "https://archive.org/download/movies-streamvault.live/How.to.Train.Your.Dragon.2025.mp4"
+      "filename": "Can.This.Love.Be.Translated.S01E012.mp4",
+      "video_url": "https://archive.org/download/can-this-love-be-translated-streamvault.live/Can.This.Love.Be.Translated.S01E012.mp4"
     },
     {
-      "filename": "Mission.Impossible-The.Final.Reckoning.2025.mp4",
-      "video_url": "https://archive.org/download/movies-streamvault.live/Mission.Impossible-The.Final.Reckoning.2025.mp4"
+      "filename": "Can.This.Love.Be.Translated.S01E02.mp4",
+      "video_url": "https://archive.org/download/can-this-love-be-translated-streamvault.live/Can.This.Love.Be.Translated.S01E02.mp4"
     },
     {
-      "filename": "Nobody.2.2025.mp4",
-      "video_url": "https://archive.org/download/movies-streamvault.live/Nobody.2.2025.mp4"
+      "filename": "Can.This.Love.Be.Translated.S01E03.mp4",
+      "video_url": "https://archive.org/download/can-this-love-be-translated-streamvault.live/Can.This.Love.Be.Translated.S01E03.mp4"
     },
     {
-      "filename": "The Toxic Avenger.mp4",
-      "video_url": "https://archive.org/download/movies-streamvault.live/The Toxic Avenger.mp4"
+      "filename": "Can.This.Love.Be.Translated.S01E04.mp4",
+      "video_url": "https://archive.org/download/can-this-love-be-translated-streamvault.live/Can.This.Love.Be.Translated.S01E04.mp4"
+    },
+    {
+      "filename": "Can.This.Love.Be.Translated.S01E05.mp4",
+      "video_url": "https://archive.org/download/can-this-love-be-translated-streamvault.live/Can.This.Love.Be.Translated.S01E05.mp4"
+    },
+    {
+      "filename": "Can.This.Love.Be.Translated.S01E06.mp4",
+      "video_url": "https://archive.org/download/can-this-love-be-translated-streamvault.live/Can.This.Love.Be.Translated.S01E06.mp4"
+    },
+    {
+      "filename": "Can.This.Love.Be.Translated.S01E07.mp4",
+      "video_url": "https://archive.org/download/can-this-love-be-translated-streamvault.live/Can.This.Love.Be.Translated.S01E07.mp4"
+    },
+    {
+      "filename": "Can.This.Love.Be.Translated.S01E08.mp4",
+      "video_url": "https://archive.org/download/can-this-love-be-translated-streamvault.live/Can.This.Love.Be.Translated.S01E08.mp4"
+    },
+    {
+      "filename": "Can.This.Love.Be.Translated.S01E09.mp4",
+      "video_url": "https://archive.org/download/can-this-love-be-translated-streamvault.live/Can.This.Love.Be.Translated.S01E09.mp4"
     }
   ],
   "failed_files": []

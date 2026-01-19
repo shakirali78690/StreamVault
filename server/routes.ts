@@ -1635,17 +1635,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
         newMovies = allMovies.slice(0, 6);
       }
 
+      // Sort anime by most recent date (newest first)
+      let allAnime = (contentData.anime || [])
+        .sort((a: any, b: any) => getLatestDate(b) - getLatestDate(a));
+
+      // Get new anime (in last week) or fall back to trending/featured
+      let newAnime = allAnime.filter((a: any) => {
+        const latestDate = new Date(Math.max(
+          a.createdAt ? new Date(a.createdAt).getTime() : 0,
+          a.updatedAt ? new Date(a.updatedAt).getTime() : 0
+        )).toISOString();
+        return latestDate >= oneWeekAgo;
+      }).slice(0, 6);
+      if (newAnime.length < 5) {
+        newAnime = allAnime.filter((a: any) => a.trending || a.featured).slice(0, 6);
+      }
+      if (newAnime.length === 0) {
+        newAnime = allAnime.slice(0, 6);
+      }
+
       // Get blog posts
       const blogPosts = await storage.getAllBlogPosts();
       const featuredBlogs = blogPosts.filter((b: any) => b.featured).slice(0, 5);
       const latestBlogs = featuredBlogs.length > 0 ? featuredBlogs : blogPosts.slice(0, 5);
 
       // Generate email HTML (simplified version)
+      const totalShows = (contentData.shows || []).length;
+      const totalMovies = (contentData.movies || []).length;
+      const totalAnime = (contentData.anime || []).length;
+
       const generateContentRow = (items: any[], type: string) => {
         return items.slice(0, 5).map((item: any) => {
-          const url = type === 'show'
-            ? `https://streamvault.live/show/${item.slug}`
-            : `https://streamvault.live/movie/${item.slug}`;
+          let url;
+          if (type === 'show') url = `https://streamvault.live/show/${item.slug}`;
+          else if (type === 'movie') url = `https://streamvault.live/movie/${item.slug}`;
+          else url = `https://streamvault.live/anime/${item.slug}`;
           return `
             <tr>
               <td style="padding:15px 0;border-bottom:1px solid #2a2a2a;">
@@ -1661,7 +1685,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
                         <h3 style="margin:0 0 8px 0;font-size:18px;color:#ffffff;font-weight:600;">${item.title}</h3>
                       </a>
                       <p style="margin:0 0 8px 0;color:#888888;font-size:13px;">
-                        ${item.year} ${item.imdbRating ? '• ⭐ ' + item.imdbRating : ''}
+                        ${item.year} ${item.genres ? '• ' + (item.genres.split(',')[0] || '') : ''} ${item.imdbRating ? '• ⭐ ' + item.imdbRating : ''}
+                      </p>
+                      <p style="margin:0 0 12px 0;color:#aaaaaa;font-size:14px;line-height:1.4;">
+                        ${(item.description || '').substring(0, 120)}${item.description?.length > 120 ? '...' : ''}
                       </p>
                       <a href="${url}" style="display:inline-block;background:#e50914;color:#ffffff;padding:10px 24px;border-radius:5px;text-decoration:none;font-size:13px;font-weight:600;">
                         ▶ Watch Now
@@ -1735,6 +1762,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
               </table>
               ` : ''}
 
+              <!-- Anime Section -->
+              ${newAnime.length > 0 ? `
+              <table cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-top:25px;">
+                <tr>
+                  <td style="padding:12px 0;">
+                    <h3 style="margin:0;color:#e50914;font-size:18px;font-weight:700;border-left:4px solid #e50914;padding-left:12px;">🎌 Featured Anime</h3>
+                  </td>
+                </tr>
+                ${generateContentRow(newAnime, 'anime')}
+              </table>
+              ` : ''}
+
               <!-- Blog Section -->
               ${latestBlogs.length > 0 ? `
               <table cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-top:25px;">
@@ -1779,15 +1818,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   <td style="padding:25px;text-align:center;">
                     <table cellpadding="0" cellspacing="0" border="0" width="100%">
                       <tr>
-                        <td width="33%" style="text-align:center;">
-                          <p style="margin:0;color:#e50914;font-size:28px;font-weight:700;">370+</p>
+                        <td width="25%" style="text-align:center;">
+                          <p style="margin:0;color:#e50914;font-size:28px;font-weight:700;">${totalShows}+</p>
                           <p style="margin:5px 0 0 0;color:#888;font-size:12px;text-transform:uppercase;">TV Shows</p>
                         </td>
-                        <td width="33%" style="text-align:center;border-left:1px solid #333;border-right:1px solid #333;">
-                          <p style="margin:0;color:#e50914;font-size:28px;font-weight:700;">250+</p>
+                        <td width="25%" style="text-align:center;border-left:1px solid #333;">
+                          <p style="margin:0;color:#e50914;font-size:28px;font-weight:700;">${totalMovies}+</p>
                           <p style="margin:5px 0 0 0;color:#888;font-size:12px;text-transform:uppercase;">Movies</p>
                         </td>
-                        <td width="33%" style="text-align:center;">
+                        <td width="25%" style="text-align:center;border-left:1px solid #333;">
+                          <p style="margin:0;color:#e50914;font-size:28px;font-weight:700;">${totalAnime}+</p>
+                          <p style="margin:5px 0 0 0;color:#888;font-size:12px;text-transform:uppercase;">Anime</p>
+                        </td>
+                        <td width="25%" style="text-align:center;border-left:1px solid #333;">
                           <p style="margin:0;color:#e50914;font-size:28px;font-weight:700;">HD</p>
                           <p style="margin:5px 0 0 0;color:#888;font-size:12px;text-transform:uppercase;">Quality</p>
                         </td>
@@ -1940,6 +1983,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         newMovies = allMovies.slice(0, 5);
       }
 
+      // Sort anime by most recent date
+      let allAnime = (contentData.anime || [])
+        .sort((a: any, b: any) => getLatestDate(b) - getLatestDate(a));
+
+      let newAnime = allAnime.filter((anime: any) => {
+        const latestDate = new Date(getLatestDate(anime));
+        return latestDate >= cutoffDate;
+      }).slice(0, 5);
+
+      if (newAnime.length < 5) {
+        const trendingAnime = allAnime.filter((a: any) => a.trending || a.featured && !newAnime.find((na: any) => na.id === a.id));
+        newAnime = [...newAnime, ...trendingAnime].slice(0, 5);
+      }
+      if (newAnime.length === 0) {
+        newAnime = allAnime.slice(0, 5);
+      }
+
       // Get blog posts - sorted by most recent, limit 5
       const blogPosts = await storage.getAllBlogPosts();
       const sortedBlogs = [...blogPosts].sort((a: any, b: any) => {
@@ -1950,14 +2010,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const featuredBlogs = sortedBlogs.filter((b: any) => b.featured).slice(0, 5);
       const latestBlogs = featuredBlogs.length >= 5 ? featuredBlogs : sortedBlogs.slice(0, 5);
 
-      const totalNew = newShows.length + newMovies.length;
+      // Total counts for stats (auto-updated from actual data)
+      const totalShows = (contentData.shows || []).length;
+      const totalMovies = (contentData.movies || []).length;
+      const totalAnime = (contentData.anime || []).length;
+      const totalNew = newShows.length + newMovies.length + newAnime.length;
 
       // Generate professional email HTML
       const generateContentRow = (items: any[], type: string) => {
         return items.map((item: any) => {
-          const url = type === 'show'
-            ? `https://streamvault.live/show/${item.slug}`
-            : `https://streamvault.live/movie/${item.slug}`;
+          let url;
+          if (type === 'show') url = `https://streamvault.live/show/${item.slug}`;
+          else if (type === 'movie') url = `https://streamvault.live/movie/${item.slug}`;
+          else url = `https://streamvault.live/anime/${item.slug}`;
           return `
             <tr>
               <td style="padding:15px 0;border-bottom:1px solid #2a2a2a;">
@@ -2050,21 +2115,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
               </table>
               ` : ''}
 
+              <!-- Anime Section -->
+              ${newAnime.length > 0 ? `
+              <table cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-top:25px;">
+                <tr>
+                  <td style="padding:12px 0;">
+                    <h3 style="margin:0;color:#e50914;font-size:18px;font-weight:700;border-left:4px solid #e50914;padding-left:12px;">🎌 Featured Anime</h3>
+                  </td>
+                </tr>
+                ${generateContentRow(newAnime.slice(0, 5), 'anime')}
+              </table>
+              ` : ''}
+
               <!-- Stats Banner -->
               <table cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-top:30px;background:linear-gradient(135deg,#1a1a1a,#252525);border-radius:10px;">
                 <tr>
                   <td style="padding:25px;text-align:center;">
                     <table cellpadding="0" cellspacing="0" border="0" width="100%">
                       <tr>
-                        <td width="33%" style="text-align:center;">
-                          <p style="margin:0;color:#e50914;font-size:28px;font-weight:700;">370+</p>
+                        <td width="25%" style="text-align:center;">
+                          <p style="margin:0;color:#e50914;font-size:28px;font-weight:700;">${totalShows}+</p>
                           <p style="margin:5px 0 0 0;color:#888;font-size:12px;text-transform:uppercase;">TV Shows</p>
                         </td>
-                        <td width="33%" style="text-align:center;border-left:1px solid #333;border-right:1px solid #333;">
-                          <p style="margin:0;color:#e50914;font-size:28px;font-weight:700;">250+</p>
+                        <td width="25%" style="text-align:center;border-left:1px solid #333;">
+                          <p style="margin:0;color:#e50914;font-size:28px;font-weight:700;">${totalMovies}+</p>
                           <p style="margin:5px 0 0 0;color:#888;font-size:12px;text-transform:uppercase;">Movies</p>
                         </td>
-                        <td width="33%" style="text-align:center;">
+                        <td width="25%" style="text-align:center;border-left:1px solid #333;">
+                          <p style="margin:0;color:#e50914;font-size:28px;font-weight:700;">${totalAnime}+</p>
+                          <p style="margin:5px 0 0 0;color:#888;font-size:12px;text-transform:uppercase;">Anime</p>
+                        </td>
+                        <td width="25%" style="text-align:center;border-left:1px solid #333;">
                           <p style="margin:0;color:#e50914;font-size:28px;font-weight:700;">HD</p>
                           <p style="margin:5px 0 0 0;color:#888;font-size:12px;text-transform:uppercase;">Quality</p>
                         </td>

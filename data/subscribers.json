@@ -1,34 +1,39 @@
 {
-    "subscribers": [
-        {
-            "email": "fiquakhan339@gmail.com",
-            "subscribedAt": "2024-12-25T08:00:00.000Z",
-            "source": "manual"
-        },
-        {
-            "email": "dhruvhasija.2008@gmail.com",
-            "subscribedAt": "2024-12-25T08:00:00.000Z",
-            "source": "manual"
-        },
-        {
-            "email": "yawaraquil678@gmail.com",
-            "subscribedAt": "2024-12-25T08:00:00.000Z",
-            "source": "manual"
-        },
-        {
-            "email": "yawaraquil121@gmail.com",
-            "subscribedAt": "2024-12-25T08:00:00.000Z",
-            "source": "manual"
-        },
-        {
-            "email": "yasiraquil121@gmail.com",
-            "subscribedAt": "2024-12-25T08:00:00.000Z",
-            "source": "manual"
-        },
-        {
-            "email": "aasia1920@gmail.com",
-            "subscribedAt": "2024-12-25T08:00:00.000Z",
-            "source": "manual"
-        }
-    ]
+  "subscribers": [
+    {
+      "email": "fiquakhan339@gmail.com",
+      "subscribedAt": "2024-12-25T08:00:00.000Z",
+      "source": "manual"
+    },
+    {
+      "email": "dhruvhasija.2008@gmail.com",
+      "subscribedAt": "2024-12-25T08:00:00.000Z",
+      "source": "manual"
+    },
+    {
+      "email": "yawaraquil678@gmail.com",
+      "subscribedAt": "2024-12-25T08:00:00.000Z",
+      "source": "manual"
+    },
+    {
+      "email": "yawaraquil121@gmail.com",
+      "subscribedAt": "2024-12-25T08:00:00.000Z",
+      "source": "manual"
+    },
+    {
+      "email": "yasiraquil121@gmail.com",
+      "subscribedAt": "2024-12-25T08:00:00.000Z",
+      "source": "manual"
+    },
+    {
+      "email": "aasia1920@gmail.com",
+      "subscribedAt": "2024-12-25T08:00:00.000Z",
+      "source": "manual"
+    },
+    {
+      "email": "indonesiak8ng@gmail.com",
+      "subscribedAt": "2026-01-19T07:39:29.183Z",
+      "source": "footer"
+    }
+  ]
 }
