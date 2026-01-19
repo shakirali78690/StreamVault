@@ -117,6 +117,10 @@ function WatchTogetherContent() {
     const [, setLocation] = useLocation();
     const roomCode = params?.roomCode;
 
+    // Get password from URL if provided (for private room joins)
+    const searchParams = new URLSearchParams(window.location.search);
+    const urlPassword = searchParams.get('password');
+
     const {
         socket,
         isConnected,
@@ -452,9 +456,13 @@ function WatchTogetherContent() {
     useEffect(() => {
         const storedUsername = sessionStorage.getItem('watchTogether_username');
         const isCreator = sessionStorage.getItem('watchTogether_isCreator');
-        const contentType = sessionStorage.getItem('watchTogether_contentType') as 'show' | 'movie' | null;
+        const contentType = sessionStorage.getItem('watchTogether_contentType') as 'show' | 'movie' | 'anime' | null;
         const contentId = sessionStorage.getItem('watchTogether_contentId');
         const episodeId = sessionStorage.getItem('watchTogether_episodeId');
+        const contentTitle = sessionStorage.getItem('watchTogether_contentTitle');
+        const contentPoster = sessionStorage.getItem('watchTogether_contentPoster');
+        const isPublicStr = sessionStorage.getItem('watchTogether_isPublic');
+        const storedPassword = sessionStorage.getItem('watchTogether_password');
 
         if (!isConnected || roomInfo) return;
 
@@ -466,14 +474,23 @@ function WatchTogetherContent() {
             sessionStorage.removeItem('watchTogether_contentType');
             sessionStorage.removeItem('watchTogether_contentId');
             sessionStorage.removeItem('watchTogether_episodeId');
+            sessionStorage.removeItem('watchTogether_contentTitle');
+            sessionStorage.removeItem('watchTogether_contentPoster');
+            sessionStorage.removeItem('watchTogether_isPublic');
+            sessionStorage.removeItem('watchTogether_password');
 
             // Also clear auto-rejoin localStorage to prevent rejoining old room
             localStorage.removeItem('watch-together-username');
             localStorage.removeItem('watch-together-room');
 
-            // Create the room
+            // Create the room with public/private settings
             setUsername(storedUsername);
-            createRoom(contentType, contentId, storedUsername, episodeId || undefined);
+            createRoom(contentType, contentId, storedUsername, episodeId || undefined, {
+                contentTitle: contentTitle || 'Untitled',
+                contentPoster: contentPoster || undefined,
+                isPublic: isPublicStr !== 'false',
+                password: storedPassword || undefined,
+            });
             setShowJoinModal(false);
         }
         // If joining an existing room with stored username
@@ -482,10 +499,10 @@ function WatchTogetherContent() {
             sessionStorage.removeItem('watchTogether_isCreator');
 
             setUsername(storedUsername);
-            joinRoom(roomCode, storedUsername);
+            joinRoom(roomCode, storedUsername, urlPassword || undefined);
             setShowJoinModal(false);
         }
-    }, [isConnected, roomCode, roomInfo, joinRoom, createRoom]);
+    }, [isConnected, roomCode, roomInfo, joinRoom, createRoom, urlPassword]);
 
     // Update URL when room is created (replace /NEW with actual room code)
     useEffect(() => {
@@ -594,7 +611,8 @@ function WatchTogetherContent() {
             localStorage.setItem('watch-together-username', username.trim());
             localStorage.setItem('watch-together-room', roomCode);
 
-            joinRoom(roomCode, username.trim());
+            // Pass URL password for private rooms
+            joinRoom(roomCode, username.trim(), urlPassword || undefined);
             setShowJoinModal(false);
         }
     };

@@ -1,15 +1,21 @@
 /**
- * Subtitle Service - Wyzie Subs API Integration
- * Fetches subtitles from subs.wyzie.ru (OpenSubtitles + SubDl)
- * Free, no rate limits, no API key required
+ * Subtitle Service - Multi-provider subtitle search with fallbacks
+ * Primary: subs.wyzie.ru (OpenSubtitles + SubDl)
+ * Fallback 1: Sub.wyzie.ru/v2  
+ * Fallback 2: opensubtitles via subdl.com
+ * All free, no API key required
  */
 
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 
-// Wyzie Subs API base URL
-const WYZIE_API_URL = 'https://subs.wyzie.ru';
+// API URLs (in order of preference)
+const SUBTITLE_APIS = [
+    'https://subs.wyzie.ru',           // Primary
+    'https://sub.wyzie.ru/v2',         // Alternative mirror
+    'https://api.subdl.com/subtitle'   // SubDL API (backup)
+];
 
 // Subtitle cache directory
 const SUBTITLE_CACHE_DIR = path.join(process.cwd(), 'data', 'subtitles');
@@ -22,6 +28,7 @@ if (!fs.existsSync(SUBTITLE_CACHE_DIR)) {
 export interface SubtitleResult {
     id: string;
     url: string;
+    downloadUrl: string;
     lang: string;
     language: string;
     format: string;
@@ -35,11 +42,30 @@ export interface SubtitleSearchResponse {
 }
 
 /**
- * Search for subtitles using IMDB ID
- * @param imdbId - IMDB ID (e.g., "tt1234567")
- * @param season - Season number (for TV shows)
- * @param episode - Episode number (for TV shows)
- * @param language - Language code (e.g., "en", "es")
+ * Try fetching with timeout
+ */
+async function fetchWithTimeout(url: string, timeoutMs: number = 8000): Promise<Response> {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+        const response = await fetch(url, {
+            signal: controller.signal,
+            headers: {
+                'User-Agent': 'StreamVault/1.0',
+                'Accept': 'application/json'
+            }
+        });
+        clearTimeout(timeoutId);
+        return response;
+    } catch (error) {
+        clearTimeout(timeoutId);
+        throw error;
+    }
+}
+
+/**
+ * Search for subtitles using IMDB ID with fallback providers
  */
 export async function searchSubtitles(
     imdbId: string,
@@ -47,49 +73,86 @@ export async function searchSubtitles(
     episode?: number,
     language: string = 'en'
 ): Promise<SubtitleSearchResponse> {
-    try {
-        // Build API URL
-        let url = `${WYZIE_API_URL}/search?id=${imdbId}&language=${language}`;
+    console.log(`🔍 Subtitle search: imdbId=${imdbId}, season=${season}, episode=${episode}, lang=${language}`);
 
-        // Add season/episode for TV shows
-        if (season !== undefined && episode !== undefined) {
-            url += `&season=${season}&episode=${episode}`;
-        }
+    // Try each API in order
+    for (let i = 0; i < SUBTITLE_APIS.length; i++) {
+        const baseUrl = SUBTITLE_APIS[i];
 
-        console.log(`🔍 Searching subtitles: ${url}`);
+        try {
+            let url: string;
 
-        const response = await fetch(url, {
-            headers: {
-                'User-Agent': 'StreamVault/1.0',
-                'Accept': 'application/json'
+            // Different URL formats for different providers
+            if (baseUrl.includes('subdl.com')) {
+                // SubDL format
+                url = `${baseUrl}/search?imdb_id=${imdbId}&languages=${language}`;
+                if (season !== undefined && episode !== undefined) {
+                    url += `&season_number=${season}&episode_number=${episode}`;
+                }
+            } else {
+                // Wyzie format
+                url = `${baseUrl}/search?id=${imdbId}&language=${language}`;
+                if (season !== undefined && episode !== undefined) {
+                    url += `&season=${season}&episode=${episode}`;
+                }
             }
-        });
 
-        if (!response.ok) {
-            console.error(`❌ Subtitle search failed: ${response.status}`);
-            return { subtitles: [], error: `API error: ${response.status}` };
+            console.log(`🔍 Trying provider ${i + 1}/${SUBTITLE_APIS.length}: ${url}`);
+
+            const response = await fetchWithTimeout(url, 8000);
+
+            if (!response.ok) {
+                console.log(`⚠️ Provider ${i + 1} returned ${response.status}, trying next...`);
+                continue;
+            }
+
+            const data = await response.json();
+
+            // Parse response based on provider format
+            let subtitles: SubtitleResult[] = [];
+
+            if (Array.isArray(data)) {
+                // Wyzie format - array of subtitles
+                subtitles = data.map((sub: any, index: number) => ({
+                    id: sub.id || `sub_${index}`,
+                    url: sub.url || sub.SubDownloadLink || '',
+                    downloadUrl: sub.url || sub.SubDownloadLink || '',
+                    lang: sub.lang || sub.LanguageId || language,
+                    language: sub.language || sub.LanguageName || 'English',
+                    format: sub.format || 'srt',
+                    hearingImpaired: sub.hearingImpaired || sub.SubHearingImpaired === '1' || false,
+                    provider: baseUrl.includes('subdl') ? 'subdl' : 'wyzie'
+                }));
+            } else if (data.subtitles && Array.isArray(data.subtitles)) {
+                // SubDL format - { subtitles: [] }
+                subtitles = data.subtitles.map((sub: any, index: number) => ({
+                    id: sub.id || sub.subtitle_id || `sub_${index}`,
+                    url: sub.url || sub.download_url || '',
+                    downloadUrl: sub.url || sub.download_url || '',
+                    lang: sub.lang || sub.language || language,
+                    language: sub.language_name || sub.language || 'English',
+                    format: sub.format || 'srt',
+                    hearingImpaired: sub.hi || sub.hearing_impaired || false,
+                    provider: 'subdl'
+                }));
+            }
+
+            if (subtitles.length > 0) {
+                console.log(`✅ Found ${subtitles.length} subtitles from provider ${i + 1}`);
+                return { subtitles };
+            } else {
+                console.log(`⚠️ No subtitles found from provider ${i + 1}, trying next...`);
+            }
+
+        } catch (error: any) {
+            console.log(`⚠️ Provider ${i + 1} failed: ${error.message}, trying next...`);
+            continue;
         }
-
-        const data = await response.json();
-
-        // Parse response - Wyzie returns array of subtitle objects
-        const subtitles: SubtitleResult[] = Array.isArray(data) ? data.map((sub: any, index: number) => ({
-            id: sub.id || `sub_${index}`,
-            url: sub.url || sub.SubDownloadLink || '',
-            lang: sub.lang || sub.LanguageId || language,
-            language: sub.language || sub.LanguageName || 'English',
-            format: sub.format || 'srt',
-            hearingImpaired: sub.hearingImpaired || sub.SubHearingImpaired === '1' || false,
-            provider: sub.provider || 'unknown'
-        })) : [];
-
-        console.log(`✅ Found ${subtitles.length} subtitles`);
-        return { subtitles };
-
-    } catch (error: any) {
-        console.error('❌ Subtitle search error:', error.message);
-        return { subtitles: [], error: error.message };
     }
+
+    // All providers failed
+    console.error('❌ All subtitle providers failed');
+    return { subtitles: [], error: 'All subtitle providers failed' };
 }
 
 /**

@@ -12,6 +12,7 @@ import { fileURLToPath } from "url";
 import { setupSitemaps } from "./sitemap";
 import { sendContentRequestEmail, sendIssueReportEmail } from "./email-service";
 import { searchSubtitles, downloadSubtitle, getCachedSubtitle } from "./subtitle-service";
+import { getActiveRooms } from "./watch-together";
 import webpush from "web-push";
 
 // Helper to convert ReadableStream to async iterable for Node.js
@@ -225,6 +226,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(categories);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch categories" });
+    }
+  });
+
+  // Watch Together Rooms API
+  app.get("/api/watch-rooms", (req, res) => {
+    try {
+      const rooms = getActiveRooms();
+      res.json(rooms);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch watch rooms" });
     }
   });
 

@@ -55,8 +55,8 @@ interface WatchTogetherContextType {
     hostDisconnected: boolean;
     reconnectCountdown: number | null;
     // Actions
-    createRoom: (contentType: 'show' | 'movie' | 'anime', contentId: string, username: string, episodeId?: string) => void;
-    joinRoom: (roomCode: string, username: string) => void;
+    createRoom: (contentType: 'show' | 'movie' | 'anime', contentId: string, username: string, episodeId?: string, options?: { contentTitle?: string; contentPoster?: string; episodeTitle?: string; isPublic?: boolean; password?: string }) => void;
+    joinRoom: (roomCode: string, username: string, password?: string) => void;
     leaveRoom: () => void;
     sendMessage: (message: string) => void;
     sendReaction: (emoji: string) => void;
@@ -355,15 +355,33 @@ export function WatchTogetherProvider({ children }: Props) {
         contentType: 'show' | 'movie' | 'anime',
         contentId: string,
         username: string,
-        episodeId?: string
+        episodeId?: string,
+        options?: {
+            contentTitle?: string;
+            contentPoster?: string;
+            episodeTitle?: string;
+            isPublic?: boolean;
+            password?: string;
+        }
     ) => {
         const sessionId = getSessionId();
-        socket?.emit('room:create', { contentType, contentId, username, episodeId, sessionId });
+        socket?.emit('room:create', {
+            contentType,
+            contentId,
+            username,
+            episodeId,
+            sessionId,
+            contentTitle: options?.contentTitle || 'Untitled',
+            contentPoster: options?.contentPoster,
+            episodeTitle: options?.episodeTitle,
+            isPublic: options?.isPublic ?? true,
+            password: options?.password,
+        });
     }, [socket]);
 
-    const joinRoom = useCallback((roomCode: string, username: string) => {
+    const joinRoom = useCallback((roomCode: string, username: string, password?: string) => {
         const sessionId = getSessionId();
-        socket?.emit('room:join', { roomCode: roomCode.toUpperCase(), username, sessionId });
+        socket?.emit('room:join', { roomCode: roomCode.toUpperCase(), username, sessionId, password });
     }, [socket]);
 
     const leaveRoom = useCallback(() => {

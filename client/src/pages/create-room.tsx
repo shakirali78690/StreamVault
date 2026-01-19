@@ -24,6 +24,8 @@ function CreateRoomContent() {
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedContent, setSelectedContent] = useState<Show | Movie | Anime | null>(null);
     const [selectedEpisode, setSelectedEpisode] = useState<string | null>(null);
+    const [isPublic, setIsPublic] = useState(true);
+    const [password, setPassword] = useState('');
 
     // Parse URL params
     const urlParams = new URLSearchParams(searchString);
@@ -94,17 +96,23 @@ function CreateRoomContent() {
             ? movies?.filter(m => m.title.toLowerCase().includes(searchQuery.toLowerCase())).slice(0, 10)
             : animeList?.filter(a => a.title.toLowerCase().includes(searchQuery.toLowerCase())).slice(0, 10);
 
-    // Redirect when room is created - NOT USED ANYMORE
     // Room creation now happens on watch-together page
 
     const handleCreate = () => {
         if (!username.trim() || !selectedContent) return;
         if ((contentType === 'show' || contentType === 'anime') && !selectedEpisode) return;
+        if (!isPublic && !password.trim()) return; // Require password for private rooms
 
         // Store room creation params for watch-together page
         sessionStorage.setItem('watchTogether_username', username.trim());
         sessionStorage.setItem('watchTogether_contentType', contentType);
         sessionStorage.setItem('watchTogether_contentId', selectedContent.id);
+        sessionStorage.setItem('watchTogether_contentTitle', selectedContent.title);
+        sessionStorage.setItem('watchTogether_contentPoster', selectedContent.posterUrl || '');
+        sessionStorage.setItem('watchTogether_isPublic', String(isPublic));
+        if (!isPublic && password.trim()) {
+            sessionStorage.setItem('watchTogether_password', password.trim());
+        }
         if ((contentType === 'show' || contentType === 'anime') && selectedEpisode) {
             sessionStorage.setItem('watchTogether_episodeId', selectedEpisode);
         }
@@ -270,6 +278,56 @@ function CreateRoomContent() {
                         </div>
                     )}
 
+                    {/* Step 5: Room Type */}
+                    {selectedContent && (
+                        <div>
+                            <label className="text-lg font-semibold mb-3 block flex items-center gap-2">
+                                <span className="bg-primary text-primary-foreground w-6 h-6 rounded-full text-sm flex items-center justify-center">5</span>
+                                Room Type
+                            </label>
+                            <div className="grid grid-cols-2 gap-3 mb-4">
+                                <button
+                                    onClick={() => { setIsPublic(true); setPassword(''); }}
+                                    className={`p-4 rounded-xl border-2 transition-all ${isPublic
+                                        ? 'border-green-500 bg-green-500/10'
+                                        : 'border-border hover:border-green-500/50'
+                                        }`}
+                                >
+                                    <div className="text-2xl mb-2">🌐</div>
+                                    <span className="font-medium block">Public</span>
+                                    <span className="text-sm text-muted-foreground">Anyone can join</span>
+                                </button>
+                                <button
+                                    onClick={() => setIsPublic(false)}
+                                    className={`p-4 rounded-xl border-2 transition-all ${!isPublic
+                                        ? 'border-orange-500 bg-orange-500/10'
+                                        : 'border-border hover:border-orange-500/50'
+                                        }`}
+                                >
+                                    <div className="text-2xl mb-2">🔒</div>
+                                    <span className="font-medium block">Private</span>
+                                    <span className="text-sm text-muted-foreground">Password required</span>
+                                </button>
+                            </div>
+
+                            {/* Password Input for Private Rooms */}
+                            {!isPublic && (
+                                <div className="mt-4">
+                                    <Input
+                                        type="password"
+                                        value={password}
+                                        onChange={(e) => setPassword(e.target.value)}
+                                        placeholder="Enter room password..."
+                                        className="text-lg"
+                                    />
+                                    <p className="text-sm text-muted-foreground mt-2">
+                                        Share this password with friends to let them join
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
                     {/* Create Button */}
                     <Button
                         className="w-full py-6 text-lg"
@@ -279,13 +337,14 @@ function CreateRoomContent() {
                             !username.trim() ||
                             !selectedContent ||
                             !isConnected ||
-                            ((contentType === 'show' || contentType === 'anime') && !selectedEpisode)
+                            ((contentType === 'show' || contentType === 'anime') && !selectedEpisode) ||
+                            (!isPublic && !password.trim())
                         }
                     >
                         {isConnected ? (
                             <>
                                 <Users className="mr-2 h-5 w-5" />
-                                Create Room
+                                Create {isPublic ? 'Public' : 'Private'} Room
                                 <ArrowRight className="ml-2 h-5 w-5" />
                             </>
                         ) : (

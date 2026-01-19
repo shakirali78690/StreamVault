@@ -22,9 +22,15 @@ interface Room {
     code: string;
     hostId: string;
     hostSessionId: string; // Host's session ID for reconnection
+    hostUsername: string; // Host's display name
     contentType: 'show' | 'movie' | 'anime';
     contentId: string;
+    contentTitle: string; // Title of the content being watched
+    contentPoster?: string; // Poster URL for display
     episodeId?: string;
+    episodeTitle?: string; // Episode title if watching a show
+    isPublic: boolean; // Public rooms visible to everyone
+    password?: string; // Password for private rooms
     users: Map<string, User>;
     videoState: VideoState;
     createdAt: Date;
@@ -61,6 +67,25 @@ function generateId(): string {
     return Math.random().toString(36).substring(2, 15);
 }
 
+// Export function to get active rooms for HTTP API
+export function getActiveRooms() {
+    return Array.from(rooms.values()).map(room => ({
+        id: room.id,
+        code: room.code,
+        hostUsername: room.hostUsername,
+        contentType: room.contentType,
+        contentId: room.contentId,
+        contentTitle: room.contentTitle,
+        contentPoster: room.contentPoster,
+        episodeId: room.episodeId,
+        episodeTitle: room.episodeTitle,
+        isPublic: room.isPublic,
+        hasPassword: !room.isPublic && !!room.password,
+        userCount: room.users.size,
+        createdAt: room.createdAt,
+    }));
+}
+
 export function setupWatchTogether(httpServer: HttpServer): Server {
     const io = new Server(httpServer, {
         cors: {
@@ -75,13 +100,38 @@ export function setupWatchTogether(httpServer: HttpServer): Server {
     watchNamespace.on('connection', (socket: Socket) => {
         console.log(`🎬 Watch Together: User connected ${socket.id}`);
 
+        // Get list of active rooms (for watch-rooms page)
+        socket.on('rooms:list', () => {
+            const roomsList = Array.from(rooms.values()).map(room => ({
+                id: room.id,
+                code: room.code,
+                hostUsername: room.hostUsername,
+                contentType: room.contentType,
+                contentId: room.contentId,
+                contentTitle: room.contentTitle,
+                contentPoster: room.contentPoster,
+                episodeId: room.episodeId,
+                episodeTitle: room.episodeTitle,
+                isPublic: room.isPublic,
+                hasPassword: !room.isPublic && !!room.password,
+                userCount: room.users.size,
+                createdAt: room.createdAt,
+            }));
+            socket.emit('rooms:list', roomsList);
+        });
+
         // Create a new room
         socket.on('room:create', (data: {
             contentType: 'show' | 'movie' | 'anime';
             contentId: string;
+            contentTitle: string;
+            contentPoster?: string;
             episodeId?: string;
+            episodeTitle?: string;
             username: string;
             sessionId: string;
+            isPublic: boolean;
+            password?: string;
         }) => {
             // Check if user already has an active room with this session
             const existingRoomCode = sessionToRoom.get(data.sessionId);
@@ -145,9 +195,15 @@ export function setupWatchTogether(httpServer: HttpServer): Server {
                 code,
                 hostId: socket.id,
                 hostSessionId: data.sessionId,
+                hostUsername: data.username,
                 contentType: data.contentType,
                 contentId: data.contentId,
+                contentTitle: data.contentTitle,
+                contentPoster: data.contentPoster,
                 episodeId: data.episodeId,
+                episodeTitle: data.episodeTitle,
+                isPublic: data.isPublic,
+                password: data.isPublic ? undefined : data.password,
                 users: new Map(),
                 videoState: {
                     isPlaying: false,
@@ -186,7 +242,7 @@ export function setupWatchTogether(httpServer: HttpServer): Server {
         });
 
         // Join an existing room
-        socket.on('room:join', (data: { roomCode: string; username: string; sessionId: string }) => {
+        socket.on('room:join', (data: { roomCode: string; username: string; sessionId: string; password?: string }) => {
             const room = rooms.get(data.roomCode.toUpperCase());
 
             if (!room) {
@@ -194,8 +250,17 @@ export function setupWatchTogether(httpServer: HttpServer): Server {
                 return;
             }
 
-            // Check if this is the HOST reconnecting (matches hostSessionId)
+            // Validate password for private rooms (unless it's the host reconnecting)
             const isHostReconnecting = room.hostSessionId === data.sessionId;
+            if (!room.isPublic && !isHostReconnecting && room.password) {
+                if (!data.password || data.password !== room.password) {
+                    socket.emit('room:error', { message: 'Invalid password' });
+                    return;
+                }
+            }
+
+            // Check if this is the HOST reconnecting (matches hostSessionId)
+            // (isHostReconnecting already declared above)
 
             if (isHostReconnecting) {
                 console.log(`🎬 Host reconnecting to room ${room.code} via join`);

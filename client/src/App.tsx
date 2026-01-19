@@ -45,6 +45,7 @@ import ContinueWatching from "@/pages/continue-watching";
 import Blog from "@/pages/blog";
 import BlogPost from "@/pages/blog-post";
 import WatchTogether from "@/pages/watch-together";
+import WatchRooms from "@/pages/watch-rooms";
 import CreateRoom from "@/pages/create-room";
 import WidgetDashboard from "@/pages/widget-dashboard";
 import SiteAnalytics from "@/pages/site-analytics";
@@ -96,6 +97,7 @@ function Router() {
           <Route path="/continue-watching" component={ContinueWatching} />
           <Route path="/blog" component={Blog} />
           <Route path="/blog/:type/:slug" component={BlogPost} />
+          <Route path="/watch-rooms" component={WatchRooms} />
           <Route path="/watch-together/:roomCode" component={WatchTogether} />
           <Route path="/create-room" component={CreateRoom} />
           <Route component={NotFound} />

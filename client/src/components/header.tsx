@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Search, Moon, Sun, Play, Menu, X, Bookmark } from "lucide-react";
+import { Search, Moon, Sun, Play, Menu, X, Bookmark, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useTheme } from "./theme-provider";
@@ -152,6 +152,19 @@ export function Header() {
 
         {/* Right Section */}
         <div className="flex items-center gap-2">
+          {/* Watch Rooms */}
+          <Link href="/watch-rooms">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="hidden sm:flex gap-2"
+              data-testid="button-watch-rooms"
+            >
+              <Users className="h-4 w-4" />
+              Rooms
+            </Button>
+          </Link>
+
           {/* Watchlist */}
           <Link href="/watchlist">
             <Button
@@ -355,6 +368,21 @@ export function Header() {
                 </div>
               </Link>
             ))}
+
+            {/* Watch Rooms Link */}
+            <Link href="/watch-rooms">
+              <div
+                className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md hover-elevate active-elevate-2 cursor-pointer ${location === "/watch-rooms"
+                  ? "text-foreground bg-accent"
+                  : "text-muted-foreground"
+                  }`}
+                onClick={() => setMobileMenuOpen(false)}
+                data-testid="link-mobile-watch-rooms"
+              >
+                <Users className="h-4 w-4" />
+                Watch Rooms
+              </div>
+            </Link>
 
             {/* Watchlist Link */}
             <Link href="/watchlist">
