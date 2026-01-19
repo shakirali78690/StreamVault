@@ -8,6 +8,7 @@ interface ContentRowProps {
   shows: (Show | Movie | Anime)[];
   orientation?: "portrait" | "landscape";
   showProgress?: Map<string, number>;
+  progressDataMap?: Map<string, { season?: number; episodeNumber?: number }>;
 }
 
 export function ContentRow({
@@ -15,6 +16,7 @@ export function ContentRow({
   shows,
   orientation = "portrait",
   showProgress,
+  progressDataMap,
 }: ContentRowProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
@@ -44,12 +46,14 @@ export function ContentRow({
   return (
     <div className="space-y-4">
       {/* Title */}
-      <h2
-        className="text-xl md:text-2xl font-semibold px-4 md:px-6"
-        data-testid={`text-row-title-${title.toLowerCase().replace(/\s+/g, "-")}`}
-      >
-        {title}
-      </h2>
+      {title && (
+        <h2
+          className="text-xl md:text-2xl font-semibold px-4 md:px-6"
+          data-testid={`text-row-title-${title.toLowerCase().replace(/\s+/g, "-")}`}
+        >
+          {title}
+        </h2>
+      )}
 
       {/* Scrollable Row */}
       <div className="relative group">
@@ -84,6 +88,7 @@ export function ContentRow({
                 show={show}
                 orientation={orientation}
                 showProgress={showProgress?.get(show.id)}
+                progressData={progressDataMap?.get(show.id)}
               />
             </div>
           ))}

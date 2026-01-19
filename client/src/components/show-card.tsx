@@ -12,12 +12,14 @@ interface ShowCardProps {
   show: Show | Movie | Anime;
   orientation?: "portrait" | "landscape";
   showProgress?: number;
+  progressData?: { season?: number; episodeNumber?: number };
 }
 
 export function ShowCard({
   show,
   orientation = "portrait",
   showProgress,
+  progressData,
 }: ShowCardProps) {
   const [isHovered, setIsHovered] = useState(false);
   const queryClient = useQueryClient();
@@ -69,12 +71,17 @@ export function ShowCard({
   const handlePlayClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+
+    // If we have saved progress data, navigate to the saved episode
+    const season = progressData?.season || 1;
+    const episode = progressData?.episodeNumber || 1;
+
     if (isAnime) {
-      setLocation(`/watch-anime/${show.slug}`);
+      setLocation(`/watch-anime/${show.slug}?s=${season}&e=${episode}`);
     } else if (isMovie) {
       setLocation(`/watch-movie/${show.slug}`);
     } else {
-      setLocation(`/watch/${show.slug}`);
+      setLocation(`/watch/${show.slug}?season=${season}&episode=${episode}`);
     }
   };
 
@@ -149,8 +156,17 @@ export function ShowCard({
                   className="flex-1 gap-1"
                   onClick={handlePlayClick}
                 >
-                  <Play className="w-4 h-4" />
-                  Play
+                  {showProgress !== undefined && showProgress > 0 ? (
+                    <>
+                      <Play className="w-4 h-4" />
+                      Resume
+                    </>
+                  ) : (
+                    <>
+                      <Play className="w-4 h-4" />
+                      Play
+                    </>
+                  )}
                 </Button>
                 <Button
                   size="sm"

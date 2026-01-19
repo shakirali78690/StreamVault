@@ -130,11 +130,14 @@ export const watchlistSchema = z.object({
 
 // Viewing progress (localStorage for MVP)
 export const viewingProgressSchema = z.object({
-  showId: z.string(),
-  episodeId: z.string(),
-  season: z.number(),
-  episodeNumber: z.number(),
-  progress: z.number(), // percentage 0-100
+  showId: z.string().optional(),
+  movieId: z.string().optional(),
+  animeId: z.string().optional(),
+  episodeId: z.string().optional(),
+  season: z.number().optional(),
+  episodeNumber: z.number().optional(),
+  progress: z.number(), // seconds watched
+  duration: z.number(), // total duration in seconds
   lastWatched: z.string(),
 });
 

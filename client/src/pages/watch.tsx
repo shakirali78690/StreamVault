@@ -164,27 +164,45 @@ export default function Watch() {
     }
   };
 
-  // Handle time update from video player - shows Next Episode button 30s before end
+  // Handle time update from video player - shows Next Episode button 30s before end AND saves progress
+  const lastSaveTimeRef = useRef(0);
+  const hasResumedRef = useRef(false);
+
   const handleTimeUpdate = (currentTime: number, duration: number) => {
-    if (!nextEpisode || duration <= 0) return;
+    if (!currentEpisodeData || !show || duration <= 0) return;
 
     const remaining = duration - currentTime;
 
-    // Show button 30 seconds before end
-    if (remaining <= 30 && remaining > 0) {
-      setShowNextEpisode(true);
-      setSecondsRemaining(Math.ceil(remaining));
-    } else if (remaining <= 0) {
-      // Keep showing after video ends
-      setShowNextEpisode(true);
-      setSecondsRemaining(0);
-    } else {
-      setShowNextEpisode(false);
+    // Show Next Episode button 30 seconds before end
+    if (nextEpisode) {
+      if (remaining <= 30 && remaining > 0) {
+        setShowNextEpisode(true);
+        setSecondsRemaining(Math.ceil(remaining));
+      } else if (remaining <= 0) {
+        setShowNextEpisode(true);
+        setSecondsRemaining(0);
+      } else {
+        setShowNextEpisode(false);
+      }
+    }
+
+    // Save progress every 10 seconds
+    const now = Date.now();
+    if (now - lastSaveTimeRef.current >= 10000 && currentTime > 5) {
+      lastSaveTimeRef.current = now;
+      updateProgressMutation.mutate({
+        showId: show.id,
+        episodeId: currentEpisodeData.id,
+        season: currentSeason,
+        episodeNumber: currentEpisode,
+        progress: Math.floor(currentTime),
+        duration: Math.floor(duration),
+        lastWatched: new Date().toISOString(),
+      });
     }
   };
 
   const queryClient = useQueryClient();
-  const progressUpdated = useRef(false);
 
   const updateProgressMutation = useMutation({
     mutationFn: (progress: any) =>
@@ -194,26 +212,52 @@ export default function Watch() {
     },
   });
 
-  useEffect(() => {
-    if (currentEpisodeData && show && !progressUpdated.current) {
-      progressUpdated.current = true;
-      updateProgressMutation.mutate({
-        showId: show.id,
-        episodeId: currentEpisodeData.id,
-        season: currentSeason,
-        episodeNumber: currentEpisode,
-        progress: 0,
-        lastWatched: new Date().toISOString(),
-      });
+  // Fetch saved progress for this episode
+  const { data: savedProgress } = useQuery<any[]>({
+    queryKey: ["/api/progress"],
+    enabled: !!show?.id && !!currentEpisodeData?.id,
+  });
 
-      // Track watch event for analytics
+  // Find saved progress for current episode
+  const currentSavedProgress = savedProgress?.find(
+    (p) => p.showId === show?.id && p.episodeId === currentEpisodeData?.id
+  );
+
+  // Resume from saved position when video is ready (only for JWPlayer/direct videos)
+  useEffect(() => {
+    if (
+      currentSavedProgress &&
+      currentSavedProgress.progress > 10 &&
+      videoPlayerRef.current &&
+      !hasResumedRef.current
+    ) {
+      // Only resume if less than 95% watched
+      const percentage = (currentSavedProgress.progress / currentSavedProgress.duration) * 100;
+      if (percentage < 95) {
+        const seekTime = currentSavedProgress.progress;
+        console.log(`▶️ Resuming from ${Math.floor(seekTime / 60)}:${Math.floor(seekTime % 60).toString().padStart(2, '0')}`);
+
+        // Delay seek slightly to ensure player is ready
+        setTimeout(() => {
+          videoPlayerRef.current?.seek(seekTime);
+          hasResumedRef.current = true;
+        }, 1000);
+      }
+    }
+  }, [currentSavedProgress, currentEpisodeData?.id]);
+
+  // Reset resume flag when episode changes
+  useEffect(() => {
+    hasResumedRef.current = false;
+    lastSaveTimeRef.current = 0;
+  }, [currentEpisodeData?.id]);
+
+  // Track watch event for analytics
+  useEffect(() => {
+    if (currentEpisodeData && show) {
       trackWatch('show', show.id, show.title, currentEpisodeData.id, currentEpisodeData.duration ? currentEpisodeData.duration * 60 : 0);
     }
-
-    return () => {
-      progressUpdated.current = false;
-    };
-  }, [currentEpisodeData?.id, show?.id, currentSeason, currentEpisode]);
+  }, [currentEpisodeData?.id, show?.id]);
 
   // Set Media Session metadata for browser controls
   useEffect(() => {

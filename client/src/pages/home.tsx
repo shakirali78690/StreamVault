@@ -3,8 +3,9 @@ import { HeroCarousel } from "@/components/hero-carousel";
 import { ContentRow } from "@/components/content-row";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SEO } from "@/components/seo";
-import type { Show, Movie, ViewingProgress } from "@shared/schema";
+import type { Show, Movie, Anime, ViewingProgress } from "@shared/schema";
 import { useMemo } from "react";
+import { Link } from "wouter";
 
 export default function Home() {
   const { data: shows, isLoading: showsLoading } = useQuery<Show[]>({
@@ -15,34 +16,87 @@ export default function Home() {
     queryKey: ["/api/movies"],
   });
 
+  const { data: animeList } = useQuery<Anime[]>({
+    queryKey: ["/api/anime"],
+  });
+
   const isLoading = showsLoading || moviesLoading;
 
-  const { data: progressData = [] } = useQuery<ViewingProgress[]>({
+  const { data: progressData = [] } = useQuery<any[]>({
     queryKey: ["/api/progress"],
   });
 
-  const { continueWatching, progressMap } = useMemo(() => {
+  // Combine all continue watching items (shows, movies, anime)
+  const { continueWatching, progressMap, progressDataMap, totalInProgress } = useMemo(() => {
     if (!shows || !progressData.length) {
-      return { continueWatching: [], progressMap: new Map<string, number>() };
+      return { continueWatching: [], progressMap: new Map<string, number>(), progressDataMap: new Map<string, { season?: number; episodeNumber?: number }>(), totalInProgress: 0 };
     }
 
-    const progressShows = progressData
+    // Shows progress
+    const showProgress = progressData
+      .filter((p) => p.showId)
       .map((progress) => {
         const show = shows.find((s) => s.id === progress.showId);
-        return show ? { show, progress: progress.progress, lastWatched: progress.lastWatched } : null;
+        if (!show) return null;
+        const percentage = progress.duration > 0
+          ? Math.min(100, (progress.progress / progress.duration) * 100)
+          : 0;
+        return { item: show, itemId: show.id, percentage, lastWatched: progress.lastWatched, type: 'show' };
       })
-      .filter((item): item is { show: Show; progress: number; lastWatched: string } => item !== null)
-      .sort(
-        (a, b) =>
-          new Date(b.lastWatched).getTime() -
-          new Date(a.lastWatched).getTime()
-      );
+      .filter((item) => item !== null && item.percentage < 95);
+
+    // Movies progress
+    const movieProgress = progressData
+      .filter((p) => p.movieId)
+      .map((progress) => {
+        const movie = movies?.find((m) => m.id === progress.movieId);
+        if (!movie) return null;
+        const percentage = progress.duration > 0
+          ? Math.min(100, (progress.progress / progress.duration) * 100)
+          : 0;
+        return { item: movie, itemId: movie.id, percentage, lastWatched: progress.lastWatched, type: 'movie' };
+      })
+      .filter((item) => item !== null && item.percentage < 95);
+
+    // Anime progress  
+    const animeProgress = progressData
+      .filter((p) => p.animeId)
+      .map((progress) => {
+        const anime = animeList?.find((a) => a.id === progress.animeId);
+        if (!anime) return null;
+        const percentage = progress.duration > 0
+          ? Math.min(100, (progress.progress / progress.duration) * 100)
+          : 0;
+        return { item: anime, itemId: anime.id, percentage, lastWatched: progress.lastWatched, type: 'anime' };
+      })
+      .filter((item) => item !== null && item.percentage < 95);
+
+    // Combine and sort by last watched
+    const allProgress = [...(showProgress as any[]), ...(movieProgress as any[]), ...(animeProgress as any[])]
+      .sort((a, b) => new Date(b.lastWatched).getTime() - new Date(a.lastWatched).getTime());
+
+    // For the ContentRow, we only pass shows (it only handles Show type)
+    const continueWatchingShows = allProgress
+      .filter(p => p.type === 'show')
+      .slice(0, 10)
+      .map(p => p.item as Show);
+
+    // Create progressDataMap with season/episode info for Resume navigation
+    const progressDataMap = new Map<string, { season?: number; episodeNumber?: number }>();
+    progressData.forEach((p: any) => {
+      const id = p.showId || p.movieId || p.animeId;
+      if (id && (p.season || p.episodeNumber)) {
+        progressDataMap.set(id, { season: p.season, episodeNumber: p.episodeNumber });
+      }
+    });
 
     return {
-      continueWatching: progressShows.map((item) => item.show),
-      progressMap: new Map(progressShows.map((item) => [item.show.id, item.progress])),
+      continueWatching: continueWatchingShows,
+      progressMap: new Map(allProgress.map((item) => [item.itemId, item.percentage])),
+      progressDataMap,
+      totalInProgress: allProgress.length,
     };
-  }, [shows, progressData]);
+  }, [shows, movies, animeList, progressData]);
 
   if (isLoading) {
     return (
@@ -62,7 +116,7 @@ export default function Home() {
 
   // Combine shows and movies
   const allContent: (Show | Movie)[] = [...(shows || []), ...(movies || [])];
-  
+
   const featured = allContent.filter((item) => item.featured) || [];
   const trending = allContent.filter((item) => item.trending) || [];
   const action = allContent.filter((item) => item.genres?.toLowerCase().includes("action")) || [];
@@ -72,12 +126,12 @@ export default function Home() {
 
   return (
     <div className="min-h-screen">
-      <SEO 
+      <SEO
         title="Free Movies Online | Watch TV Shows Free | HD Streaming"
         description="Watch 200+ movies & TV shows free in HD. No registration required. Stream Hollywood, Bollywood & international content instantly on any device."
         canonical="https://streamvault.live"
       />
-      
+
       {/* Hero Carousel */}
       {featured.length > 0 && <HeroCarousel shows={featured} />}
 
@@ -92,12 +146,25 @@ export default function Home() {
         )}
 
         {continueWatching.length > 0 && (
-          <ContentRow
-            title="Continue Watching"
-            shows={continueWatching}
-            orientation="landscape"
-            showProgress={progressMap}
-          />
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold">Continue Watching</h2>
+              {totalInProgress > continueWatching.length && (
+                <Link href="/continue-watching">
+                  <a className="text-sm text-primary hover:underline">
+                    View All ({totalInProgress})
+                  </a>
+                </Link>
+              )}
+            </div>
+            <ContentRow
+              title=""
+              shows={continueWatching}
+              orientation="landscape"
+              showProgress={progressMap}
+              progressDataMap={progressDataMap}
+            />
+          </div>
         )}
 
         {action.length > 0 && (

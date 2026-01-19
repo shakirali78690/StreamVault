@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRoute, Link } from "wouter";
 import { useEffect, useRef, useState } from "react";
 import { ChevronLeft, Play } from "lucide-react";
@@ -6,15 +6,19 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CommentsSection } from "@/components/comments-section";
-import { VideoPlayer } from "@/components/video-player";
+import { VideoPlayer, VideoPlayerRef } from "@/components/video-player";
 import { Helmet } from "react-helmet-async";
 import type { Movie } from "@shared/schema";
 import { trackWatch } from "@/components/analytics-tracker";
+import { apiRequest } from "@/lib/queryClient";
 
 export default function WatchMovie() {
   const [, params] = useRoute("/watch-movie/:slug");
   const slug = params?.slug;
   const watchTracked = useRef(false);
+  const videoPlayerRef = useRef<VideoPlayerRef>(null);
+  const lastSaveTimeRef = useRef(0);
+  const hasResumedRef = useRef(false);
 
   const { data: movie } = useQuery<Movie>({
     queryKey: [`/api/movies/${slug}`],
@@ -113,6 +117,72 @@ export default function WatchMovie() {
 
     fetchSubtitles();
   }, [movie?.id, blogPost]);
+
+  const queryClient = useQueryClient();
+
+  const updateProgressMutation = useMutation({
+    mutationFn: (progress: any) =>
+      apiRequest("POST", "/api/progress", progress),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/progress"] });
+    },
+  });
+
+  // Fetch saved progress for movies
+  const { data: savedProgress } = useQuery<any[]>({
+    queryKey: ["/api/progress"],
+    enabled: !!movie?.id,
+  });
+
+  // Find saved progress for current movie
+  const currentSavedProgress = savedProgress?.find(
+    (p) => p.movieId === movie?.id
+  );
+
+  // Handle time update - saves progress every 10 seconds
+  const handleTimeUpdate = (currentTime: number, duration: number) => {
+    if (!movie || duration <= 0) return;
+
+    // Save progress every 10 seconds
+    const now = Date.now();
+    if (now - lastSaveTimeRef.current >= 10000 && currentTime > 5) {
+      lastSaveTimeRef.current = now;
+      updateProgressMutation.mutate({
+        movieId: movie.id,
+        progress: Math.floor(currentTime),
+        duration: Math.floor(duration),
+        lastWatched: new Date().toISOString(),
+      });
+    }
+  };
+
+  // Resume from saved position when video is ready
+  useEffect(() => {
+    if (
+      currentSavedProgress &&
+      currentSavedProgress.progress > 10 &&
+      videoPlayerRef.current &&
+      !hasResumedRef.current
+    ) {
+      // Only resume if less than 95% watched
+      const percentage = (currentSavedProgress.progress / currentSavedProgress.duration) * 100;
+      if (percentage < 95) {
+        const seekTime = currentSavedProgress.progress;
+        console.log(`▶️ Resuming movie from ${Math.floor(seekTime / 60)}:${Math.floor(seekTime % 60).toString().padStart(2, '0')}`);
+
+        setTimeout(() => {
+          videoPlayerRef.current?.seek(seekTime);
+          hasResumedRef.current = true;
+        }, 1000);
+      }
+    }
+  }, [currentSavedProgress, movie?.id]);
+
+  // Reset resume flag when movie changes
+  useEffect(() => {
+    hasResumedRef.current = false;
+    lastSaveTimeRef.current = 0;
+  }, [movie?.id]);
 
   // Track watch event for analytics
   useEffect(() => {
@@ -223,7 +293,12 @@ export default function WatchMovie() {
           {/* Video Player */}
           <div className="bg-card rounded-lg overflow-hidden shadow-lg">
             <div className="aspect-video bg-black">
-              <VideoPlayer videoUrl={movie.googleDriveUrl} subtitleTracks={subtitleTracks} />
+              <VideoPlayer
+                ref={videoPlayerRef}
+                videoUrl={movie.googleDriveUrl}
+                subtitleTracks={subtitleTracks}
+                onTimeUpdate={handleTimeUpdate}
+              />
             </div>
 
             {/* Movie Info Below Player */}
