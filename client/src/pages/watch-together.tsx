@@ -26,10 +26,17 @@ import {
     Minimize2,
     Maximize2,
     Maximize,
-    Minimize
+    Minimize,
+    Share2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { useWatchTogether, WatchTogetherProvider } from '@/contexts/watch-together-context';
 import { useVoiceChat } from '@/hooks/use-voice-chat';
 import EmojiPicker, { Theme } from 'emoji-picker-react';
@@ -206,6 +213,10 @@ function WatchTogetherContent() {
     const containerRef = useRef<HTMLDivElement>(null);
     const chatOverlayRef = useRef<HTMLDivElement>(null);
 
+    // Countdown timer for scheduled rooms
+    const [countdown, setCountdown] = useState<{ hours: number; minutes: number; seconds: number } | null>(null);
+    const [isScheduledRoomReady, setIsScheduledRoomReady] = useState(false);
+
     // Detect portrait mode on mobile
     useEffect(() => {
         const checkOrientation = () => {
@@ -250,6 +261,48 @@ function WatchTogetherContent() {
             document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
         };
     }, []);
+
+    // Countdown timer for scheduled rooms
+    useEffect(() => {
+        if (!roomInfo?.scheduledFor) {
+            setCountdown(null);
+            setIsScheduledRoomReady(true);
+            return;
+        }
+
+        const scheduledTime = new Date(roomInfo.scheduledFor).getTime();
+
+        const updateCountdown = () => {
+            const now = Date.now();
+            const diff = scheduledTime - now;
+
+            if (diff <= 0) {
+                setCountdown(null);
+                setIsScheduledRoomReady(true);
+                return true; // Timer complete
+            }
+
+            const hours = Math.floor(diff / (1000 * 60 * 60));
+            const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+            setCountdown({ hours, minutes, seconds });
+            setIsScheduledRoomReady(false);
+            return false;
+        };
+
+        // Initial check
+        if (updateCountdown()) return;
+
+        // Update every second
+        const interval = setInterval(() => {
+            if (updateCountdown()) {
+                clearInterval(interval);
+            }
+        }, 1000);
+
+        return () => clearInterval(interval);
+    }, [roomInfo?.scheduledFor]);
 
     // Handle file attachment - convert to base64 for sharing
     const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -463,6 +516,8 @@ function WatchTogetherContent() {
         const contentPoster = sessionStorage.getItem('watchTogether_contentPoster');
         const isPublicStr = sessionStorage.getItem('watchTogether_isPublic');
         const storedPassword = sessionStorage.getItem('watchTogether_password');
+        const storedDescription = sessionStorage.getItem('watchTogether_description');
+        const storedScheduledFor = sessionStorage.getItem('watchTogether_scheduledFor');
 
         if (!isConnected || roomInfo) return;
 
@@ -478,6 +533,8 @@ function WatchTogetherContent() {
             sessionStorage.removeItem('watchTogether_contentPoster');
             sessionStorage.removeItem('watchTogether_isPublic');
             sessionStorage.removeItem('watchTogether_password');
+            sessionStorage.removeItem('watchTogether_description');
+            sessionStorage.removeItem('watchTogether_scheduledFor');
 
             // Also clear auto-rejoin localStorage to prevent rejoining old room
             localStorage.removeItem('watch-together-username');
@@ -490,6 +547,8 @@ function WatchTogetherContent() {
                 contentPoster: contentPoster || undefined,
                 isPublic: isPublicStr !== 'false',
                 password: storedPassword || undefined,
+                description: storedDescription || undefined,
+                scheduledFor: storedScheduledFor || undefined,
             });
             setShowJoinModal(false);
         }
@@ -632,6 +691,33 @@ function WatchTogetherContent() {
             navigator.clipboard.writeText(`${window.location.origin}/watch-together/${roomInfo.roomCode}`);
             setCopied(true);
             setTimeout(() => setCopied(false), 2000);
+        }
+    };
+
+    // Share room link via WhatsApp
+    const shareViaWhatsApp = () => {
+        if (roomInfo?.roomCode) {
+            const url = `${window.location.origin}/watch-together/${roomInfo.roomCode}`;
+            const text = `🎬 Join my watch party on StreamVault!\n${url}`;
+            window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+        }
+    };
+
+    // Share room link via Telegram
+    const shareViaTelegram = () => {
+        if (roomInfo?.roomCode) {
+            const url = `${window.location.origin}/watch-together/${roomInfo.roomCode}`;
+            const text = `🎬 Join my watch party on StreamVault!`;
+            window.open(`https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`, '_blank');
+        }
+    };
+
+    // Share room link via Twitter/X
+    const shareViaTwitter = () => {
+        if (roomInfo?.roomCode) {
+            const url = `${window.location.origin}/watch-together/${roomInfo.roomCode}`;
+            const text = `🎬 Join my watch party on StreamVault!`;
+            window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`, '_blank');
         }
     };
 
@@ -979,6 +1065,40 @@ function WatchTogetherContent() {
                                 {roomInfo?.roomCode}
                             </Button>
 
+                            {/* Share Dropdown */}
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="outline" size="sm">
+                                        <Share2 className="h-4 w-4 mr-2" />
+                                        Share
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-48">
+                                    <DropdownMenuItem onClick={copyRoomCode} className="cursor-pointer">
+                                        <Copy className="h-4 w-4 mr-2" />
+                                        Copy Link
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={shareViaWhatsApp} className="cursor-pointer">
+                                        <svg className="h-4 w-4 mr-2" viewBox="0 0 24 24" fill="currentColor">
+                                            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+                                        </svg>
+                                        WhatsApp
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={shareViaTelegram} className="cursor-pointer">
+                                        <svg className="h-4 w-4 mr-2" viewBox="0 0 24 24" fill="currentColor">
+                                            <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z" />
+                                        </svg>
+                                        Telegram
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={shareViaTwitter} className="cursor-pointer">
+                                        <svg className="h-4 w-4 mr-2" viewBox="0 0 24 24" fill="currentColor">
+                                            <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+                                        </svg>
+                                        Twitter / X
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+
                             {/* Users Count */}
                             <Button variant="ghost" size="sm">
                                 <Users className="h-4 w-4 mr-2" />
@@ -1032,48 +1152,117 @@ function WatchTogetherContent() {
                     {/* Video Player - fills available space */}
                     <div className="flex-1 relative bg-black flex items-center justify-center min-h-0">
                         <div className="w-full h-full max-h-full flex items-center justify-center">
-                            <VideoPlayer
-                                ref={videoPlayerRef}
-                                videoUrl={episode?.googleDriveUrl || movie?.googleDriveUrl}
-                                className="w-full h-full"
-                                isHost={isHost}
-                                syncMode={true}
-                                subtitleTracks={subtitleTracks}
-                                onPlay={() => {
-                                    console.log('🎬 onPlay handler called - isHost:', isHost);
-                                    if (isHost) {
-                                        const time = videoPlayerRef.current?.getCurrentTime() || 0;
-                                        console.log('🎬 Calling videoPlay with time:', time);
-                                        videoPlay(time);
-                                    }
-                                }}
-                                onPause={() => {
-                                    console.log('🎬 onPause handler called - isHost:', isHost);
-                                    if (isHost) {
-                                        const time = videoPlayerRef.current?.getCurrentTime() || 0;
-                                        console.log('🎬 Calling videoPause with time:', time);
-                                        videoPause(time);
-                                    }
-                                }}
-                                onSeek={(time) => {
-                                    console.log('🎬 onSeek handler called - isHost:', isHost, 'time:', time);
-                                    if (isHost) {
-                                        videoSeek(time);
-                                    }
-                                }}
-                                onPlaybackRateChange={(rate) => {
-                                    console.log('🎬 onPlaybackRateChange handler called - isHost:', isHost, 'rate:', rate);
-                                    if (isHost) {
-                                        videoPlaybackRate(rate);
-                                    }
-                                }}
-                                onSubtitleChange={(subtitleIndex) => {
-                                    console.log('🎬 onSubtitleChange handler called - isHost:', isHost, 'index:', subtitleIndex);
-                                    if (isHost) {
-                                        videoSubtitle(subtitleIndex);
-                                    }
-                                }}
-                            />
+                            {/* Countdown overlay for scheduled rooms */}
+                            {countdown && !isScheduledRoomReady && (
+                                <div className="absolute inset-0 z-20 bg-black flex flex-col items-center justify-center">
+                                    {/* Background pattern */}
+                                    <div className="absolute inset-0 opacity-10">
+                                        <div className="w-full h-full" style={{
+                                            backgroundImage: `url(${episode?.posterUrl || movie?.posterUrl || ''})`,
+                                            backgroundSize: 'cover',
+                                            backgroundPosition: 'center',
+                                            filter: 'blur(20px)'
+                                        }} />
+                                    </div>
+
+                                    {/* Content */}
+                                    <div className="relative z-10 text-center px-4">
+                                        <div className="mb-6">
+                                            <span className="inline-flex items-center gap-2 bg-amber-500/20 text-amber-400 px-4 py-2 rounded-full text-sm font-medium">
+                                                <span className="w-2 h-2 bg-amber-400 rounded-full animate-pulse" />
+                                                Scheduled Watch Party
+                                            </span>
+                                        </div>
+
+                                        <h2 className="text-2xl md:text-3xl font-bold text-white mb-2">{title}</h2>
+                                        {roomInfo?.description && (
+                                            <p className="text-gray-400 mb-8 max-w-md">"{roomInfo.description}"</p>
+                                        )}
+
+                                        <p className="text-gray-400 mb-4 text-lg">Starting in</p>
+
+                                        {/* Countdown Timer */}
+                                        <div className="flex items-center justify-center gap-4 md:gap-6">
+                                            <div className="flex flex-col items-center">
+                                                <div className="w-20 h-20 md:w-24 md:h-24 bg-white/10 backdrop-blur-sm rounded-xl flex items-center justify-center border border-white/20">
+                                                    <span className="text-4xl md:text-5xl font-bold text-white font-mono">
+                                                        {String(countdown.hours).padStart(2, '0')}
+                                                    </span>
+                                                </div>
+                                                <span className="text-gray-400 text-sm mt-2">Hours</span>
+                                            </div>
+                                            <span className="text-4xl text-white/50 font-bold">:</span>
+                                            <div className="flex flex-col items-center">
+                                                <div className="w-20 h-20 md:w-24 md:h-24 bg-white/10 backdrop-blur-sm rounded-xl flex items-center justify-center border border-white/20">
+                                                    <span className="text-4xl md:text-5xl font-bold text-white font-mono">
+                                                        {String(countdown.minutes).padStart(2, '0')}
+                                                    </span>
+                                                </div>
+                                                <span className="text-gray-400 text-sm mt-2">Minutes</span>
+                                            </div>
+                                            <span className="text-4xl text-white/50 font-bold">:</span>
+                                            <div className="flex flex-col items-center">
+                                                <div className="w-20 h-20 md:w-24 md:h-24 bg-white/10 backdrop-blur-sm rounded-xl flex items-center justify-center border border-white/20">
+                                                    <span className="text-4xl md:text-5xl font-bold text-amber-400 font-mono animate-pulse">
+                                                        {String(countdown.seconds).padStart(2, '0')}
+                                                    </span>
+                                                </div>
+                                                <span className="text-gray-400 text-sm mt-2">Seconds</span>
+                                            </div>
+                                        </div>
+
+                                        <p className="text-gray-500 mt-8 text-sm">
+                                            {users.length} {users.length === 1 ? 'person' : 'people'} waiting
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Video Player - only render when ready */}
+                            {isScheduledRoomReady && (
+                                <VideoPlayer
+                                    ref={videoPlayerRef}
+                                    videoUrl={episode?.googleDriveUrl || movie?.googleDriveUrl}
+                                    className="w-full h-full"
+                                    isHost={isHost}
+                                    syncMode={true}
+                                    subtitleTracks={subtitleTracks}
+                                    onPlay={() => {
+                                        console.log('🎬 onPlay handler called - isHost:', isHost);
+                                        if (isHost) {
+                                            const time = videoPlayerRef.current?.getCurrentTime() || 0;
+                                            console.log('🎬 Calling videoPlay with time:', time);
+                                            videoPlay(time);
+                                        }
+                                    }}
+                                    onPause={() => {
+                                        console.log('🎬 onPause handler called - isHost:', isHost);
+                                        if (isHost) {
+                                            const time = videoPlayerRef.current?.getCurrentTime() || 0;
+                                            console.log('🎬 Calling videoPause with time:', time);
+                                            videoPause(time);
+                                        }
+                                    }}
+                                    onSeek={(time) => {
+                                        console.log('🎬 onSeek handler called - isHost:', isHost, 'time:', time);
+                                        if (isHost) {
+                                            videoSeek(time);
+                                        }
+                                    }}
+                                    onPlaybackRateChange={(rate) => {
+                                        console.log('🎬 onPlaybackRateChange handler called - isHost:', isHost, 'rate:', rate);
+                                        if (isHost) {
+                                            videoPlaybackRate(rate);
+                                        }
+                                    }}
+                                    onSubtitleChange={(subtitleIndex) => {
+                                        console.log('🎬 onSubtitleChange handler called - isHost:', isHost, 'index:', subtitleIndex);
+                                        if (isHost) {
+                                            videoSubtitle(subtitleIndex);
+                                        }
+                                    }}
+                                />
+                            )}
                         </div>
 
                         {/* Host indicator */}

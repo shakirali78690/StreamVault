@@ -26,6 +26,9 @@ function CreateRoomContent() {
     const [selectedEpisode, setSelectedEpisode] = useState<string | null>(null);
     const [isPublic, setIsPublic] = useState(true);
     const [password, setPassword] = useState('');
+    const [isScheduled, setIsScheduled] = useState(false);
+    const [scheduledDateTime, setScheduledDateTime] = useState('');
+    const [description, setDescription] = useState('');
 
     // Parse URL params
     const urlParams = new URLSearchParams(searchString);
@@ -102,6 +105,7 @@ function CreateRoomContent() {
         if (!username.trim() || !selectedContent) return;
         if ((contentType === 'show' || contentType === 'anime') && !selectedEpisode) return;
         if (!isPublic && !password.trim()) return; // Require password for private rooms
+        if (isScheduled && !scheduledDateTime) return; // Require date/time for scheduled parties
 
         // Store room creation params for watch-together page
         sessionStorage.setItem('watchTogether_username', username.trim());
@@ -115,6 +119,12 @@ function CreateRoomContent() {
         }
         if ((contentType === 'show' || contentType === 'anime') && selectedEpisode) {
             sessionStorage.setItem('watchTogether_episodeId', selectedEpisode);
+        }
+        if (description.trim()) {
+            sessionStorage.setItem('watchTogether_description', description.trim());
+        }
+        if (isScheduled && scheduledDateTime) {
+            sessionStorage.setItem('watchTogether_scheduledFor', new Date(scheduledDateTime).toISOString());
         }
         sessionStorage.setItem('watchTogether_isCreator', 'true');
 
@@ -328,6 +338,49 @@ function CreateRoomContent() {
                         </div>
                     )}
 
+                    {/* Step 6: Schedule & Description (Optional) */}
+                    {selectedContent && (
+                        <div>
+                            <label className="text-lg font-semibold mb-3 block flex items-center gap-2">
+                                <span className="bg-primary text-primary-foreground w-6 h-6 rounded-full text-sm flex items-center justify-center">6</span>
+                                Options (Optional)
+                            </label>
+
+                            {/* Schedule Toggle */}
+                            <div className="flex items-center gap-3 mb-4">
+                                <button
+                                    onClick={() => { setIsScheduled(!isScheduled); if (!isScheduled === false) setScheduledDateTime(''); }}
+                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${isScheduled ? 'bg-primary' : 'bg-muted'}`}
+                                >
+                                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isScheduled ? 'translate-x-6' : 'translate-x-1'}`} />
+                                </button>
+                                <span className="text-sm">Schedule for later</span>
+                            </div>
+
+                            {/* Date/Time Picker */}
+                            {isScheduled && (
+                                <div className="mb-4">
+                                    <Input
+                                        type="datetime-local"
+                                        value={scheduledDateTime}
+                                        onChange={(e) => setScheduledDateTime(e.target.value)}
+                                        min={new Date().toISOString().slice(0, 16)}
+                                        className="text-lg"
+                                    />
+                                </div>
+                            )}
+
+                            {/* Description */}
+                            <Input
+                                value={description}
+                                onChange={(e) => setDescription(e.target.value)}
+                                placeholder="Add a note (e.g., 'Season finale discussion!')"
+                                className="text-base"
+                                maxLength={100}
+                            />
+                        </div>
+                    )}
+
                     {/* Create Button */}
                     <Button
                         className="w-full py-6 text-lg"
@@ -338,7 +391,8 @@ function CreateRoomContent() {
                             !selectedContent ||
                             !isConnected ||
                             ((contentType === 'show' || contentType === 'anime') && !selectedEpisode) ||
-                            (!isPublic && !password.trim())
+                            (!isPublic && !password.trim()) ||
+                            (isScheduled && !scheduledDateTime)
                         }
                     >
                         {isConnected ? (

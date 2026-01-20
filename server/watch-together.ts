@@ -31,6 +31,9 @@ interface Room {
     episodeTitle?: string; // Episode title if watching a show
     isPublic: boolean; // Public rooms visible to everyone
     password?: string; // Password for private rooms
+    description?: string; // Optional description/notes for the party
+    scheduledFor?: Date; // Optional scheduled start time for the party
+    hostJoinedAt?: number; // Timestamp when host first joined (for scheduled rooms)
     users: Map<string, User>;
     videoState: VideoState;
     createdAt: Date;
@@ -52,6 +55,9 @@ const sessionToRoom = new Map<string, string>(); // sessionId -> roomCode (for r
 
 // Host reconnection grace period (2 minutes)
 const HOST_GRACE_PERIOD_MS = 2 * 60 * 1000;
+
+// Scheduled room: wait 10 minutes for host after scheduled time before deleting
+const SCHEDULED_ROOM_HOST_WAIT_MS = 10 * 60 * 1000;
 
 // Generate 6-character room code
 function generateRoomCode(): string {
@@ -81,6 +87,8 @@ export function getActiveRooms() {
         episodeTitle: room.episodeTitle,
         isPublic: room.isPublic,
         hasPassword: !room.isPublic && !!room.password,
+        description: room.description,
+        scheduledFor: room.scheduledFor,
         userCount: room.users.size,
         createdAt: room.createdAt,
     }));
@@ -114,6 +122,8 @@ export function setupWatchTogether(httpServer: HttpServer): Server {
                 episodeTitle: room.episodeTitle,
                 isPublic: room.isPublic,
                 hasPassword: !room.isPublic && !!room.password,
+                description: room.description,
+                scheduledFor: room.scheduledFor,
                 userCount: room.users.size,
                 createdAt: room.createdAt,
             }));
@@ -132,6 +142,8 @@ export function setupWatchTogether(httpServer: HttpServer): Server {
             sessionId: string;
             isPublic: boolean;
             password?: string;
+            description?: string;
+            scheduledFor?: string; // ISO date string
         }) => {
             // Check if user already has an active room with this session
             const existingRoomCode = sessionToRoom.get(data.sessionId);
@@ -204,6 +216,9 @@ export function setupWatchTogether(httpServer: HttpServer): Server {
                 episodeTitle: data.episodeTitle,
                 isPublic: data.isPublic,
                 password: data.isPublic ? undefined : data.password,
+                description: data.description,
+                scheduledFor: data.scheduledFor ? new Date(data.scheduledFor) : undefined,
+                hostJoinedAt: Date.now(), // Track when host joined
                 users: new Map(),
                 videoState: {
                     isPlaying: false,
@@ -234,6 +249,8 @@ export function setupWatchTogether(httpServer: HttpServer): Server {
                 contentType: room.contentType,
                 contentId: room.contentId,
                 episodeId: room.episodeId,
+                description: room.description,
+                scheduledFor: room.scheduledFor?.toISOString(),
                 user,
                 videoState: room.videoState
             });
@@ -313,6 +330,8 @@ export function setupWatchTogether(httpServer: HttpServer): Server {
                 contentType: room.contentType,
                 contentId: room.contentId,
                 episodeId: room.episodeId,
+                description: room.description,
+                scheduledFor: room.scheduledFor?.toISOString(),
                 users: Array.from(room.users.values()),
                 videoState: room.videoState,
                 user
@@ -589,14 +608,41 @@ export function setupWatchTogether(httpServer: HttpServer): Server {
 
             // If host left, start grace period instead of immediately destroying
             if (wasHost && user) {
-                console.log(`🎬 Host disconnected from room ${roomCode}, starting ${HOST_GRACE_PERIOD_MS / 1000}s grace period`);
+                const now = Date.now();
+                const scheduledTime = room.scheduledFor?.getTime();
+                const isScheduledRoom = !!scheduledTime;
+                const isAfterScheduledTime = !scheduledTime || now >= scheduledTime;
+                const hostJoinedAfterScheduledTime = room.hostJoinedAt && scheduledTime && room.hostJoinedAt >= scheduledTime;
 
-                room.hostDisconnectedAt = Date.now();
+                // Determine grace period based on room type and state
+                let gracePeriod: number;
+                if (isScheduledRoom && !isAfterScheduledTime) {
+                    // Scheduled room but time hasn't arrived - DON'T DELETE, just wait
+                    console.log(`🎬 Host disconnected from scheduled room ${roomCode}, waiting for scheduled time`);
+                    room.hostDisconnectedAt = now;
+
+                    // Notify others
+                    watchNamespace.to(roomCode).emit('room:host-disconnected', {
+                        message: 'Host disconnected. Room will start at scheduled time.',
+                        gracePeriodMs: null // No destruction countdown
+                    });
+                    return; // Don't set destroy timeout
+                } else if (isScheduledRoom && isAfterScheduledTime && !hostJoinedAfterScheduledTime) {
+                    // Scheduled room, time arrived, host never joined - 10 min wait
+                    gracePeriod = SCHEDULED_ROOM_HOST_WAIT_MS;
+                    console.log(`🎬 Host disconnected from scheduled room ${roomCode} (never joined after schedule), waiting 10min`);
+                } else {
+                    // Normal room OR scheduled room where host joined after scheduled time - 2 min rule
+                    gracePeriod = HOST_GRACE_PERIOD_MS;
+                    console.log(`🎬 Host disconnected from room ${roomCode}, starting ${gracePeriod / 1000}s grace period`);
+                }
+
+                room.hostDisconnectedAt = now;
 
                 // Notify others that host disconnected (but room still active)
                 watchNamespace.to(roomCode).emit('room:host-disconnected', {
                     message: 'Host disconnected. Waiting for reconnection...',
-                    gracePeriodMs: HOST_GRACE_PERIOD_MS
+                    gracePeriodMs: gracePeriod
                 });
 
                 // Set timeout to destroy room if host doesn't reconnect
@@ -616,7 +662,7 @@ export function setupWatchTogether(httpServer: HttpServer): Server {
                         rooms.delete(roomCode);
                         console.log(`🎬 Room ${roomCode} destroyed (host didn't reconnect)`);
                     }
-                }, HOST_GRACE_PERIOD_MS);
+                }, gracePeriod);
 
             } else if (user) {
                 // Non-host user left - notify others but keep session mapping for reconnection
@@ -638,7 +684,16 @@ export function setupWatchTogether(httpServer: HttpServer): Server {
         const roomCodes = Array.from(rooms.keys());
         roomCodes.forEach(code => {
             const room = rooms.get(code);
-            if (room && (room.users.size === 0 || now - room.createdAt.getTime() > timeout)) {
+            if (!room) return;
+
+            const scheduledTime = room.scheduledFor?.getTime();
+            const isScheduledForFuture = scheduledTime && now < scheduledTime;
+
+            // Don't delete scheduled rooms before their time
+            if (isScheduledForFuture) return;
+
+            // Delete empty rooms or rooms older than 2 hours
+            if (room.users.size === 0 || now - room.createdAt.getTime() > timeout) {
                 rooms.delete(code);
                 console.log(`🎬 Room ${code} cleaned up (inactive)`);
             }

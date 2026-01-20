@@ -35,6 +35,8 @@ export interface RoomInfo {
     contentType: 'show' | 'movie' | 'anime';
     contentId: string;
     episodeId?: string;
+    description?: string;
+    scheduledFor?: string;
     users: User[];
     videoState: VideoState;
     user: User;
@@ -55,7 +57,7 @@ interface WatchTogetherContextType {
     hostDisconnected: boolean;
     reconnectCountdown: number | null;
     // Actions
-    createRoom: (contentType: 'show' | 'movie' | 'anime', contentId: string, username: string, episodeId?: string, options?: { contentTitle?: string; contentPoster?: string; episodeTitle?: string; isPublic?: boolean; password?: string }) => void;
+    createRoom: (contentType: 'show' | 'movie' | 'anime', contentId: string, username: string, episodeId?: string, options?: { contentTitle?: string; contentPoster?: string; episodeTitle?: string; isPublic?: boolean; password?: string; description?: string; scheduledFor?: string }) => void;
     joinRoom: (roomCode: string, username: string, password?: string) => void;
     leaveRoom: () => void;
     sendMessage: (message: string) => void;
@@ -362,6 +364,8 @@ export function WatchTogetherProvider({ children }: Props) {
             episodeTitle?: string;
             isPublic?: boolean;
             password?: string;
+            description?: string;
+            scheduledFor?: string;
         }
     ) => {
         const sessionId = getSessionId();
@@ -376,6 +380,8 @@ export function WatchTogetherProvider({ children }: Props) {
             episodeTitle: options?.episodeTitle,
             isPublic: options?.isPublic ?? true,
             password: options?.password,
+            description: options?.description,
+            scheduledFor: options?.scheduledFor,
         });
     }, [socket]);
 
