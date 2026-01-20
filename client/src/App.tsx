@@ -51,6 +51,13 @@ import WidgetDashboard from "@/pages/widget-dashboard";
 import SiteAnalytics from "@/pages/site-analytics";
 import { AnalyticsTracker } from "@/components/analytics-tracker";
 import NotFound from "@/pages/not-found";
+import Login from "@/pages/login";
+import Register from "@/pages/register";
+import Profile from "@/pages/profile";
+import Friends from "@/pages/friends";
+import { AuthProvider } from "@/contexts/auth-context";
+import { NotificationsProvider } from "@/contexts/notifications-context";
+import { FriendsProvider } from "@/contexts/friends-context";
 
 function Router() {
   // Hide header/footer on watch-together routes
@@ -100,6 +107,10 @@ function Router() {
           <Route path="/watch-rooms" component={WatchRooms} />
           <Route path="/watch-together/:roomCode" component={WatchTogether} />
           <Route path="/create-room" component={CreateRoom} />
+          <Route path="/login" component={Login} />
+          <Route path="/register" component={Register} />
+          <Route path="/profile" component={Profile} />
+          <Route path="/friends" component={Friends} />
           <Route component={NotFound} />
         </Switch>
       </main>
@@ -120,14 +131,20 @@ function App() {
   return (
     <HelmetProvider>
       <QueryClientProvider client={queryClient}>
-        <ThemeProvider defaultTheme="dark">
-          <TooltipProvider>
-            <Toaster />
-            <AdBlockDetector />
-            <AnalyticsTracker />
-            <Router />
-          </TooltipProvider>
-        </ThemeProvider>
+        <AuthProvider>
+          <NotificationsProvider>
+            <FriendsProvider>
+              <ThemeProvider defaultTheme="dark">
+                <TooltipProvider>
+                  <Toaster />
+                  <AdBlockDetector />
+                  <AnalyticsTracker />
+                  <Router />
+                </TooltipProvider>
+              </ThemeProvider>
+            </FriendsProvider>
+          </NotificationsProvider>
+        </AuthProvider>
       </QueryClientProvider>
     </HelmetProvider>
   );

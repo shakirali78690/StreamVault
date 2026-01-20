@@ -6,11 +6,13 @@ import { ArrowRight, Users, Film, Tv, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useWatchTogether, WatchTogetherProvider } from '@/contexts/watch-together-context';
+import { useAuth } from '@/contexts/auth-context';
 import type { Show, Movie, Anime } from '@shared/schema';
 
 function CreateRoomContent() {
     const [, setLocation] = useLocation();
     const searchString = useSearch();
+    const { user, isAuthenticated, isLoading: authLoading } = useAuth();
     const {
         isConnected,
         roomInfo,
@@ -19,7 +21,22 @@ function CreateRoomContent() {
         clearError
     } = useWatchTogether();
 
+    // Redirect to login if not authenticated
+    useEffect(() => {
+        if (!authLoading && !isAuthenticated) {
+            const returnUrl = encodeURIComponent(window.location.pathname + window.location.search);
+            setLocation(`/login?redirect=${returnUrl}`);
+        }
+    }, [authLoading, isAuthenticated, setLocation]);
+
+    // Auto-use authenticated username
     const [username, setUsername] = useState('');
+    useEffect(() => {
+        if (user?.username) {
+            setUsername(user.username);
+        }
+    }, [user]);
+
     const [contentType, setContentType] = useState<'show' | 'movie' | 'anime'>('show');
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedContent, setSelectedContent] = useState<Show | Movie | Anime | null>(null);

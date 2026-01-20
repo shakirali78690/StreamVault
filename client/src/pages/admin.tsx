@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Trash2, Edit, Plus, Save, X, Upload, FileJson, LogOut, Mail, Send } from "lucide-react";
+import { Trash2, Edit, Plus, Save, X, Upload, FileJson, LogOut, Mail, Send, Bell, Megaphone } from "lucide-react";
 import type { Show, Episode, Movie, BlogPost, Anime, AnimeEpisode } from "@shared/schema";
 import { getAuthHeaders, logout as authLogout } from "@/lib/auth";
 
@@ -114,7 +114,7 @@ export default function AdminPage() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-12 mb-8">
+          <TabsList className="flex flex-wrap h-auto gap-2 mb-8 bg-muted/50 p-1">
             <TabsTrigger value="shows">Shows</TabsTrigger>
             <TabsTrigger value="movies">Movies</TabsTrigger>
             <TabsTrigger value="anime">Anime</TabsTrigger>
@@ -124,6 +124,7 @@ export default function AdminPage() {
             <TabsTrigger value="reports">Reports</TabsTrigger>
             <TabsTrigger value="newsletter">Newsletter</TabsTrigger>
             <TabsTrigger value="push">Push</TabsTrigger>
+            <TabsTrigger value="broadcast">📢 Broadcast</TabsTrigger>
             <TabsTrigger value="add-show">Add Show</TabsTrigger>
             <TabsTrigger value="add-episode">Add Episode</TabsTrigger>
             <TabsTrigger value="import">Import</TabsTrigger>
@@ -172,6 +173,11 @@ export default function AdminPage() {
           {/* Push Notifications Tab */}
           <TabsContent value="push">
             <PushNotificationManager shows={shows} movies={movies} />
+          </TabsContent>
+
+          {/* Broadcast In-App Notifications Tab */}
+          <TabsContent value="broadcast">
+            <BroadcastNotificationManager shows={shows} movies={movies} anime={anime} />
           </TabsContent>
 
           {/* Add Show Tab */}
@@ -3137,6 +3143,250 @@ function PushNotificationManager({ shows, movies }: { shows: Show[]; movies: Mov
               {isSending ? "Sending..." : `Send Push to ${subscriberCount} Subscribers`}
             </Button>
           </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// Broadcast In-App Notification Manager Component
+function BroadcastNotificationManager({ shows, movies, anime }: { shows: Show[]; movies: Movie[]; anime: Anime[] }) {
+  const { toast } = useToast();
+  const [notificationType, setNotificationType] = useState<'new_content' | 'new_episode' | 'custom'>('new_content');
+  const [contentType, setContentType] = useState<'show' | 'movie' | 'anime'>('show');
+  const [selectedContentId, setSelectedContentId] = useState('');
+  const [customTitle, setCustomTitle] = useState('');
+  const [customMessage, setCustomMessage] = useState('');
+  const [customLink, setCustomLink] = useState(''); // Added customLink state
+  const [isSending, setIsSending] = useState(false);
+
+  const getContentList = () => {
+    switch (contentType) {
+      case 'show': return shows;
+      case 'movie': return movies;
+      case 'anime': return anime;
+      default: return [];
+    }
+  };
+
+  const getSelectedContent = () => {
+    const list = getContentList();
+    return list.find((item: any) => item.id === selectedContentId);
+  };
+
+  const handleBroadcast = async () => {
+    if (notificationType !== 'custom' && !selectedContentId) {
+      toast({
+        title: 'Error',
+        description: 'Please select content to notify about',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (notificationType === 'custom' && (!customTitle.trim() || !customMessage.trim())) {
+      toast({
+        title: 'Error',
+        description: 'Please enter both title and message for custom notification',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsSending(true);
+    try {
+      const selectedContent = getSelectedContent();
+
+      const payload = {
+        type: notificationType,
+        contentType: notificationType !== 'custom' ? contentType : undefined,
+        contentId: selectedContentId || undefined,
+        contentTitle: selectedContent?.title || undefined,
+        contentPoster: (selectedContent as any)?.posterUrl || undefined,
+        customTitle: notificationType === 'custom' ? customTitle : undefined,
+        customMessage: notificationType === 'custom' ? customMessage : undefined,
+        customLink: customLink || undefined, // Send customLink
+      };
+
+      const response = await fetch('/api/admin/broadcast-notification', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(payload),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        toast({
+          title: '🎉 Broadcast Sent!',
+          description: `Notification sent to ${data.sentCount} users`,
+        });
+        // Reset form
+        setSelectedContentId('');
+        setSelectedContentId('');
+        setCustomTitle('');
+        setCustomMessage('');
+        setCustomLink(''); // Reset customLink
+      } else {
+        throw new Error(data.error || 'Failed to broadcast');
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to send broadcast',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  return (
+    <div className="grid gap-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Megaphone className="w-5 h-5" />
+            Broadcast In-App Notifications
+          </CardTitle>
+          <CardDescription>
+            Send notifications to all authenticated users about new content, episodes, or custom announcements
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Notification Type */}
+          <div className="space-y-2">
+            <Label>Notification Type</Label>
+            <select
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              value={notificationType}
+              onChange={(e) => setNotificationType(e.target.value as any)}
+            >
+              <option value="new_content">🆕 New Content Added</option>
+              <option value="new_episode">📺 New Episode Released</option>
+              <option value="custom">✍️ Custom Announcement</option>
+            </select>
+          </div>
+
+          {notificationType !== 'custom' && (
+            <>
+              {/* Content Type */}
+              <div className="space-y-2">
+                <Label>Content Type</Label>
+                <select
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  value={contentType}
+                  onChange={(e) => {
+                    setContentType(e.target.value as any);
+                    setSelectedContentId('');
+                  }}
+                >
+                  <option value="show">📺 TV Show</option>
+                  <option value="movie">🎬 Movie</option>
+                  <option value="anime">🎌 Anime</option>
+                </select>
+              </div>
+
+              {/* Content Selection */}
+              <div className="space-y-2">
+                <Label>Select Content</Label>
+                <select
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  value={selectedContentId}
+                  onChange={(e) => setSelectedContentId(e.target.value)}
+                >
+                  <option value="">-- Select {contentType} --</option>
+                  {getContentList().map((item: any) => (
+                    <option key={item.id} value={item.id}>
+                      {item.title} ({item.year})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Preview */}
+              {selectedContentId && getSelectedContent() && (
+                <div className="p-4 bg-muted rounded-lg">
+                  <Label className="text-xs text-muted-foreground mb-2 block">Notification Preview</Label>
+                  <div className="flex items-center gap-4">
+                    <img
+                      src={(getSelectedContent() as any).posterUrl}
+                      alt=""
+                      className="w-16 h-24 object-cover rounded"
+                    />
+                    <div>
+                      <p className="font-semibold">
+                        {notificationType === 'new_content' ? '🆕 New Content Added!' : '📺 New Episode Available!'}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {(getSelectedContent() as any).title} is now available on StreamVault!
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {notificationType === 'custom' && (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="customTitle">Notification Title</Label>
+                <Input
+                  id="customTitle"
+                  value={customTitle}
+                  onChange={(e) => setCustomTitle(e.target.value)}
+                  placeholder="e.g., 🎉 Special Announcement!"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="customMessage">Notification Message</Label>
+                <Textarea
+                  id="customMessage"
+                  value={customMessage}
+                  onChange={(e) => setCustomMessage(e.target.value)}
+                  placeholder="Enter your announcement message..."
+                  rows={3}
+                />
+              </div>
+
+              {/* Preview */}
+              {customTitle && customMessage && (
+                <div className="p-4 bg-muted rounded-lg">
+                  <Label className="text-xs text-muted-foreground mb-2 block">Notification Preview</Label>
+                  <div>
+                    <p className="font-semibold">{customTitle}</p>
+                    <p className="text-sm text-muted-foreground">{customMessage}</p>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          <div className="space-y-2">
+            <Label htmlFor="customLink">Destination Link (Optional)</Label>
+            <Input
+              id="customLink"
+              value={customLink}
+              onChange={(e) => setCustomLink(e.target.value)}
+              placeholder={notificationType === 'custom' 
+                ? "e.g., /show/stranger-things or https://example.com" 
+                : "Override default link (e.g., /special-promo)"}
+            />
+            <p className="text-xs text-muted-foreground">
+              Internal paths like <code>/show/slug</code> or external URLs. Leave empty to {notificationType === 'custom' ? 'take no action' : 'use default content page'}.
+            </p>
+          </div>
+
+          <Button
+            onClick={handleBroadcast}
+            disabled={isSending}
+            className="w-full"
+            size="lg"
+          >
+            <Bell className="w-4 h-4 mr-2" />
+            {isSending ? 'Broadcasting...' : 'Broadcast to All Users'}
+          </Button>
         </CardContent>
       </Card>
     </div>

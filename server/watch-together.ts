@@ -6,6 +6,8 @@ interface User {
     id: string;
     sessionId: string; // Persistent session ID for reconnection
     username: string;
+    avatarUrl?: string;
+    authUserId?: string; // Actual authenticated user ID from database (for friend requests)
     isHost: boolean;
     isMuted: boolean;
 }
@@ -44,14 +46,34 @@ interface Room {
 interface ChatMessage {
     id: string;
     username: string;
+    avatarUrl?: string;
     message: string;
     timestamp: Date;
+}
+
+// Poll feature interfaces
+interface PollOption {
+    id: string;
+    text: string;
+    votes: Set<string>; // Set of user IDs who voted for this option
+}
+
+interface Poll {
+    id: string;
+    roomCode: string;
+    question: string;
+    options: PollOption[];
+    createdBy: string; // User ID who created the poll
+    createdAt: Date;
+    isActive: boolean;
+    expiresAt?: Date; // Optional expiration time
 }
 
 // In-memory room storage
 const rooms = new Map<string, Room>();
 const userToRoom = new Map<string, string>(); // socketId -> roomCode
 const sessionToRoom = new Map<string, string>(); // sessionId -> roomCode (for reconnection)
+const roomPolls = new Map<string, Poll[]>(); // roomCode -> polls
 
 // Host reconnection grace period (2 minutes)
 const HOST_GRACE_PERIOD_MS = 2 * 60 * 1000;
@@ -139,11 +161,13 @@ export function setupWatchTogether(httpServer: HttpServer): Server {
             episodeId?: string;
             episodeTitle?: string;
             username: string;
+            avatarUrl?: string;
             sessionId: string;
             isPublic: boolean;
             password?: string;
             description?: string;
             scheduledFor?: string; // ISO date string
+            authUserId?: string;
         }) => {
             // Check if user already has an active room with this session
             const existingRoomCode = sessionToRoom.get(data.sessionId);
@@ -184,7 +208,10 @@ export function setupWatchTogether(httpServer: HttpServer): Server {
                         roomCode: existingRoom.code,
                         contentType: existingRoom.contentType,
                         contentId: existingRoom.contentId,
+                        contentTitle: existingRoom.contentTitle,
+                        contentPoster: existingRoom.contentPoster,
                         episodeId: existingRoom.episodeId,
+                        episodeTitle: existingRoom.episodeTitle,
                         users: Array.from(existingRoom.users.values()),
                         videoState: existingRoom.videoState,
                         user
@@ -233,6 +260,8 @@ export function setupWatchTogether(httpServer: HttpServer): Server {
                 id: socket.id,
                 sessionId: data.sessionId,
                 username: data.username,
+                avatarUrl: data.avatarUrl,
+                authUserId: data.authUserId, // Actual user ID from auth system
                 isHost: true,
                 isMuted: false
             };
@@ -248,7 +277,10 @@ export function setupWatchTogether(httpServer: HttpServer): Server {
                 roomCode: code,
                 contentType: room.contentType,
                 contentId: room.contentId,
+                contentTitle: room.contentTitle,
+                contentPoster: room.contentPoster,
                 episodeId: room.episodeId,
+                episodeTitle: room.episodeTitle,
                 description: room.description,
                 scheduledFor: room.scheduledFor?.toISOString(),
                 user,
@@ -259,7 +291,7 @@ export function setupWatchTogether(httpServer: HttpServer): Server {
         });
 
         // Join an existing room
-        socket.on('room:join', (data: { roomCode: string; username: string; sessionId: string; password?: string }) => {
+        socket.on('room:join', (data: { roomCode: string; username: string; avatarUrl?: string; sessionId: string; password?: string; authUserId?: string }) => {
             const room = rooms.get(data.roomCode.toUpperCase());
 
             if (!room) {
@@ -313,6 +345,8 @@ export function setupWatchTogether(httpServer: HttpServer): Server {
                 id: socket.id,
                 sessionId: data.sessionId,
                 username: data.username,
+                avatarUrl: data.avatarUrl,
+                authUserId: data.authUserId, // Actual user ID from auth system
                 isHost: isHostReconnecting || (existingUser?.isHost ?? false),
                 isMuted: existingUser?.isMuted || false
             };
@@ -495,6 +529,7 @@ export function setupWatchTogether(httpServer: HttpServer): Server {
             const chatMessage: ChatMessage = {
                 id: generateId(),
                 username: user.username,
+                avatarUrl: user.avatarUrl,
                 message: data.message,
                 timestamp: new Date()
             };
@@ -584,6 +619,159 @@ export function setupWatchTogether(httpServer: HttpServer): Server {
                 });
                 console.log(`🎬 Host ${data.isMuted ? 'muted' : 'unmuted'} ${targetUser.username}`);
             }
+        });
+
+        // ============================================
+        // POLL FEATURE SOCKET EVENTS
+        // ============================================
+
+        // Create a new poll (host only)
+        socket.on('poll:create', (data: { question: string; options: string[]; expiresInMinutes?: number }) => {
+            const roomCode = userToRoom.get(socket.id);
+            if (!roomCode) return;
+            const room = rooms.get(roomCode);
+            if (!room) return;
+
+            // Only host can create polls
+            if (room.hostId !== socket.id) {
+                socket.emit('poll:error', { message: 'Only the host can create polls' });
+                return;
+            }
+
+            if (!data.question || !data.options || data.options.length < 2) {
+                socket.emit('poll:error', { message: 'Poll must have a question and at least 2 options' });
+                return;
+            }
+
+            const pollId = generateId();
+            const poll: Poll = {
+                id: pollId,
+                roomCode,
+                question: data.question,
+                options: data.options.map(text => ({
+                    id: generateId(),
+                    text,
+                    votes: new Set<string>()
+                })),
+                createdBy: socket.id,
+                createdAt: new Date(),
+                isActive: true,
+                expiresAt: data.expiresInMinutes ? new Date(Date.now() + data.expiresInMinutes * 60 * 1000) : undefined
+            };
+
+            // Store poll
+            if (!roomPolls.has(roomCode)) {
+                roomPolls.set(roomCode, []);
+            }
+            roomPolls.get(roomCode)!.push(poll);
+
+            // Broadcast to room
+            const pollData = {
+                id: poll.id,
+                question: poll.question,
+                options: poll.options.map(o => ({
+                    id: o.id,
+                    text: o.text,
+                    voteCount: o.votes.size
+                })),
+                isActive: poll.isActive,
+                createdAt: poll.createdAt,
+                expiresAt: poll.expiresAt
+            };
+
+            watchNamespace.to(roomCode).emit('poll:created', pollData);
+            console.log(`📊 Poll created in room ${roomCode}: "${data.question}"`);
+        });
+
+        // Vote on a poll
+        socket.on('poll:vote', (data: { pollId: string; optionId: string }) => {
+            const roomCode = userToRoom.get(socket.id);
+            if (!roomCode) return;
+
+            const polls = roomPolls.get(roomCode);
+            if (!polls) return;
+
+            const poll = polls.find(p => p.id === data.pollId);
+            if (!poll || !poll.isActive) {
+                socket.emit('poll:error', { message: 'Poll not found or already closed' });
+                return;
+            }
+
+            // Check if poll expired
+            if (poll.expiresAt && new Date() > poll.expiresAt) {
+                poll.isActive = false;
+                socket.emit('poll:error', { message: 'Poll has expired' });
+                return;
+            }
+
+            // Remove any previous vote from this user
+            poll.options.forEach(o => o.votes.delete(socket.id));
+
+            // Add new vote
+            const option = poll.options.find(o => o.id === data.optionId);
+            if (option) {
+                option.votes.add(socket.id);
+
+                // Broadcast updated results
+                const pollData = {
+                    id: poll.id,
+                    question: poll.question,
+                    options: poll.options.map(o => ({
+                        id: o.id,
+                        text: o.text,
+                        voteCount: o.votes.size
+                    })),
+                    isActive: poll.isActive
+                };
+                watchNamespace.to(roomCode).emit('poll:updated', pollData);
+                console.log(`📊 Vote cast in poll ${poll.id} by ${socket.id}`);
+            }
+        });
+
+        // Close a poll (host only)
+        socket.on('poll:close', (data: { pollId: string }) => {
+            const roomCode = userToRoom.get(socket.id);
+            if (!roomCode) return;
+            const room = rooms.get(roomCode);
+            if (!room) return;
+
+            // Only host can close polls
+            if (room.hostId !== socket.id) {
+                socket.emit('poll:error', { message: 'Only the host can close polls' });
+                return;
+            }
+
+            const polls = roomPolls.get(roomCode);
+            if (!polls) return;
+
+            const poll = polls.find(p => p.id === data.pollId);
+            if (poll) {
+                poll.isActive = false;
+                watchNamespace.to(roomCode).emit('poll:closed', { pollId: poll.id });
+                console.log(`📊 Poll closed: ${poll.id}`);
+            }
+        });
+
+        // Get active polls for room
+        socket.on('poll:get', () => {
+            const roomCode = userToRoom.get(socket.id);
+            if (!roomCode) return;
+
+            const polls = roomPolls.get(roomCode) || [];
+            const activePolls = polls.filter(p => p.isActive).map(poll => ({
+                id: poll.id,
+                question: poll.question,
+                options: poll.options.map(o => ({
+                    id: o.id,
+                    text: o.text,
+                    voteCount: o.votes.size
+                })),
+                isActive: poll.isActive,
+                createdAt: poll.createdAt,
+                expiresAt: poll.expiresAt
+            }));
+
+            socket.emit('poll:list', activePolls);
         });
 
         // Handle disconnect

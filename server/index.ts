@@ -5,6 +5,9 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { setupWatchTogether } from "./watch-together";
+import { initSocialSocket } from "./social";
+import cookieParser from "cookie-parser";
+import path from "path";
 
 const app = express();
 
@@ -13,12 +16,19 @@ declare module 'http' {
     rawBody: unknown
   }
 }
+
+// Cookie parser for auth tokens
+app.use(cookieParser());
+
 app.use(express.json({
   verify: (req, _res, buf) => {
     req.rawBody = buf;
   }
 }));
 app.use(express.urlencoded({ extended: false }));
+
+// Serve uploads folder statically (for avatars, etc.)
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
 // Add caching headers for static assets
 app.use((req, res, next) => {
@@ -74,6 +84,9 @@ app.get('/430747cadbbf78f339306f7049a8f3c5.txt', (_req, res) => {
 
   // Initialize Watch Together Socket.io
   setupWatchTogether(server);
+
+  // Initialize Social Socket.io (friends, DMs, online status)
+  initSocialSocket(server);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;

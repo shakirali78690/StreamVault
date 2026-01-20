@@ -27,7 +27,9 @@ import {
     Maximize2,
     Maximize,
     Minimize,
-    Share2
+    Share2,
+    BarChart2,
+    UserPlus
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -38,9 +40,14 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useWatchTogether, WatchTogetherProvider } from '@/contexts/watch-together-context';
+import { useAuth } from '@/contexts/auth-context';
 import { useVoiceChat } from '@/hooks/use-voice-chat';
 import EmojiPicker, { Theme } from 'emoji-picker-react';
 import { VideoPlayer, VideoPlayerRef } from '@/components/video-player';
+import { RoomPolls } from '@/components/room-polls';
+import { useFriends } from '@/contexts/friends-context';
+import { useToast } from '@/hooks/use-toast';
+import { useSocialSocket } from '@/hooks/use-social-socket';
 import type { Show, Movie, Episode } from '@shared/schema';
 
 // Emoji reactions
@@ -124,6 +131,9 @@ function WatchTogetherContent() {
     const [, setLocation] = useLocation();
     const roomCode = params?.roomCode;
 
+    // Auth check - require login to join watch parties
+    const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+
     // Get password from URL if provided (for private room joins)
     const searchParams = new URLSearchParams(window.location.search);
     const urlPassword = searchParams.get('password');
@@ -152,7 +162,11 @@ function WatchTogetherContent() {
         videoSubtitle,
         hostMuteUser,
         changeContent,
-        clearError
+        clearError,
+        polls,
+        createPoll,
+        votePoll,
+        closePoll
     } = useWatchTogether();
 
     // Video player ref for sync control
@@ -192,6 +206,7 @@ function WatchTogetherContent() {
     const [chatMessage, setChatMessage] = useState('');
     const [copied, setCopied] = useState(false);
     const [showChat, setShowChat] = useState(true);
+    const [showPolls, setShowPolls] = useState(false);
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
     const [showGifPicker, setShowGifPicker] = useState(false);
     const [gifSearch, setGifSearch] = useState('');
@@ -204,6 +219,12 @@ function WatchTogetherContent() {
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [isOverlayChatMinimized, setIsOverlayChatMinimized] = useState(false);
     const [chatPosition, setChatPosition] = useState({ x: 16, y: 16 }); // top-right position in pixels from top-right
+    const [pendingFriendRequests, setPendingFriendRequests] = useState<Set<string>>(new Set());
+
+    // Friends system hooks
+    const { sendFriendRequest, friends } = useFriends();
+    const { toast } = useToast();
+    const { startActivity, stopActivity } = useSocialSocket();
     const [isDragging, setIsDragging] = useState(false);
     const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
     const hasDraggedRef = useRef(false); // Track if actual drag motion happened
@@ -261,6 +282,28 @@ function WatchTogetherContent() {
             document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
         };
     }, []);
+
+    // Broadcast watch activity to friends
+    useEffect(() => {
+        if (roomInfo && isAuthenticated && roomCode) {
+            // Start activity when room is joined
+            startActivity({
+                roomCode: roomInfo.roomCode,
+                contentType: roomInfo.contentType,
+                contentId: roomInfo.contentId,
+                contentTitle: roomInfo.contentTitle || 'Unknown',
+                contentPoster: roomInfo.contentPoster || undefined,
+                episodeTitle: roomInfo.episodeTitle || undefined,
+            });
+        }
+
+        // Stop activity when component unmounts or room changes
+        return () => {
+            if (isAuthenticated) {
+                stopActivity();
+            }
+        };
+    }, [roomInfo?.roomCode, isAuthenticated, startActivity, stopActivity]);
 
     // Countdown timer for scheduled rooms
     useEffect(() => {
@@ -542,14 +585,22 @@ function WatchTogetherContent() {
 
             // Create the room with public/private settings
             setUsername(storedUsername);
-            createRoom(contentType, contentId, storedUsername, episodeId || undefined, {
-                contentTitle: contentTitle || 'Untitled',
-                contentPoster: contentPoster || undefined,
-                isPublic: isPublicStr !== 'false',
-                password: storedPassword || undefined,
-                description: storedDescription || undefined,
-                scheduledFor: storedScheduledFor || undefined,
-            });
+            createRoom(
+                contentType,
+                contentId,
+                storedUsername,
+                user?.avatarUrl,
+                episodeId || undefined,
+                user?.id, // authUserId
+                {
+                    contentTitle: contentTitle || 'Untitled',
+                    contentPoster: contentPoster || undefined,
+                    isPublic: isPublicStr !== 'false',
+                    password: storedPassword || undefined,
+                    description: storedDescription || undefined,
+                    scheduledFor: storedScheduledFor || undefined,
+                }
+            );
             setShowJoinModal(false);
         }
         // If joining an existing room with stored username
@@ -588,20 +639,25 @@ function WatchTogetherContent() {
         // Skip auto-rejoin if we're creating a new room
         if (!isConnected || currentUser || !roomCode || roomCode === 'NEW') return;
 
-        const savedUsername = localStorage.getItem('watch-together-username');
-        const savedRoom = localStorage.getItem('watch-together-room');
+        // Require authentication to join watch parties
+        if (!authLoading && !isAuthenticated) {
+            // Redirect to login with return URL
+            const returnUrl = encodeURIComponent(window.location.pathname + window.location.search);
+            setLocation(`/login?redirect=${returnUrl}`);
+            return;
+        }
 
-        // If we have saved credentials for this room, auto-rejoin
-        if (savedUsername && savedRoom && savedRoom === roomCode) {
-            console.log('🔄 Auto-rejoining with saved credentials:', savedUsername);
-            setUsername(savedUsername);
+        // Use authenticated user's username if available
+        if (isAuthenticated && user?.username) {
+            console.log('🔐 Auto-joining with authenticated user:', user.username);
+            setUsername(user.username);
             // Small delay to ensure socket is ready
             setTimeout(() => {
-                joinRoom(roomCode, savedUsername);
+                joinRoom(roomCode, user.username, user.avatarUrl);
                 setShowJoinModal(false);
             }, 500);
         }
-    }, [isConnected, currentUser, roomCode, joinRoom]);
+    }, [isConnected, currentUser, roomCode, joinRoom, isAuthenticated, authLoading, user, setLocation]);
 
     // Video sync effect - listen for sync events from host and apply to player
     useEffect(() => {
@@ -670,8 +726,8 @@ function WatchTogetherContent() {
             localStorage.setItem('watch-together-username', username.trim());
             localStorage.setItem('watch-together-room', roomCode);
 
-            // Pass URL password for private rooms
-            joinRoom(roomCode, username.trim(), urlPassword || undefined);
+            // Pass URL password for private rooms, and auth user ID for friend requests
+            joinRoom(roomCode, username.trim(), user?.avatarUrl, urlPassword || undefined, user?.id?.toString());
             setShowJoinModal(false);
         }
     };
@@ -692,6 +748,51 @@ function WatchTogetherContent() {
             setCopied(true);
             setTimeout(() => setCopied(false), 2000);
         }
+    };
+
+    // Add friend from watch room
+    const handleAddFriend = async (userId: string, username: string) => {
+        if (!isAuthenticated) {
+            toast({
+                title: 'Login Required',
+                description: 'Please login to add friends',
+                variant: 'destructive',
+            });
+            return;
+        }
+
+        // Check if already friends
+        const isAlreadyFriend = friends.some(f => f.friendId === userId);
+        if (isAlreadyFriend) {
+            toast({
+                title: 'Already Friends',
+                description: `You are already friends with ${username}`,
+            });
+            return;
+        }
+
+        setPendingFriendRequests(prev => new Set(Array.from(prev).concat(userId)));
+
+        const result = await sendFriendRequest(userId);
+
+        if (result.success) {
+            toast({
+                title: 'Friend Request Sent! 🎉',
+                description: `Request sent to ${username}`,
+            });
+        } else {
+            toast({
+                title: 'Request Failed',
+                description: result.error || 'Could not send friend request',
+                variant: 'destructive',
+            });
+        }
+
+        setPendingFriendRequests(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(userId);
+            return newSet;
+        });
     };
 
     // Share room link via WhatsApp
@@ -1099,11 +1200,96 @@ function WatchTogetherContent() {
                                 </DropdownMenuContent>
                             </DropdownMenu>
 
-                            {/* Users Count */}
-                            <Button variant="ghost" size="sm">
-                                <Users className="h-4 w-4 mr-2" />
-                                {users.length}
-                            </Button>
+                            {/* Users Count - Dropdown */}
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="sm">
+                                        <Users className="h-4 w-4 mr-2" />
+                                        {users.length}
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-64">
+                                    <div className="p-2 border-b border-border">
+                                        <span className="text-sm font-semibold">Viewers ({users.length})</span>
+                                    </div>
+                                    <div className="max-h-64 overflow-y-auto">
+                                        {users.map((roomUser) => {
+                                            const isRoomUserSpeaking = roomUser.id === currentUser?.id
+                                                ? (isSpeaking && !isMuted)
+                                                : speakingUsers.has(roomUser.id);
+
+                                            return (
+                                                <div
+                                                    key={roomUser.id}
+                                                    className={`flex items-center justify-between p-2 hover:bg-accent/50 ${isRoomUserSpeaking ? 'bg-green-500/10' : ''
+                                                        }`}
+                                                >
+                                                    <div className="flex items-center gap-2">
+                                                        {/* Avatar */}
+                                                        {/* Avatar */}
+                                                        <div className={`w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium overflow-hidden ${isRoomUserSpeaking ? 'ring-2 ring-green-400' : ''
+                                                            }`}>
+                                                            {roomUser.avatarUrl ? (
+                                                                <img src={roomUser.avatarUrl} alt={roomUser.username} className="w-full h-full object-cover" />
+                                                            ) : (
+                                                                roomUser.username.slice(0, 2).toUpperCase()
+                                                            )}
+                                                        </div>
+                                                        <div className="flex flex-col">
+                                                            <div className="flex items-center gap-1">
+                                                                {roomUser.isHost && <Crown className="h-3 w-3 text-yellow-500" />}
+                                                                <span className="text-sm font-medium">{roomUser.username}</span>
+                                                            </div>
+                                                            {isRoomUserSpeaking && (
+                                                                <span className="text-xs text-green-500">Speaking...</span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-1">
+                                                        {/* Mute button - only for host to mute others */}
+                                                        {isHost && roomUser.id !== currentUser?.id && (
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                onClick={() => hostMuteUser(roomUser.id, !roomUser.isMuted)}
+                                                                className="h-7 w-7 p-0"
+                                                                title={roomUser.isMuted ? 'Unmute user' : 'Mute user'}
+                                                            >
+                                                                {roomUser.isMuted ? <MicOff className="h-3 w-3 text-destructive" /> : <Mic className="h-3 w-3" />}
+                                                            </Button>
+                                                        )}
+                                                        {/* Add friend button - only for authenticated users with authUserId */}
+                                                        {isAuthenticated && roomUser.authUserId && roomUser.authUserId !== user?.id?.toString() && (
+                                                            (() => {
+                                                                const isAlreadyFriend = friends.some(f => f.friendId === roomUser.authUserId);
+                                                                const isPending = pendingFriendRequests.has(roomUser.authUserId!);
+                                                                return (
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="sm"
+                                                                        className={`h-7 w-7 p-0 ${isAlreadyFriend ? 'text-green-500' : ''}`}
+                                                                        title={isAlreadyFriend ? `Already friends with ${roomUser.username}` : `Add ${roomUser.username} as friend`}
+                                                                        disabled={isAlreadyFriend || isPending}
+                                                                        onClick={() => handleAddFriend(roomUser.authUserId!, roomUser.username)}
+                                                                    >
+                                                                        {isPending ? (
+                                                                            <span className="h-3 w-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                                                                        ) : isAlreadyFriend ? (
+                                                                            <Check className="h-3 w-3" />
+                                                                        ) : (
+                                                                            <UserPlus className="h-3 w-3" />
+                                                                        )}
+                                                                    </Button>
+                                                                );
+                                                            })()
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
 
                             {/* Voice Chat Toggle */}
                             <Button
@@ -1389,273 +1575,285 @@ function WatchTogetherContent() {
                             </div>
                         ) : (
                             <>
-                                {/* Users List */}
-                                <div className={`p-4 border-b ${isFullscreen ? 'border-white/10' : 'border-border'}`}>
-                                    <h3 className="font-semibold mb-2 flex items-center gap-2">
-                                        <Users className="h-4 w-4" />
-                                        Viewers ({users.length})
-                                    </h3>
-                                    <div className="flex flex-wrap gap-2">
-                                        {users.map((user) => {
-                                            // Check if user is speaking: for current user use local state, for others use context
-                                            const isUserSpeaking = user.id === currentUser?.id
-                                                ? (isSpeaking && !isMuted)
-                                                : speakingUsers.has(user.id);
+                                {/* Tab Navigation - Chat/Polls */}
+                                <div className={`flex items-center border-b ${isFullscreen ? 'border-white/10' : 'border-border'}`}>
+                                    <button
+                                        onClick={() => setShowPolls(false)}
+                                        className={`flex-1 flex items-center justify-center gap-2 p-3 text-sm font-medium transition-colors ${!showPolls
+                                            ? 'text-primary border-b-2 border-primary'
+                                            : 'text-muted-foreground hover:text-foreground'
+                                            }`}
+                                    >
+                                        <MessageCircle className="h-4 w-4" />
+                                        Chat
+                                    </button>
+                                    <button
+                                        onClick={() => setShowPolls(true)}
+                                        className={`flex-1 flex items-center justify-center gap-2 p-3 text-sm font-medium transition-colors ${showPolls
+                                            ? 'text-primary border-b-2 border-primary'
+                                            : 'text-muted-foreground hover:text-foreground'
+                                            }`}
+                                    >
+                                        <BarChart2 className="h-4 w-4" />
+                                        Polls
+                                        {polls.filter(p => p.isActive).length > 0 && (
+                                            <span className="bg-primary/20 text-primary text-xs px-1.5 py-0.5 rounded-full">
+                                                {polls.filter(p => p.isActive).length}
+                                            </span>
+                                        )}
+                                    </button>
+                                </div>
 
-                                            return (
+                                {/* Polls Panel */}
+                                {showPolls ? (
+                                    <div className="flex-1 overflow-hidden">
+                                        <RoomPolls
+                                            polls={polls}
+                                            isHost={isHost}
+                                            onCreatePoll={createPoll}
+                                            onVote={votePoll}
+                                            onClosePoll={closePoll}
+                                        />
+                                    </div>
+                                ) : (
+                                    <>
+                                        {/* Messages */}
+                                        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                                            {messages.map((msg) => (
                                                 <div
-                                                    key={user.id}
-                                                    className={`flex items-center gap-1 px-2 py-1 rounded-full text-sm transition-all ${isUserSpeaking
-                                                        ? 'bg-green-500/20 ring-2 ring-green-400 animate-pulse'
-                                                        : 'bg-accent'
-                                                        }`}
+                                                    key={msg.id}
+                                                    className={`${msg.username === 'System' ? 'text-center text-muted-foreground text-sm italic' : 'flex gap-3'}`}
                                                 >
-                                                    {user.isHost && <Crown className="h-3 w-3 text-yellow-500" />}
-                                                    {isUserSpeaking && (
-                                                        <span className="w-2 h-2 bg-green-400 rounded-full animate-ping" />
+                                                    {msg.username !== 'System' && (
+                                                        <>
+                                                            {/* Avatar */}
+                                                            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium overflow-hidden shrink-0">
+                                                                {msg.avatarUrl ? (
+                                                                    <img src={msg.avatarUrl} alt={msg.username} className="w-full h-full object-cover" />
+                                                                ) : (
+                                                                    msg.username.slice(0, 2).toUpperCase()
+                                                                )}
+                                                            </div>
+                                                            <div className="flex-1 min-w-0">
+                                                                <p className="text-sm">
+                                                                    <span className="font-semibold text-primary">{msg.username}</span>
+                                                                    <span className="text-muted-foreground ml-2 text-xs">
+                                                                        {new Date(msg.timestamp).toLocaleTimeString()}
+                                                                    </span>
+                                                                </p>
+                                                                <p className="mt-0.5 break-words">{formatMessageWithMedia(msg.message)}</p>
+                                                            </div>
+                                                        </>
                                                     )}
-                                                    {user.username}
-                                                    {user.isMuted && <MicOff className="h-3 w-3 text-red-500" />}
-                                                    {/* Host can mute other users */}
-                                                    {isHost && user.id !== currentUser?.id && !user.isHost && (
-                                                        <button
-                                                            onClick={() => hostMuteUser(user.id, !user.isMuted)}
-                                                            className="ml-1 p-0.5 rounded hover:bg-muted transition-colors"
-                                                            title={user.isMuted ? 'Unmute user' : 'Mute user'}
-                                                        >
-                                                            {user.isMuted ? (
-                                                                <Mic className="h-3 w-3 text-muted-foreground" />
-                                                            ) : (
-                                                                <MicOff className="h-3 w-3 text-muted-foreground hover:text-red-500" />
-                                                            )}
-                                                        </button>
+                                                    {msg.username === 'System' && (
+                                                        <p>{formatMessageWithMedia(msg.message)}</p>
                                                     )}
                                                 </div>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-
-                                {/* Messages */}
-                                <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                                    {messages.map((msg) => (
-                                        <div
-                                            key={msg.id}
-                                            className={`${msg.username === 'System' ? 'text-center text-muted-foreground text-sm italic' : ''}`}
-                                        >
-                                            {msg.username !== 'System' && (
-                                                <p className="text-sm">
-                                                    <span className="font-semibold text-primary">{msg.username}</span>
-                                                    <span className="text-muted-foreground ml-2 text-xs">
-                                                        {new Date(msg.timestamp).toLocaleTimeString()}
-                                                    </span>
-                                                </p>
-                                            )}
-                                            <p className={msg.username === 'System' ? '' : 'mt-0.5'}>{formatMessageWithMedia(msg.message)}</p>
+                                            ))}
+                                            <div ref={chatEndRef} />
                                         </div>
-                                    ))}
-                                    <div ref={chatEndRef} />
-                                </div>
 
-                                {/* Chat Input */}
-                                <form onSubmit={handleSendMessage} className="p-4 border-t border-border">
-                                    {/* Hidden file input */}
-                                    <input
-                                        type="file"
-                                        ref={fileInputRef}
-                                        onChange={handleFileSelect}
-                                        accept="image/*,video/*,audio/*"
-                                        className="hidden"
-                                    />
-
-                                    {/* GIF Preview */}
-                                    {selectedGif && (
-                                        <div className="mb-3 relative inline-block">
-                                            <button
-                                                type="button"
-                                                onClick={() => setSelectedGif(null)}
-                                                className="absolute -top-2 -right-2 w-6 h-6 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center hover:bg-destructive/80 z-10"
-                                            >
-                                                <X className="w-4 h-4" />
-                                            </button>
-                                            <img
-                                                src={selectedGif}
-                                                alt="GIF Preview"
-                                                className="max-w-[200px] max-h-[150px] rounded-lg"
+                                        {/* Chat Input */}
+                                        <form onSubmit={handleSendMessage} className="p-4 border-t border-border">
+                                            {/* Hidden file input */}
+                                            <input
+                                                type="file"
+                                                ref={fileInputRef}
+                                                onChange={handleFileSelect}
+                                                accept="image/*,video/*,audio/*"
+                                                className="hidden"
                                             />
-                                        </div>
-                                    )}
 
-                                    {/* Attachment Preview */}
-                                    {attachment && (
-                                        <div className="mb-3 relative inline-block">
-                                            <button
-                                                type="button"
-                                                onClick={removeAttachment}
-                                                className="absolute -top-2 -right-2 w-6 h-6 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center hover:bg-destructive/80 z-10"
-                                            >
-                                                <X className="w-4 h-4" />
-                                            </button>
-                                            {attachment.type === 'image' && (
-                                                <img
-                                                    src={attachment.preview}
-                                                    alt="Preview"
-                                                    className="max-w-[200px] max-h-[150px] rounded-lg object-cover"
-                                                />
-                                            )}
-                                            {attachment.type === 'video' && (
-                                                <video
-                                                    src={attachment.preview}
-                                                    className="max-w-[200px] max-h-[150px] rounded-lg"
-                                                    controls
-                                                />
-                                            )}
-                                            {attachment.type === 'audio' && (
-                                                <div className="flex items-center gap-2 bg-muted p-3 rounded-lg">
-                                                    <Music className="w-8 h-8 text-primary" />
-                                                    <audio src={attachment.preview} controls className="h-8" />
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-
-                                    {/* Reaction Emojis - above input, no visible container */}
-                                    <div className="flex items-center justify-center gap-1 py-1">
-                                        {REACTION_EMOJIS.map((emoji) => (
-                                            <button
-                                                key={emoji}
-                                                type="button"
-                                                onClick={() => sendReaction(emoji)}
-                                                className="text-lg hover:scale-125 transition-transform p-1 rounded hover:bg-accent/50"
-                                                title={`React with ${emoji}`}
-                                            >
-                                                {emoji}
-                                            </button>
-                                        ))}
-                                    </div>
-
-                                    <div className="flex gap-1 items-center">
-                                        {/* Emoji Button */}
-                                        <div className="relative">
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                                                className={`h-8 w-8 p-0 ${showEmojiPicker ? 'bg-muted' : ''}`}
-                                            >
-                                                <Smile className="h-4 w-4" />
-                                            </Button>
-                                            {showEmojiPicker && (
-                                                <div className="absolute bottom-12 left-0 z-50">
-                                                    <EmojiPicker
-                                                        onEmojiClick={(emojiData) => {
-                                                            setChatMessage(prev => prev + emojiData.emoji);
-                                                            setShowEmojiPicker(false);
-                                                        }}
-                                                        theme={Theme.DARK}
-                                                        width={300}
-                                                        height={350}
-                                                        searchPlaceHolder="Search emoji..."
-                                                        skinTonesDisabled
-                                                        previewConfig={{ showPreview: false }}
+                                            {/* GIF Preview */}
+                                            {selectedGif && (
+                                                <div className="mb-3 relative inline-block">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setSelectedGif(null)}
+                                                        className="absolute -top-2 -right-2 w-6 h-6 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center hover:bg-destructive/80 z-10"
+                                                    >
+                                                        <X className="w-4 h-4" />
+                                                    </button>
+                                                    <img
+                                                        src={selectedGif}
+                                                        alt="GIF Preview"
+                                                        className="max-w-[200px] max-h-[150px] rounded-lg"
                                                     />
                                                 </div>
                                             )}
-                                        </div>
 
-                                        {/* GIF Button */}
-                                        <div className="relative">
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() => setShowGifPicker(!showGifPicker)}
-                                                className={`h-8 w-8 p-0 ${showGifPicker ? 'bg-muted' : ''}`}
-                                            >
-                                                <span className="text-[10px] font-bold">GIF</span>
-                                            </Button>
-                                            {showGifPicker && (
-                                                <div className="absolute bottom-12 right-0 z-50 w-[280px] max-w-[calc(100vw-2rem)] bg-card border border-border rounded-lg shadow-xl">
-                                                    <div className="p-2 border-b border-border">
-                                                        <div className="relative">
-                                                            <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                                                            <Input
-                                                                type="text"
-                                                                placeholder="Search GIFs..."
-                                                                value={gifSearch}
-                                                                onChange={(e) => {
-                                                                    setGifSearch(e.target.value);
-                                                                    searchGifs(e.target.value);
-                                                                }}
-                                                                className="pl-8 h-8 text-sm"
-                                                            />
+                                            {/* Attachment Preview */}
+                                            {attachment && (
+                                                <div className="mb-3 relative inline-block">
+                                                    <button
+                                                        type="button"
+                                                        onClick={removeAttachment}
+                                                        className="absolute -top-2 -right-2 w-6 h-6 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center hover:bg-destructive/80 z-10"
+                                                    >
+                                                        <X className="w-4 h-4" />
+                                                    </button>
+                                                    {attachment.type === 'image' && (
+                                                        <img
+                                                            src={attachment.preview}
+                                                            alt="Preview"
+                                                            className="max-w-[200px] max-h-[150px] rounded-lg object-cover"
+                                                        />
+                                                    )}
+                                                    {attachment.type === 'video' && (
+                                                        <video
+                                                            src={attachment.preview}
+                                                            className="max-w-[200px] max-h-[150px] rounded-lg"
+                                                            controls
+                                                        />
+                                                    )}
+                                                    {attachment.type === 'audio' && (
+                                                        <div className="flex items-center gap-2 bg-muted p-3 rounded-lg">
+                                                            <Music className="w-8 h-8 text-primary" />
+                                                            <audio src={attachment.preview} controls className="h-8" />
                                                         </div>
-                                                    </div>
-                                                    <div className="h-[250px] overflow-y-auto p-2">
-                                                        {isLoadingGifs ? (
-                                                            <div className="flex items-center justify-center h-full text-muted-foreground text-sm">Loading...</div>
-                                                        ) : gifs.length > 0 ? (
-                                                            <div className="grid grid-cols-2 gap-1">
-                                                                {gifs.map((gif: any) => (
-                                                                    <button
-                                                                        key={gif.id}
-                                                                        type="button"
-                                                                        onClick={() => {
-                                                                            const gifUrl = gif.media_formats?.gif?.url || gif.media_formats?.tinygif?.url;
-                                                                            if (gifUrl) {
-                                                                                setSelectedGif(gifUrl);
-                                                                            }
-                                                                            setShowGifPicker(false);
-                                                                            setGifSearch('');
-                                                                        }}
-                                                                        className="aspect-video rounded overflow-hidden hover:ring-2 ring-primary"
-                                                                    >
-                                                                        <img
-                                                                            src={gif.media_formats?.tinygif?.url || gif.media_formats?.nanogif?.url}
-                                                                            alt={gif.content_description}
-                                                                            className="w-full h-full object-cover"
-                                                                            loading="lazy"
-                                                                        />
-                                                                    </button>
-                                                                ))}
-                                                            </div>
-                                                        ) : (
-                                                            <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
-                                                                {gifSearch ? 'No GIFs found' : 'Search for GIFs'}
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                    <div className="p-1 border-t border-border text-center">
-                                                        <span className="text-xs text-muted-foreground">Powered by Tenor</span>
-                                                    </div>
+                                                    )}
                                                 </div>
                                             )}
-                                        </div>
 
-                                        {/* Attachment Button */}
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => fileInputRef.current?.click()}
-                                            title="Attach image, video, or audio"
-                                            className="h-8 w-8 p-0"
-                                        >
-                                            <Paperclip className="h-4 w-4" />
-                                        </Button>
+                                            {/* Reaction Emojis - above input, no visible container */}
+                                            <div className="flex items-center justify-center gap-1 py-1">
+                                                {REACTION_EMOJIS.map((emoji) => (
+                                                    <button
+                                                        key={emoji}
+                                                        type="button"
+                                                        onClick={() => sendReaction(emoji)}
+                                                        className="text-lg hover:scale-125 transition-transform p-1 rounded hover:bg-accent/50"
+                                                        title={`React with ${emoji}`}
+                                                    >
+                                                        {emoji}
+                                                    </button>
+                                                ))}
+                                            </div>
 
-                                        <Input
-                                            value={chatMessage}
-                                            onChange={(e) => setChatMessage(e.target.value)}
-                                            placeholder="Type a message..."
-                                            className="flex-1 h-8"
-                                        />
-                                        <Button type="submit" size="sm" disabled={!chatMessage.trim() && !attachment && !selectedGif} className="h-8 w-8 p-0">
-                                            <Send className="h-4 w-4" />
-                                        </Button>
-                                    </div>
-                                </form>
+                                            <div className="flex gap-1 items-center">
+                                                {/* Emoji Button */}
+                                                <div className="relative">
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                                                        className={`h-8 w-8 p-0 ${showEmojiPicker ? 'bg-muted' : ''}`}
+                                                    >
+                                                        <Smile className="h-4 w-4" />
+                                                    </Button>
+                                                    {showEmojiPicker && (
+                                                        <div className="absolute bottom-12 left-0 z-50">
+                                                            <EmojiPicker
+                                                                onEmojiClick={(emojiData) => {
+                                                                    setChatMessage(prev => prev + emojiData.emoji);
+                                                                    setShowEmojiPicker(false);
+                                                                }}
+                                                                theme={Theme.DARK}
+                                                                width={300}
+                                                                height={350}
+                                                                searchPlaceHolder="Search emoji..."
+                                                                skinTonesDisabled
+                                                                previewConfig={{ showPreview: false }}
+                                                            />
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* GIF Button */}
+                                                <div className="relative">
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() => setShowGifPicker(!showGifPicker)}
+                                                        className={`h-8 w-8 p-0 ${showGifPicker ? 'bg-muted' : ''}`}
+                                                    >
+                                                        <span className="text-[10px] font-bold">GIF</span>
+                                                    </Button>
+                                                    {showGifPicker && (
+                                                        <div className="absolute bottom-12 right-0 z-50 w-[280px] max-w-[calc(100vw-2rem)] bg-card border border-border rounded-lg shadow-xl">
+                                                            <div className="p-2 border-b border-border">
+                                                                <div className="relative">
+                                                                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                                                                    <Input
+                                                                        type="text"
+                                                                        placeholder="Search GIFs..."
+                                                                        value={gifSearch}
+                                                                        onChange={(e) => {
+                                                                            setGifSearch(e.target.value);
+                                                                            searchGifs(e.target.value);
+                                                                        }}
+                                                                        className="pl-8 h-8 text-sm"
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                            <div className="h-[250px] overflow-y-auto p-2">
+                                                                {isLoadingGifs ? (
+                                                                    <div className="flex items-center justify-center h-full text-muted-foreground text-sm">Loading...</div>
+                                                                ) : gifs.length > 0 ? (
+                                                                    <div className="grid grid-cols-2 gap-1">
+                                                                        {gifs.map((gif: any) => (
+                                                                            <button
+                                                                                key={gif.id}
+                                                                                type="button"
+                                                                                onClick={() => {
+                                                                                    const gifUrl = gif.media_formats?.gif?.url || gif.media_formats?.tinygif?.url;
+                                                                                    if (gifUrl) {
+                                                                                        setSelectedGif(gifUrl);
+                                                                                    }
+                                                                                    setShowGifPicker(false);
+                                                                                    setGifSearch('');
+                                                                                }}
+                                                                                className="aspect-video rounded overflow-hidden hover:ring-2 ring-primary"
+                                                                            >
+                                                                                <img
+                                                                                    src={gif.media_formats?.tinygif?.url || gif.media_formats?.nanogif?.url}
+                                                                                    alt={gif.content_description}
+                                                                                    className="w-full h-full object-cover"
+                                                                                    loading="lazy"
+                                                                                />
+                                                                            </button>
+                                                                        ))}
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+                                                                        {gifSearch ? 'No GIFs found' : 'Search for GIFs'}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                            <div className="p-1 border-t border-border text-center">
+                                                                <span className="text-xs text-muted-foreground">Powered by Tenor</span>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* Attachment Button */}
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() => fileInputRef.current?.click()}
+                                                    title="Attach image, video, or audio"
+                                                    className="h-8 w-8 p-0"
+                                                >
+                                                    <Paperclip className="h-4 w-4" />
+                                                </Button>
+
+                                                <Input
+                                                    value={chatMessage}
+                                                    onChange={(e) => setChatMessage(e.target.value)}
+                                                    placeholder="Type a message..."
+                                                    className="flex-1 h-8"
+                                                />
+                                                <Button type="submit" size="sm" disabled={!chatMessage.trim() && !attachment && !selectedGif} className="h-8 w-8 p-0">
+                                                    <Send className="h-4 w-4" />
+                                                </Button>
+                                            </div>
+                                        </form>
+                                    </>
+                                )}
                             </>
                         )}
                     </div>

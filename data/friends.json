@@ -1,0 +1,326 @@
+{
+  "friends": [
+    {
+      "id": "b00be8bf-fcf1-4f5a-9fe0-2fbcdb7d318f",
+      "userId": "b59fe60c-35c8-4689-b83a-feda335caa19",
+      "friendId": "c480dcef-3488-4083-b326-00920fdbc1e1",
+      "createdAt": "2026-01-20T17:01:14.721Z"
+    }
+  ],
+  "friendRequests": [
+    {
+      "id": "73f68eb5-116e-4240-b78f-97e82b529e94",
+      "fromUserId": "b59fe60c-35c8-4689-b83a-feda335caa19",
+      "toUserId": "c480dcef-3488-4083-b326-00920fdbc1e1",
+      "status": "accepted",
+      "createdAt": "2026-01-20T17:00:43.783Z",
+      "respondedAt": "2026-01-20T17:01:14.719Z"
+    }
+  ],
+  "notifications": [
+    {
+      "userId": "c480dcef-3488-4083-b326-00920fdbc1e1",
+      "type": "friend_request",
+      "title": "Friend Request",
+      "message": "elton galeech sent you a friend request",
+      "data": {
+        "requestId": "73f68eb5-116e-4240-b78f-97e82b529e94",
+        "fromUserId": "b59fe60c-35c8-4689-b83a-feda335caa19"
+      },
+      "read": true,
+      "id": "0f737744-bac7-4e95-98a1-7214c4270d8a",
+      "createdAt": "2026-01-20T17:00:43.785Z"
+    },
+    {
+      "userId": "b59fe60c-35c8-4689-b83a-feda335caa19",
+      "type": "friend_accepted",
+      "title": "Friend Request Accepted",
+      "message": "admin accepted your friend request",
+      "data": {
+        "friendId": "c480dcef-3488-4083-b326-00920fdbc1e1"
+      },
+      "read": true,
+      "id": "3c39b25b-887a-426b-a6ec-9667b2726163",
+      "createdAt": "2026-01-20T17:01:14.722Z"
+    },
+    {
+      "userId": "b59fe60c-35c8-4689-b83a-feda335caa19",
+      "type": "dm",
+      "title": "New Message",
+      "message": "admin: hiii",
+      "data": {
+        "fromUserId": "c480dcef-3488-4083-b326-00920fdbc1e1"
+      },
+      "read": true,
+      "id": "f03ce28f-7f00-48ac-ba95-e1558b6820e7",
+      "createdAt": "2026-01-20T17:01:30.204Z"
+    },
+    {
+      "userId": "c480dcef-3488-4083-b326-00920fdbc1e1",
+      "type": "dm",
+      "title": "New Message",
+      "message": "elton galeech: wsp",
+      "data": {
+        "fromUserId": "b59fe60c-35c8-4689-b83a-feda335caa19"
+      },
+      "read": true,
+      "id": "79c85a1c-bf4c-4ac9-afdc-84be286f8b11",
+      "createdAt": "2026-01-20T17:02:26.468Z"
+    },
+    {
+      "userId": "c480dcef-3488-4083-b326-00920fdbc1e1",
+      "type": "dm",
+      "title": "New Message",
+      "message": "elton galeech: 🤒",
+      "data": {
+        "fromUserId": "b59fe60c-35c8-4689-b83a-feda335caa19"
+      },
+      "read": true,
+      "id": "9782694d-61f2-4783-a7e0-8e0257f1a4ae",
+      "createdAt": "2026-01-20T17:25:41.802Z"
+    },
+    {
+      "userId": "b59fe60c-35c8-4689-b83a-feda335caa19",
+      "type": "dm",
+      "title": "New Message",
+      "message": "admin sent a GIF",
+      "data": {
+        "fromUserId": "c480dcef-3488-4083-b326-00920fdbc1e1"
+      },
+      "read": true,
+      "id": "65ee6b16-4010-4ab5-acae-470ab5cc9d21",
+      "createdAt": "2026-01-20T17:28:17.541Z"
+    },
+    {
+      "userId": "b59fe60c-35c8-4689-b83a-feda335caa19",
+      "type": "dm",
+      "title": "New Attachment",
+      "message": "admin sent an image",
+      "data": {
+        "fromUserId": "c480dcef-3488-4083-b326-00920fdbc1e1"
+      },
+      "read": true,
+      "id": "0cf38246-cf34-4be3-b473-b08517a8b6cc",
+      "createdAt": "2026-01-20T17:28:25.291Z"
+    },
+    {
+      "userId": "b59fe60c-35c8-4689-b83a-feda335caa19",
+      "type": "content_update",
+      "title": "🆕 New Content Added!",
+      "message": "Landman is now available on StreamVault!",
+      "data": {
+        "type": "new_content",
+        "contentType": "show",
+        "contentId": "c23e616b-af89-4fa9-81e3-9dc1297ab4f3",
+        "contentTitle": "Landman",
+        "contentPoster": "https://image.tmdb.org/t/p/w500/hYthRgS1nvQkGILn9YmqsF8kSk6.jpg"
+      },
+      "read": true,
+      "id": "e018d7d4-66d0-4b13-a6e0-9b97da091a8c",
+      "createdAt": "2026-01-20T17:52:10.677Z"
+    },
+    {
+      "userId": "c480dcef-3488-4083-b326-00920fdbc1e1",
+      "type": "content_update",
+      "title": "🆕 New Content Added!",
+      "message": "Landman is now available on StreamVault!",
+      "data": {
+        "type": "new_content",
+        "contentType": "show",
+        "contentId": "c23e616b-af89-4fa9-81e3-9dc1297ab4f3",
+        "contentTitle": "Landman",
+        "contentPoster": "https://image.tmdb.org/t/p/w500/hYthRgS1nvQkGILn9YmqsF8kSk6.jpg"
+      },
+      "read": true,
+      "id": "4e10d9b5-fb5f-48ff-a921-13a8c9f36116",
+      "createdAt": "2026-01-20T17:52:10.678Z"
+    },
+    {
+      "userId": "b59fe60c-35c8-4689-b83a-feda335caa19",
+      "type": "content_update",
+      "title": "📺 New Episode Available!",
+      "message": "A new episode of Landman is now streaming!",
+      "data": {
+        "type": "new_episode",
+        "contentType": "show",
+        "contentId": "c23e616b-af89-4fa9-81e3-9dc1297ab4f3",
+        "contentTitle": "Landman",
+        "contentPoster": "https://image.tmdb.org/t/p/w500/hYthRgS1nvQkGILn9YmqsF8kSk6.jpg"
+      },
+      "read": true,
+      "id": "1605ceec-5eb2-4645-89ff-0d96ab809b3d",
+      "createdAt": "2026-01-20T17:53:25.795Z"
+    },
+    {
+      "userId": "c480dcef-3488-4083-b326-00920fdbc1e1",
+      "type": "content_update",
+      "title": "📺 New Episode Available!",
+      "message": "A new episode of Landman is now streaming!",
+      "data": {
+        "type": "new_episode",
+        "contentType": "show",
+        "contentId": "c23e616b-af89-4fa9-81e3-9dc1297ab4f3",
+        "contentTitle": "Landman",
+        "contentPoster": "https://image.tmdb.org/t/p/w500/hYthRgS1nvQkGILn9YmqsF8kSk6.jpg"
+      },
+      "read": true,
+      "id": "ad9f5a9f-7aa3-4b84-bbac-c2cad1f8e931",
+      "createdAt": "2026-01-20T17:53:25.797Z"
+    },
+    {
+      "userId": "c480dcef-3488-4083-b326-00920fdbc1e1",
+      "type": "dm",
+      "title": "New Message",
+      "message": "elton galeech: ummm",
+      "data": {
+        "fromUserId": "b59fe60c-35c8-4689-b83a-feda335caa19"
+      },
+      "read": true,
+      "id": "bd3f8f25-1e3f-4af5-875a-817ecf378e3f",
+      "createdAt": "2026-01-20T18:11:28.283Z"
+    },
+    {
+      "userId": "b59fe60c-35c8-4689-b83a-feda335caa19",
+      "type": "dm",
+      "title": "New Message",
+      "message": "admin: what lol",
+      "data": {
+        "fromUserId": "c480dcef-3488-4083-b326-00920fdbc1e1"
+      },
+      "read": true,
+      "id": "68cee89d-8cda-4190-8476-b3030a016eb1",
+      "createdAt": "2026-01-20T18:11:38.020Z"
+    },
+    {
+      "userId": "b59fe60c-35c8-4689-b83a-feda335caa19",
+      "type": "dm",
+      "title": "New Message",
+      "message": "admin: lol",
+      "data": {
+        "fromUserId": "c480dcef-3488-4083-b326-00920fdbc1e1"
+      },
+      "read": true,
+      "id": "92f87630-47b8-46dc-828b-5a9c63924052",
+      "createdAt": "2026-01-20T19:45:24.295Z"
+    },
+    {
+      "userId": "c480dcef-3488-4083-b326-00920fdbc1e1",
+      "type": "dm",
+      "title": "New Message",
+      "message": "elton galeech: hmm",
+      "data": {
+        "fromUserId": "b59fe60c-35c8-4689-b83a-feda335caa19"
+      },
+      "read": true,
+      "id": "4865de73-325f-44c4-9c25-8da6369c0d16",
+      "createdAt": "2026-01-20T19:46:20.323Z"
+    },
+    {
+      "userId": "b59fe60c-35c8-4689-b83a-feda335caa19",
+      "type": "dm",
+      "title": "Voice Message",
+      "message": "admin sent a voice message",
+      "data": {
+        "fromUserId": "c480dcef-3488-4083-b326-00920fdbc1e1"
+      },
+      "read": true,
+      "id": "f665eac1-060c-421b-b188-201609fad10f",
+      "createdAt": "2026-01-20T19:46:37.223Z"
+    }
+  ],
+  "directMessages": [
+    {
+      "id": "e409b54f-7174-44a1-9d45-7f9be1898cbb",
+      "fromUserId": "c480dcef-3488-4083-b326-00920fdbc1e1",
+      "toUserId": "b59fe60c-35c8-4689-b83a-feda335caa19",
+      "message": "hiii",
+      "read": true,
+      "createdAt": "2026-01-20T17:01:30.203Z"
+    },
+    {
+      "id": "3e977f98-cf1a-4db2-b172-74190d946cc9",
+      "fromUserId": "b59fe60c-35c8-4689-b83a-feda335caa19",
+      "toUserId": "c480dcef-3488-4083-b326-00920fdbc1e1",
+      "message": "wsp",
+      "read": true,
+      "createdAt": "2026-01-20T17:02:26.465Z"
+    },
+    {
+      "id": "09884757-d883-470d-a0e1-98499aa62ba8",
+      "fromUserId": "b59fe60c-35c8-4689-b83a-feda335caa19",
+      "toUserId": "c480dcef-3488-4083-b326-00920fdbc1e1",
+      "message": "🤒",
+      "read": true,
+      "createdAt": "2026-01-20T17:25:41.800Z"
+    },
+    {
+      "id": "8c138907-7f7f-4766-b31f-42ea18f3fa12",
+      "fromUserId": "c480dcef-3488-4083-b326-00920fdbc1e1",
+      "toUserId": "b59fe60c-35c8-4689-b83a-feda335caa19",
+      "message": "",
+      "attachmentType": "gif",
+      "attachmentUrl": "https://media.tenor.com/2RvCDQj3nVQAAAAC/its-trending-latest.gif",
+      "read": true,
+      "createdAt": "2026-01-20T17:28:17.540Z"
+    },
+    {
+      "id": "6248207c-92dc-41b3-8f8f-c1460d3e1bc4",
+      "fromUserId": "c480dcef-3488-4083-b326-00920fdbc1e1",
+      "toUserId": "b59fe60c-35c8-4689-b83a-feda335caa19",
+      "message": "",
+      "attachmentType": "image",
+      "attachmentUrl": "/uploads/dm-attachments/1768930105263-n27nvh.png",
+      "attachmentFilename": "category-page.png",
+      "attachmentSize": 1947534,
+      "attachmentMimeType": "image/png",
+      "read": true,
+      "createdAt": "2026-01-20T17:28:25.290Z"
+    },
+    {
+      "id": "a00281de-f4b1-4473-a864-00c2f1aaa943",
+      "fromUserId": "b59fe60c-35c8-4689-b83a-feda335caa19",
+      "toUserId": "c480dcef-3488-4083-b326-00920fdbc1e1",
+      "message": "ummm",
+      "read": true,
+      "createdAt": "2026-01-20T18:11:28.281Z"
+    },
+    {
+      "id": "e55881cb-449e-4e43-b79e-9390c1c170ec",
+      "fromUserId": "c480dcef-3488-4083-b326-00920fdbc1e1",
+      "toUserId": "b59fe60c-35c8-4689-b83a-feda335caa19",
+      "message": "what lol",
+      "read": true,
+      "createdAt": "2026-01-20T18:11:38.018Z"
+    },
+    {
+      "id": "9ec129b2-5e2a-4e5e-80c6-295199d3ca60",
+      "fromUserId": "c480dcef-3488-4083-b326-00920fdbc1e1",
+      "toUserId": "b59fe60c-35c8-4689-b83a-feda335caa19",
+      "message": "lol",
+      "read": true,
+      "createdAt": "2026-01-20T19:45:24.294Z"
+    },
+    {
+      "id": "158aaf79-c870-4ddc-84aa-1b219af1dacf",
+      "fromUserId": "b59fe60c-35c8-4689-b83a-feda335caa19",
+      "toUserId": "c480dcef-3488-4083-b326-00920fdbc1e1",
+      "message": "hmm",
+      "read": true,
+      "createdAt": "2026-01-20T19:46:20.322Z"
+    },
+    {
+      "id": "165d1e14-d3e2-4913-8ef8-70b32d0ea604",
+      "fromUserId": "c480dcef-3488-4083-b326-00920fdbc1e1",
+      "toUserId": "b59fe60c-35c8-4689-b83a-feda335caa19",
+      "message": "",
+      "attachmentType": "audio",
+      "attachmentUrl": "/uploads/dm-attachments/1768938397213-9seyan.webm",
+      "attachmentFilename": "voice.webm",
+      "attachmentSize": 83372,
+      "attachmentMimeType": "audio/webm",
+      "audioDuration": 0,
+      "read": true,
+      "createdAt": "2026-01-20T19:46:37.221Z"
+    }
+  ]
+}

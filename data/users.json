@@ -1,0 +1,27 @@
+{
+  "users": [
+    {
+      "email": "elton.gleichner@nodejs.uk",
+      "username": "elton galeech",
+      "passwordHash": "$2b$10$CWFt62MUifNN9hhyESQaDeMJ9gDXJ..eUWHKg8jRiff96iIb5mQSG",
+      "avatarUrl": "/uploads/avatars/1768917904977-w1rro.jpg",
+      "bio": "",
+      "emailVerified": false,
+      "id": "b59fe60c-35c8-4689-b83a-feda335caa19",
+      "createdAt": "2026-01-20T13:03:43.162Z",
+      "updatedAt": "2026-01-20T14:05:11.021Z"
+    },
+    {
+      "email": "legend12@email.com",
+      "username": "admin",
+      "passwordHash": "$2b$10$/DJpzuuHJXCZ.rOS7X4ADOlbjG7XuI/jpVVM3k1U9CMRmcJoDedVu",
+      "avatarUrl": null,
+      "bio": null,
+      "emailVerified": false,
+      "id": "c480dcef-3488-4083-b326-00920fdbc1e1",
+      "createdAt": "2026-01-20T13:34:41.090Z",
+      "updatedAt": "2026-01-20T13:34:41.090Z"
+    }
+  ],
+  "lastUpdated": "2026-01-20T14:05:11.021Z"
+}

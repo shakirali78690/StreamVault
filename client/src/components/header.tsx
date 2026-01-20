@@ -1,21 +1,26 @@
 import { Link, useLocation } from "wouter";
-import { Search, Moon, Sun, Play, Menu, X, Bookmark, Users } from "lucide-react";
+import { Search, Moon, Sun, Play, Menu, X, Bookmark, Users, User, LogOut, PartyPopper, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useTheme } from "./theme-provider";
 import { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { Show, Movie, Anime } from "@shared/schema";
+import { useAuth } from "@/contexts/auth-context";
+import { NotificationsDropdown } from "@/components/notifications-dropdown";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 
 export function Header() {
-  const [location] = useLocation();
+  const [location, navigate] = useLocation();
   const { theme, setTheme } = useTheme();
+  const { user, isAuthenticated, logout } = useAuth();
   const [searchOpen, setSearchOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -160,7 +165,7 @@ export function Header() {
               className="hidden sm:flex gap-2"
               data-testid="button-watch-rooms"
             >
-              <Users className="h-4 w-4" />
+              <PartyPopper className="h-4 w-4" />
               Rooms
             </Button>
           </Link>
@@ -275,6 +280,49 @@ export function Header() {
               <Moon className="h-5 w-5" />
             )}
           </Button>
+
+          {/* Auth: Notifications Bell and User Avatar */}
+          {isAuthenticated && (
+            <NotificationsDropdown />
+          )}
+          {isAuthenticated ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage src={user?.avatarUrl || undefined} alt={user?.username} />
+                    <AvatarFallback className="bg-primary/10 text-xs">
+                      {user?.username?.slice(0, 2).toUpperCase() || <User className="h-4 w-4" />}
+                    </AvatarFallback>
+                  </Avatar>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <div className="px-2 py-1.5 text-sm font-medium">{user?.username}</div>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => navigate('/profile')}>
+                  <User className="mr-2 h-4 w-4" />
+                  Profile
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate('/friends')}>
+                  <Users className="mr-2 h-4 w-4" />
+                  Friends
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => logout()} className="text-destructive focus:text-destructive">
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Log Out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <Link href="/login">
+              <Button variant="default" size="sm" className="hidden sm:flex gap-2">
+                <UserPlus className="h-4 w-4" />
+                Join
+              </Button>
+            </Link>
+          )}
 
           {/* Mobile Menu Toggle */}
           <Button

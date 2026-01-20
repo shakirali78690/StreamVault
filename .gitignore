@@ -106,5 +106,9 @@ bulk-imports/
 scripts/*.json
 scripts/*.txt
 
+
 # Cached subtitles
 data/subtitles/
+
+# User uploads
+uploads/

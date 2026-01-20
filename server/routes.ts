@@ -4,9 +4,9 @@ import http from "http";
 import https from "https";
 import { storage } from "./storage";
 import { z } from "zod";
-import { watchlistSchema, viewingProgressSchema, insertBlogPostSchema } from "@shared/schema";
+import { watchlistSchema, viewingProgressSchema, insertBlogPostSchema, insertUserSchema, loginSchema, updateProfileSchema } from "@shared/schema";
 import type { InsertEpisode, BlogPost } from "@shared/schema";
-import { readFileSync, existsSync, writeFileSync } from "fs";
+import { readFileSync, existsSync, writeFileSync, mkdirSync } from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { setupSitemaps } from "./sitemap";
@@ -14,6 +14,8 @@ import { sendContentRequestEmail, sendIssueReportEmail } from "./email-service";
 import { searchSubtitles, downloadSubtitle, getCachedSubtitle } from "./subtitle-service";
 import { getActiveRooms } from "./watch-together";
 import webpush from "web-push";
+import { hashPassword, verifyPassword, generateToken, verifyToken, setAuthCookie, clearAuthCookie, type AuthRequest } from "./auth";
+import multer from "multer";
 
 // Helper to convert ReadableStream to async iterable for Node.js
 async function* streamToAsyncIterable(stream: ReadableStream<Uint8Array>) {
@@ -59,6 +61,895 @@ function requireAdmin(req: any, res: any, next: any) {
 export async function registerRoutes(app: Express): Promise<Server> {
   // Setup dynamic sitemaps
   setupSitemaps(app, storage);
+
+  // Configure multer for avatar uploads
+  const avatarStorage = multer.diskStorage({
+    destination: (_req, _file, cb) => {
+      const uploadDir = path.join(process.cwd(), 'uploads', 'avatars');
+      if (!existsSync(uploadDir)) {
+        mkdirSync(uploadDir, { recursive: true });
+      }
+      cb(null, uploadDir);
+    },
+    filename: (_req, file, cb) => {
+      const uniqueName = `${Date.now()}-${Math.random().toString(36).substring(7)}${path.extname(file.originalname)}`;
+      cb(null, uniqueName);
+    },
+  });
+  const avatarUpload = multer({
+    storage: avatarStorage,
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+    fileFilter: (_req, file, cb) => {
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+      if (allowedTypes.includes(file.mimetype)) {
+        cb(null, true);
+      } else {
+        cb(new Error('Invalid file type. Only JPEG, PNG, GIF, and WebP are allowed.'));
+      }
+    },
+  });
+
+  // Configure multer for DM attachments (images, videos, audio, files)
+  const dmAttachmentStorage = multer.diskStorage({
+    destination: (_req, _file, cb) => {
+      const uploadDir = path.join(process.cwd(), 'uploads', 'dm-attachments');
+      if (!existsSync(uploadDir)) {
+        mkdirSync(uploadDir, { recursive: true });
+      }
+      cb(null, uploadDir);
+    },
+    filename: (_req, file, cb) => {
+      const uniqueName = `${Date.now()}-${Math.random().toString(36).substring(7)}${path.extname(file.originalname)}`;
+      cb(null, uniqueName);
+    },
+  });
+  const upload = multer({
+    storage: dmAttachmentStorage,
+    limits: { fileSize: 25 * 1024 * 1024 }, // 25MB limit for all media
+    fileFilter: (_req, file, cb) => {
+      // Allow images, videos, audio, and common document types
+      const allowedTypes = [
+        'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+        'video/mp4', 'video/webm', 'video/quicktime',
+        'audio/mpeg', 'audio/wav', 'audio/webm', 'audio/ogg',
+        'application/pdf', 'text/plain',
+        'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      ];
+      if (allowedTypes.includes(file.mimetype)) {
+        cb(null, true);
+      } else {
+        cb(new Error('File type not allowed.'));
+      }
+    },
+  });
+
+  // ============================================
+  // AUTHENTICATION ROUTES
+  // ============================================
+
+  // Register new user
+  app.post("/api/auth/register", async (req, res) => {
+    try {
+      const result = insertUserSchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ error: result.error.errors[0].message });
+      }
+
+      const { email, username, password } = result.data;
+
+      // Check if email already exists
+      const existingEmail = await storage.getUserByEmail(email);
+      if (existingEmail) {
+        return res.status(400).json({ error: "Email already registered" });
+      }
+
+      // Check if username already exists
+      const existingUsername = await storage.getUserByUsername(username);
+      if (existingUsername) {
+        return res.status(400).json({ error: "Username already taken" });
+      }
+
+      // Hash password and create user
+      const passwordHash = await hashPassword(password);
+      const user = await storage.createUser({
+        email,
+        username,
+        passwordHash,
+        avatarUrl: null,
+        bio: null,
+        emailVerified: false,
+      });
+
+      // Generate token and set cookie
+      const token = generateToken({
+        userId: user.id,
+        email: user.email,
+        username: user.username,
+      });
+      setAuthCookie(res, token);
+
+      res.status(201).json({
+        user: {
+          id: user.id,
+          email: user.email,
+          username: user.username,
+          avatarUrl: user.avatarUrl,
+          bio: user.bio,
+        },
+      });
+    } catch (error) {
+      console.error("Registration error:", error);
+      res.status(500).json({ error: "Failed to register" });
+    }
+  });
+
+  // Login
+  app.post("/api/auth/login", async (req, res) => {
+    try {
+      const result = loginSchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ error: result.error.errors[0].message });
+      }
+
+      const { email, password } = result.data;
+
+      // Find user by email
+      const user = await storage.getUserByEmail(email);
+      if (!user) {
+        return res.status(401).json({ error: "Invalid email or password" });
+      }
+
+      // Verify password
+      const isValid = await verifyPassword(password, user.passwordHash);
+      if (!isValid) {
+        return res.status(401).json({ error: "Invalid email or password" });
+      }
+
+      // Generate token and set cookie
+      const token = generateToken({
+        userId: user.id,
+        email: user.email,
+        username: user.username,
+      });
+      setAuthCookie(res, token);
+
+      res.json({
+        user: {
+          id: user.id,
+          email: user.email,
+          username: user.username,
+          avatarUrl: user.avatarUrl,
+          bio: user.bio,
+        },
+      });
+    } catch (error) {
+      console.error("Login error:", error);
+      res.status(500).json({ error: "Failed to login" });
+    }
+  });
+
+  // Logout
+  app.post("/api/auth/logout", (_req, res) => {
+    clearAuthCookie(res);
+    res.json({ success: true });
+  });
+
+  // Get current user
+  app.get("/api/auth/me", async (req: AuthRequest, res) => {
+    try {
+      const token = req.cookies?.authToken || req.headers.authorization?.replace('Bearer ', '');
+      if (!token) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const payload = verifyToken(token);
+      if (!payload) {
+        return res.status(401).json({ error: "Invalid or expired token" });
+      }
+
+      const user = await storage.getUserById(payload.userId);
+      if (!user) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      res.json({
+        user: {
+          id: user.id,
+          email: user.email,
+          username: user.username,
+          avatarUrl: user.avatarUrl,
+          bio: user.bio,
+        },
+      });
+    } catch (error) {
+      console.error("Get user error:", error);
+      res.status(500).json({ error: "Failed to get user" });
+    }
+  });
+
+  // Update profile
+  app.put("/api/auth/profile", async (req: AuthRequest, res) => {
+    try {
+      const token = req.cookies?.authToken || req.headers.authorization?.replace('Bearer ', '');
+      if (!token) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const payload = verifyToken(token);
+      if (!payload) {
+        return res.status(401).json({ error: "Invalid or expired token" });
+      }
+
+      const result = updateProfileSchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ error: result.error.errors[0].message });
+      }
+
+      const updates: any = {};
+      if (result.data.username) {
+        // Check if username is taken by another user
+        const existing = await storage.getUserByUsername(result.data.username);
+        if (existing && existing.id !== payload.userId) {
+          return res.status(400).json({ error: "Username already taken" });
+        }
+        updates.username = result.data.username;
+      }
+      if (result.data.bio !== undefined) {
+        updates.bio = result.data.bio;
+      }
+
+      const user = await storage.updateUser(payload.userId, updates);
+
+      res.json({
+        user: {
+          id: user.id,
+          email: user.email,
+          username: user.username,
+          avatarUrl: user.avatarUrl,
+          bio: user.bio,
+        },
+      });
+    } catch (error) {
+      console.error("Update profile error:", error);
+      res.status(500).json({ error: "Failed to update profile" });
+    }
+  });
+
+  // Upload avatar
+  app.post("/api/auth/avatar", avatarUpload.single('avatar'), async (req: AuthRequest, res) => {
+    try {
+      const token = req.cookies?.authToken || req.headers.authorization?.replace('Bearer ', '');
+      if (!token) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const payload = verifyToken(token);
+      if (!payload) {
+        return res.status(401).json({ error: "Invalid or expired token" });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded" });
+      }
+
+      const avatarUrl = `/uploads/avatars/${req.file.filename}`;
+      const user = await storage.updateUser(payload.userId, { avatarUrl });
+
+      res.json({
+        avatarUrl: user.avatarUrl,
+      });
+    } catch (error) {
+      console.error("Avatar upload error:", error);
+      res.status(500).json({ error: "Failed to upload avatar" });
+    }
+  });
+
+  // ============================================
+  // FRIENDS SYSTEM ROUTES
+  // ============================================
+
+  // Search users by username
+  app.get("/api/users/search", async (req, res) => {
+    try {
+      const token = req.cookies.authToken;
+      if (!token) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const payload = verifyToken(token);
+      if (!payload) {
+        return res.status(401).json({ error: "Invalid token" });
+      }
+
+      const query = req.query.q as string;
+      if (!query || query.length < 2) {
+        return res.status(400).json({ error: "Search query must be at least 2 characters" });
+      }
+
+      const users = await storage.searchUsers(query);
+      // Filter out current user and return only public info
+      const filtered = users
+        .filter(u => u.id !== payload.userId)
+        .map(u => ({
+          id: u.id,
+          username: u.username,
+          avatarUrl: u.avatarUrl,
+        }));
+
+      res.json(filtered);
+    } catch (error) {
+      console.error("User search error:", error);
+      res.status(500).json({ error: "Failed to search users" });
+    }
+  });
+
+  // Send friend request
+  app.post("/api/friends/request", async (req, res) => {
+    try {
+      const token = req.cookies.authToken;
+      if (!token) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const payload = verifyToken(token);
+      if (!payload) {
+        return res.status(401).json({ error: "Invalid token" });
+      }
+
+      const { toUserId } = req.body;
+      if (!toUserId) {
+        return res.status(400).json({ error: "User ID required" });
+      }
+
+      // Check if already friends
+      const alreadyFriends = await storage.areFriends(payload.userId, toUserId);
+      if (alreadyFriends) {
+        return res.status(400).json({ error: "Already friends" });
+      }
+
+      // Check if request already exists
+      const existingRequests = await storage.getSentFriendRequests(payload.userId);
+      const alreadyRequested = existingRequests.find(r => r.toUserId === toUserId && r.status === 'pending');
+      if (alreadyRequested) {
+        return res.status(400).json({ error: "Friend request already sent" });
+      }
+
+      // Check if they already sent us a request
+      const theirRequests = await storage.getFriendRequests(payload.userId);
+      const theyRequested = theirRequests.find(r => r.fromUserId === toUserId);
+      if (theyRequested) {
+        return res.status(400).json({ error: "They already sent you a request. Check your pending requests." });
+      }
+
+      const request = await storage.createFriendRequest(payload.userId, toUserId);
+
+      // Create notification for recipient
+      const currentUser = await storage.getUserById(payload.userId);
+      await storage.createNotification({
+        userId: toUserId,
+        type: 'friend_request',
+        title: 'Friend Request',
+        message: `${currentUser?.username || 'Someone'} sent you a friend request`,
+        data: { requestId: request.id, fromUserId: payload.userId },
+        read: false,
+      });
+
+      res.status(201).json(request);
+    } catch (error) {
+      console.error("Send friend request error:", error);
+      res.status(500).json({ error: "Failed to send friend request" });
+    }
+  });
+
+  // Get pending friend requests (received)
+  app.get("/api/friends/requests", async (req, res) => {
+    try {
+      const token = req.cookies.authToken;
+      if (!token) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const payload = verifyToken(token);
+      if (!payload) {
+        return res.status(401).json({ error: "Invalid token" });
+      }
+
+      const requests = await storage.getFriendRequests(payload.userId);
+
+      // Enrich with user info
+      const enrichedRequests = await Promise.all(requests.map(async (r) => {
+        const fromUser = await storage.getUserById(r.fromUserId);
+        return {
+          ...r,
+          fromUser: fromUser ? {
+            id: fromUser.id,
+            username: fromUser.username,
+            avatarUrl: fromUser.avatarUrl,
+          } : null,
+        };
+      }));
+
+      res.json(enrichedRequests);
+    } catch (error) {
+      console.error("Get friend requests error:", error);
+      res.status(500).json({ error: "Failed to get friend requests" });
+    }
+  });
+
+  // Accept friend request
+  app.post("/api/friends/accept/:requestId", async (req, res) => {
+    try {
+      const token = req.cookies.authToken;
+      if (!token) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const payload = verifyToken(token);
+      if (!payload) {
+        return res.status(401).json({ error: "Invalid token" });
+      }
+
+      const { requestId } = req.params;
+      const request = await storage.getFriendRequestById(requestId);
+
+      if (!request) {
+        return res.status(404).json({ error: "Request not found" });
+      }
+
+      if (request.toUserId !== payload.userId) {
+        return res.status(403).json({ error: "Not authorized" });
+      }
+
+      if (request.status !== 'pending') {
+        return res.status(400).json({ error: "Request already processed" });
+      }
+
+      // Update request status
+      await storage.updateFriendRequest(requestId, {
+        status: 'accepted',
+        respondedAt: new Date().toISOString(),
+      });
+
+      // Create friendship
+      await storage.addFriend(request.fromUserId, request.toUserId);
+
+      // Notify the requester
+      const currentUser = await storage.getUserById(payload.userId);
+      await storage.createNotification({
+        userId: request.fromUserId,
+        type: 'friend_accepted',
+        title: 'Friend Request Accepted',
+        message: `${currentUser?.username || 'Someone'} accepted your friend request`,
+        data: { friendId: payload.userId },
+        read: false,
+      });
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Accept friend request error:", error);
+      res.status(500).json({ error: "Failed to accept friend request" });
+    }
+  });
+
+  // Decline friend request
+  app.post("/api/friends/decline/:requestId", async (req, res) => {
+    try {
+      const token = req.cookies.authToken;
+      if (!token) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const payload = verifyToken(token);
+      if (!payload) {
+        return res.status(401).json({ error: "Invalid token" });
+      }
+
+      const { requestId } = req.params;
+      const request = await storage.getFriendRequestById(requestId);
+
+      if (!request) {
+        return res.status(404).json({ error: "Request not found" });
+      }
+
+      if (request.toUserId !== payload.userId) {
+        return res.status(403).json({ error: "Not authorized" });
+      }
+
+      await storage.updateFriendRequest(requestId, {
+        status: 'declined',
+        respondedAt: new Date().toISOString(),
+      });
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Decline friend request error:", error);
+      res.status(500).json({ error: "Failed to decline friend request" });
+    }
+  });
+
+  // Get friends list
+  app.get("/api/friends", async (req, res) => {
+    try {
+      const token = req.cookies.authToken;
+      if (!token) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const payload = verifyToken(token);
+      if (!payload) {
+        return res.status(401).json({ error: "Invalid token" });
+      }
+
+      const friends = await storage.getFriends(payload.userId);
+
+      // Enrich with user info
+      const enrichedFriends = await Promise.all(friends.map(async (f) => {
+        const friendId = f.userId === payload.userId ? f.friendId : f.userId;
+        const friendUser = await storage.getUserById(friendId);
+        return {
+          id: f.id,
+          friendId,
+          username: friendUser?.username || 'Unknown',
+          avatarUrl: friendUser?.avatarUrl || null,
+          createdAt: f.createdAt,
+        };
+      }));
+
+      res.json(enrichedFriends);
+    } catch (error) {
+      console.error("Get friends error:", error);
+      res.status(500).json({ error: "Failed to get friends" });
+    }
+  });
+
+  // Remove friend
+  app.delete("/api/friends/:friendId", async (req, res) => {
+    try {
+      const token = req.cookies.authToken;
+      if (!token) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const payload = verifyToken(token);
+      if (!payload) {
+        return res.status(401).json({ error: "Invalid token" });
+      }
+
+      const { friendId } = req.params;
+      await storage.removeFriend(payload.userId, friendId);
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Remove friend error:", error);
+      res.status(500).json({ error: "Failed to remove friend" });
+    }
+  });
+
+  // ============================================
+  // NOTIFICATIONS ROUTES
+  // ============================================
+
+  // Get notifications
+  app.get("/api/notifications", async (req, res) => {
+    try {
+      const token = req.cookies.authToken;
+      if (!token) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const payload = verifyToken(token);
+      if (!payload) {
+        return res.status(401).json({ error: "Invalid token" });
+      }
+
+      const notifications = await storage.getNotifications(payload.userId);
+      const unreadCount = await storage.getUnreadNotificationCount(payload.userId);
+
+      res.json({ notifications, unreadCount });
+    } catch (error) {
+      console.error("Get notifications error:", error);
+      res.status(500).json({ error: "Failed to get notifications" });
+    }
+  });
+
+  // Mark notification as read
+  app.post("/api/notifications/:id/read", async (req, res) => {
+    try {
+      const token = req.cookies.authToken;
+      if (!token) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const payload = verifyToken(token);
+      if (!payload) {
+        return res.status(401).json({ error: "Invalid token" });
+      }
+
+      await storage.markNotificationRead(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Mark notification read error:", error);
+      res.status(500).json({ error: "Failed to mark notification as read" });
+    }
+  });
+
+  // Mark all notifications as read
+  app.post("/api/notifications/read-all", async (req, res) => {
+    try {
+      const token = req.cookies.authToken;
+      if (!token) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const payload = verifyToken(token);
+      if (!payload) {
+        return res.status(401).json({ error: "Invalid token" });
+      }
+
+      await storage.markAllNotificationsRead(payload.userId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Mark all notifications read error:", error);
+      res.status(500).json({ error: "Failed to mark notifications as read" });
+    }
+  });
+
+  // Delete notification
+  app.delete("/api/notifications/:id", async (req, res) => {
+    try {
+      const token = req.cookies.authToken;
+      if (!token) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const payload = verifyToken(token);
+      if (!payload) {
+        return res.status(401).json({ error: "Invalid token" });
+      }
+
+      await storage.deleteNotification(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Delete notification error:", error);
+      res.status(500).json({ error: "Failed to delete notification" });
+    }
+  });
+
+  // ============================================
+  // DIRECT MESSAGES ROUTES
+  // ============================================
+
+  // Get conversations
+  app.get("/api/messages/conversations", async (req, res) => {
+    try {
+      const token = req.cookies.authToken;
+      if (!token) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const payload = verifyToken(token);
+      if (!payload) {
+        return res.status(401).json({ error: "Invalid token" });
+      }
+
+      const conversations = await storage.getConversations(payload.userId);
+
+      // Enrich with friend info
+      const enrichedConversations = await Promise.all(conversations.map(async (c) => {
+        const friend = await storage.getUserById(c.friendId);
+        return {
+          ...c,
+          friend: friend ? {
+            id: friend.id,
+            username: friend.username,
+            avatarUrl: friend.avatarUrl,
+          } : null,
+        };
+      }));
+
+      res.json(enrichedConversations);
+    } catch (error) {
+      console.error("Get conversations error:", error);
+      res.status(500).json({ error: "Failed to get conversations" });
+    }
+  });
+
+  // Get messages with a friend
+  app.get("/api/messages/:friendId", async (req, res) => {
+    try {
+      const token = req.cookies.authToken;
+      if (!token) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const payload = verifyToken(token);
+      if (!payload) {
+        return res.status(401).json({ error: "Invalid token" });
+      }
+
+      const { friendId } = req.params;
+
+      // Check if they are friends
+      const areFriends = await storage.areFriends(payload.userId, friendId);
+      if (!areFriends) {
+        return res.status(403).json({ error: "You can only message friends" });
+      }
+
+      const messages = await storage.getMessages(payload.userId, friendId);
+
+      // Mark messages as read
+      await storage.markMessagesRead(payload.userId, friendId);
+
+      res.json(messages);
+    } catch (error) {
+      console.error("Get messages error:", error);
+      res.status(500).json({ error: "Failed to get messages" });
+    }
+  });
+
+  // Send message (with optional GIF attachment)
+  app.post("/api/messages/:friendId", async (req, res) => {
+    try {
+      const token = req.cookies.authToken;
+      if (!token) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const payload = verifyToken(token);
+      if (!payload) {
+        return res.status(401).json({ error: "Invalid token" });
+      }
+
+      const { friendId } = req.params;
+      const { message, attachmentType, attachmentUrl } = req.body;
+
+      // Allow empty message if there's an attachment
+      if ((!message || !message.trim()) && !attachmentUrl) {
+        return res.status(400).json({ error: "Message or attachment required" });
+      }
+
+      // Check if they are friends
+      const areFriends = await storage.areFriends(payload.userId, friendId);
+      if (!areFriends) {
+        return res.status(403).json({ error: "You can only message friends" });
+      }
+
+      const dm = await storage.sendMessage(
+        payload.userId,
+        friendId,
+        message?.trim() || '',
+        attachmentType,
+        attachmentUrl
+      );
+
+      // Create notification for recipient
+      const currentUser = await storage.getUserById(payload.userId);
+      const notificationMessage = attachmentType === 'gif'
+        ? `${currentUser?.username || 'Someone'} sent a GIF`
+        : `${currentUser?.username || 'Someone'}: ${message?.substring(0, 50) || ''}${message?.length > 50 ? '...' : ''}`;
+
+      await storage.createNotification({
+        userId: friendId,
+        type: 'dm',
+        title: 'New Message',
+        message: notificationMessage,
+        data: { fromUserId: payload.userId },
+        read: false,
+      });
+
+      res.status(201).json(dm);
+    } catch (error) {
+      console.error("Send message error:", error);
+      res.status(500).json({ error: "Failed to send message" });
+    }
+  });
+
+  // Send voice message
+  app.post("/api/messages/:friendId/voice", upload.single('audio'), async (req, res) => {
+    try {
+      const token = req.cookies.authToken;
+      if (!token) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const payload = verifyToken(token);
+      if (!payload) {
+        return res.status(401).json({ error: "Invalid token" });
+      }
+
+      const { friendId } = req.params;
+      const duration = parseInt(req.body.duration) || 0;
+      const file = req.file;
+
+      if (!file) {
+        return res.status(400).json({ error: "No audio file provided" });
+      }
+
+      // Check if they are friends
+      const areFriends = await storage.areFriends(payload.userId, friendId);
+      if (!areFriends) {
+        return res.status(403).json({ error: "You can only message friends" });
+      }
+
+      const audioUrl = `/uploads/dm-attachments/${file.filename}`;
+      const dm = await storage.sendMessage(
+        payload.userId,
+        friendId,
+        '',
+        'audio',
+        audioUrl,
+        file.originalname,
+        file.size,
+        file.mimetype,
+        duration
+      );
+
+      // Create notification
+      const currentUser = await storage.getUserById(payload.userId);
+      await storage.createNotification({
+        userId: friendId,
+        type: 'dm',
+        title: 'Voice Message',
+        message: `${currentUser?.username || 'Someone'} sent a voice message`,
+        data: { fromUserId: payload.userId },
+        read: false,
+      });
+
+      res.status(201).json(dm);
+    } catch (error) {
+      console.error("Send voice message error:", error);
+      res.status(500).json({ error: "Failed to send voice message" });
+    }
+  });
+
+  // Send file attachment
+  app.post("/api/messages/:friendId/attachment", upload.single('file'), async (req, res) => {
+    try {
+      const token = req.cookies.authToken;
+      if (!token) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const payload = verifyToken(token);
+      if (!payload) {
+        return res.status(401).json({ error: "Invalid token" });
+      }
+
+      const { friendId } = req.params;
+      const file = req.file;
+
+      if (!file) {
+        return res.status(400).json({ error: "No file provided" });
+      }
+
+      // Check if they are friends
+      const areFriends = await storage.areFriends(payload.userId, friendId);
+      if (!areFriends) {
+        return res.status(403).json({ error: "You can only message friends" });
+      }
+
+      // Determine attachment type from mime type
+      let attachmentType: 'image' | 'video' | 'audio' | 'file' = 'file';
+      if (file.mimetype.startsWith('image/')) attachmentType = 'image';
+      else if (file.mimetype.startsWith('video/')) attachmentType = 'video';
+      else if (file.mimetype.startsWith('audio/')) attachmentType = 'audio';
+
+      const fileUrl = `/uploads/dm-attachments/${file.filename}`;
+      const dm = await storage.sendMessage(
+        payload.userId,
+        friendId,
+        '',
+        attachmentType,
+        fileUrl,
+        file.originalname,
+        file.size,
+        file.mimetype
+      );
+
+      // Create notification
+      const currentUser = await storage.getUserById(payload.userId);
+      const typeLabel = attachmentType === 'image' ? 'an image' :
+        attachmentType === 'video' ? 'a video' :
+          attachmentType === 'audio' ? 'an audio file' : 'a file';
+      await storage.createNotification({
+        userId: friendId,
+        type: 'dm',
+        title: 'New Attachment',
+        message: `${currentUser?.username || 'Someone'} sent ${typeLabel}`,
+        data: { fromUserId: payload.userId },
+        read: false,
+      });
+
+      res.status(201).json(dm);
+    } catch (error) {
+      console.error("Send attachment error:", error);
+      res.status(500).json({ error: "Failed to send attachment" });
+    }
+  });
 
   // Get all shows
   app.get("/api/shows", async (_req, res) => {
@@ -1207,11 +2098,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Either episodeId or movieId is required" });
       }
 
+      // Try to get authenticated user details to link comment
+      let userId: string | undefined;
+      let avatarUrl: string | undefined;
+
+      const token = req.cookies?.authToken;
+      if (token) {
+        const payload = verifyToken(token);
+        if (payload) {
+          userId = payload.userId;
+          // Get latest avatar from DB
+          const user = await storage.getUserById(userId);
+          if (user && user.avatarUrl) {
+            avatarUrl = user.avatarUrl;
+          }
+        }
+      }
+
       const newComment = await storage.createComment({
         episodeId: episodeId || null,
         movieId: movieId || null,
         parentId: parentId || null,
+        userId: userId || null,
         userName,
+        avatarUrl: avatarUrl || null,
         comment,
       });
 
@@ -2299,6 +3209,82 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Newsletter send error:", error);
       res.status(500).json({ error: "Failed to send newsletter" });
+    }
+  });
+
+  // Broadcast in-app notifications to all users (admin only)
+  app.post("/api/admin/broadcast-notification", requireAdmin, async (req, res) => {
+    try {
+      const { type, contentType, contentId, contentTitle, contentPoster, customTitle, customMessage, customLink } = req.body;
+
+      // Get all users
+      const users = await storage.getAllUsers();
+
+      let sentCount = 0;
+      let title = '';
+      let message = '';
+      let notificationData: any = {};
+
+      // Determine notification content based on type
+      if (type === 'custom') {
+        title = customTitle;
+        message = customMessage;
+        notificationData = {
+          type: 'announcement',
+          link: customLink || undefined
+        };
+      } else if (type === 'new_content') {
+        title = '🆕 New Content Added!';
+        message = `${contentTitle} is now available on StreamVault!`;
+        notificationData = {
+          type: 'new_content',
+          contentType,
+          contentId,
+          contentTitle,
+          contentPoster,
+          link: customLink || undefined // Allow overriding link for content too
+        };
+      } else if (type === 'new_episode') {
+        title = '📺 New Episode Available!';
+        message = `A new episode of ${contentTitle} is now streaming!`;
+        notificationData = {
+          type: 'new_episode',
+          contentType,
+          contentId,
+          contentTitle,
+          contentPoster,
+          link: customLink || undefined
+        };
+      }
+
+      // Create notification for each user
+      for (const user of users) {
+        try {
+          await storage.createNotification({
+            userId: user.id,
+            type: type === 'custom' ? 'announcement' : 'content_update',
+            title,
+            message,
+            data: notificationData,
+            read: false,
+          });
+          sentCount++;
+        } catch (err) {
+          console.error(`Failed to create notification for user ${user.id}:`, err);
+        }
+      }
+
+      console.log(`📢 Broadcast notification sent to ${sentCount} users: ${title}`);
+
+      res.json({
+        success: true,
+        sentCount,
+        title,
+        message
+      });
+    } catch (error) {
+      console.error("Broadcast notification error:", error);
+      res.status(500).json({ error: "Failed to broadcast notification" });
     }
   });
 

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useAuth } from "@/contexts/auth-context";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -119,6 +120,7 @@ function CommentItem({
   const [liked, setLiked] = useState(false);
   const [disliked, setDisliked] = useState(false);
   const queryClient = useQueryClient();
+  const { user, isAuthenticated } = useAuth();
 
   const postReply = useMutation({
     mutationFn: async (data: { userName: string; comment: string; parentId: string }) => {
@@ -204,8 +206,12 @@ function CommentItem({
       <div className="flex gap-3">
         {/* Avatar Column */}
         <div className="flex flex-col items-center relative">
-          <div className={`w-10 h-10 rounded-full ${avatarColor} flex items-center justify-center text-white font-medium text-sm flex-shrink-0 relative z-10`}>
-            {firstLetter}
+          <div className={`w-10 h-10 rounded-full ${!comment.avatarUrl ? avatarColor : 'bg-transparent'} flex items-center justify-center text-white font-medium text-sm flex-shrink-0 relative z-10 overflow-hidden`}>
+            {comment.avatarUrl ? (
+              <img src={comment.avatarUrl} alt={comment.userName} className="w-full h-full object-cover" />
+            ) : (
+              firstLetter
+            )}
           </div>
           {/* Vertical line from avatar down - always show if has replies */}
           {hasReplies && (
@@ -259,8 +265,12 @@ function CommentItem({
           {/* Reply Form */}
           {showReplyForm && (
             <div className="mt-3 flex gap-3">
-              <div className={`w-8 h-8 rounded-full ${userName ? getAvatarColor(userName) : 'bg-muted'} flex items-center justify-center text-white font-medium text-xs flex-shrink-0`}>
-                {userName ? userName.charAt(0).toUpperCase() : '?'}
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-medium text-xs flex-shrink-0 overflow-hidden ${!user?.avatarUrl ? (userName ? getAvatarColor(userName) : 'bg-muted') : ''}`}>
+                {isAuthenticated && user?.avatarUrl ? (
+                  <img src={user.avatarUrl} alt={userName} className="w-full h-full object-cover" />
+                ) : (
+                  userName ? userName.charAt(0).toUpperCase() : '?'
+                )}
               </div>
               <div className="flex-1">
                 {(!isNameSaved && !localStorage.getItem("streamvault_username")) && (
@@ -405,6 +415,7 @@ function CommentItem({
 }
 
 export function CommentsSection({ episodeId, movieId }: CommentsSectionProps) {
+  const { user, isAuthenticated } = useAuth();
   const [userName, setUserName] = useState("");
   const [isNameSaved, setIsNameSaved] = useState(false);
   const [comment, setComment] = useState("");
@@ -417,14 +428,19 @@ export function CommentsSection({ episodeId, movieId }: CommentsSectionProps) {
   const gifPickerRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
 
-  // Load saved username from localStorage
+  // Load saved username from localStorage OR auth
   useEffect(() => {
-    const savedName = localStorage.getItem("streamvault_username");
-    if (savedName) {
-      setUserName(savedName);
+    if (isAuthenticated && user) {
+      setUserName(user.username);
       setIsNameSaved(true);
+    } else {
+      const savedName = localStorage.getItem("streamvault_username");
+      if (savedName) {
+        setUserName(savedName);
+        setIsNameSaved(true);
+      }
     }
-  }, []);
+  }, [isAuthenticated, user]);
 
   // Click outside to close pickers
   useEffect(() => {
@@ -578,8 +594,12 @@ export function CommentsSection({ episodeId, movieId }: CommentsSectionProps) {
 
       {/* Comment Form - YouTube Style */}
       <div className="flex gap-3">
-        <div className={`w-10 h-10 rounded-full ${userName ? getAvatarColor(userName) : 'bg-muted'} flex items-center justify-center text-white font-medium text-sm flex-shrink-0`}>
-          {userName ? userName.charAt(0).toUpperCase() : '?'}
+        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-medium text-sm flex-shrink-0 overflow-hidden ${!user?.avatarUrl ? (userName ? getAvatarColor(userName) : 'bg-muted') : ''}`}>
+          {isAuthenticated && user?.avatarUrl ? (
+            <img src={user.avatarUrl} alt={userName} className="w-full h-full object-cover" />
+          ) : (
+            userName ? userName.charAt(0).toUpperCase() : '?'
+          )}
         </div>
         <div className="flex-1">
           <form onSubmit={handleSubmit}>

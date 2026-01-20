@@ -1,10 +1,13 @@
 import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react';
 import { io, Socket } from 'socket.io-client';
+import { useSocialSocket } from '@/hooks/use-social-socket';
 
 // Types
 export interface User {
     id: string;
     username: string;
+    avatarUrl?: string;
+    authUserId?: string; // Actual authenticated user ID from database
     isHost: boolean;
     isMuted: boolean;
 }
@@ -19,6 +22,7 @@ export interface VideoState {
 export interface ChatMessage {
     id: string;
     username: string;
+    avatarUrl?: string;
     message: string;
     timestamp: Date;
 }
@@ -29,12 +33,31 @@ export interface Reaction {
     emoji: string;
 }
 
+// Poll types
+export interface PollOption {
+    id: string;
+    text: string;
+    voteCount: number;
+}
+
+export interface Poll {
+    id: string;
+    question: string;
+    options: PollOption[];
+    isActive: boolean;
+    createdAt: Date;
+    expiresAt?: Date;
+}
+
 export interface RoomInfo {
     roomId: string;
     roomCode: string;
     contentType: 'show' | 'movie' | 'anime';
     contentId: string;
+    contentTitle?: string;
+    contentPoster?: string;
     episodeId?: string;
+    episodeTitle?: string;
     description?: string;
     scheduledFor?: string;
     users: User[];
@@ -57,8 +80,8 @@ interface WatchTogetherContextType {
     hostDisconnected: boolean;
     reconnectCountdown: number | null;
     // Actions
-    createRoom: (contentType: 'show' | 'movie' | 'anime', contentId: string, username: string, episodeId?: string, options?: { contentTitle?: string; contentPoster?: string; episodeTitle?: string; isPublic?: boolean; password?: string; description?: string; scheduledFor?: string }) => void;
-    joinRoom: (roomCode: string, username: string, password?: string) => void;
+    createRoom: (contentType: 'show' | 'movie' | 'anime', contentId: string, username: string, avatarUrl?: string, episodeId?: string, authUserId?: string, options?: { contentTitle?: string; contentPoster?: string; episodeTitle?: string; isPublic?: boolean; password?: string; description?: string; scheduledFor?: string }) => void;
+    joinRoom: (roomCode: string, username: string, avatarUrl?: string, password?: string, authUserId?: string) => void;
     leaveRoom: () => void;
     sendMessage: (message: string) => void;
     sendReaction: (emoji: string) => void;
@@ -71,6 +94,11 @@ interface WatchTogetherContextType {
     hostMuteUser: (targetUserId: string, isMuted: boolean) => void;
     changeContent: (episodeId?: string, contentId?: string, contentType?: 'show' | 'movie' | 'anime') => void;
     clearError: () => void;
+    // Poll actions
+    polls: Poll[];
+    createPoll: (question: string, options: string[], expiresInMinutes?: number) => void;
+    votePoll: (pollId: string, optionId: string) => void;
+    closePoll: (pollId: string) => void;
 }
 
 const WatchTogetherContext = createContext<WatchTogetherContextType | null>(null);
@@ -100,8 +128,10 @@ export function WatchTogetherProvider({ children }: Props) {
     const [error, setError] = useState<string | null>(null);
     const [hostDisconnected, setHostDisconnected] = useState(false);
     const [reconnectCountdown, setReconnectCountdown] = useState<number | null>(null);
+    const [polls, setPolls] = useState<Poll[]>([]);
 
     const isHost = currentUser?.isHost ?? false;
+    const { stopActivity } = useSocialSocket();
 
     // Generate or retrieve session ID from localStorage
     const getSessionId = (): string => {
@@ -345,19 +375,48 @@ export function WatchTogetherProvider({ children }: Props) {
             });
         });
 
+        // Poll events
+        newSocket.on('poll:created', (poll: Poll) => {
+            console.log('📊 Poll created:', poll.question);
+            setPolls(prev => [...prev, poll]);
+        });
+
+        newSocket.on('poll:updated', (poll: Poll) => {
+            console.log('📊 Poll updated:', poll.id);
+            setPolls(prev => prev.map(p => p.id === poll.id ? poll : p));
+        });
+
+        newSocket.on('poll:closed', ({ pollId }: { pollId: string }) => {
+            console.log('📊 Poll closed:', pollId);
+            setPolls(prev => prev.map(p => p.id === pollId ? { ...p, isActive: false } : p));
+        });
+
+        newSocket.on('poll:list', (pollsList: Poll[]) => {
+            console.log('📊 Received polls:', pollsList.length);
+            setPolls(pollsList);
+        });
+
+        newSocket.on('poll:error', ({ message }: { message: string }) => {
+            console.error('📊 Poll error:', message);
+            setError(message);
+        });
+
         setSocket(newSocket);
 
         return () => {
+            stopActivity(); // Clear social activity on unmount
             newSocket.close();
         };
-    }, []);
+    }, [stopActivity]);
 
     // Actions
     const createRoom = useCallback((
         contentType: 'show' | 'movie' | 'anime',
         contentId: string,
         username: string,
+        avatarUrl?: string,
         episodeId?: string,
+        authUserId?: string,
         options?: {
             contentTitle?: string;
             contentPoster?: string;
@@ -373,8 +432,10 @@ export function WatchTogetherProvider({ children }: Props) {
             contentType,
             contentId,
             username,
+            avatarUrl,
             episodeId,
             sessionId,
+            authUserId, // Pass authenticated user ID for friend requests
             contentTitle: options?.contentTitle || 'Untitled',
             contentPoster: options?.contentPoster,
             episodeTitle: options?.episodeTitle,
@@ -385,19 +446,20 @@ export function WatchTogetherProvider({ children }: Props) {
         });
     }, [socket]);
 
-    const joinRoom = useCallback((roomCode: string, username: string, password?: string) => {
+    const joinRoom = useCallback((roomCode: string, username: string, avatarUrl?: string, password?: string, authUserId?: string) => {
         const sessionId = getSessionId();
-        socket?.emit('room:join', { roomCode: roomCode.toUpperCase(), username, sessionId, password });
+        socket?.emit('room:join', { roomCode: roomCode.toUpperCase(), username, avatarUrl, sessionId, password, authUserId });
     }, [socket]);
 
     const leaveRoom = useCallback(() => {
         socket?.emit('room:leave');
+        stopActivity(); // Clear social activity
         setRoomInfo(null);
         setUsers([]);
         setCurrentUser(null);
         setVideoState(null);
         setMessages([]);
-    }, [socket]);
+    }, [socket, stopActivity]);
 
     const sendMessage = useCallback((message: string) => {
         if (message.trim()) {
@@ -452,6 +514,29 @@ export function WatchTogetherProvider({ children }: Props) {
         socket?.emit('video:change-content', { episodeId, contentId, contentType });
     }, [socket]);
 
+    // Poll actions
+    const createPoll = useCallback((question: string, options: string[], expiresInMinutes?: number) => {
+        console.log('📊 Creating poll:', question);
+        socket?.emit('poll:create', { question, options, expiresInMinutes });
+    }, [socket]);
+
+    const votePoll = useCallback((pollId: string, optionId: string) => {
+        console.log('📊 Voting on poll:', pollId, optionId);
+        socket?.emit('poll:vote', { pollId, optionId });
+    }, [socket]);
+
+    const closePoll = useCallback((pollId: string) => {
+        console.log('📊 Closing poll:', pollId);
+        socket?.emit('poll:close', { pollId });
+    }, [socket]);
+
+    // Request polls when joining room
+    useEffect(() => {
+        if (socket && roomInfo) {
+            socket.emit('poll:get');
+        }
+    }, [socket, roomInfo]);
+
     return (
         <WatchTogetherContext.Provider value={{
             socket,
@@ -480,7 +565,11 @@ export function WatchTogetherProvider({ children }: Props) {
             requestVideoState,
             hostMuteUser,
             changeContent,
-            clearError
+            clearError,
+            polls,
+            createPoll,
+            votePoll,
+            closePoll
         }}>
             {children}
         </WatchTogetherContext.Provider>

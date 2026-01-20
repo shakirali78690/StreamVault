@@ -1,4 +1,4 @@
-import type { Show, Episode, Movie, Anime, AnimeEpisode, Comment, InsertShow, InsertEpisode, InsertMovie, InsertAnime, InsertAnimeEpisode, InsertComment, WatchlistItem, ViewingProgress, Category, BlogPost, InsertBlogPost } from "@shared/schema";
+import type { Show, Episode, Movie, Anime, AnimeEpisode, Comment, InsertShow, InsertEpisode, InsertMovie, InsertAnime, InsertAnimeEpisode, InsertComment, WatchlistItem, ViewingProgress, Category, BlogPost, InsertBlogPost, User } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
 import { join } from "path";
@@ -32,6 +32,51 @@ export interface IssueReport {
   url?: string;
   email?: string;
   status: 'pending' | 'resolved';
+  createdAt: string;
+}
+
+// Friends System Types
+export interface Friend {
+  id: string;
+  userId: string;
+  friendId: string;
+  createdAt: string;
+}
+
+export interface FriendRequest {
+  id: string;
+  fromUserId: string;
+  toUserId: string;
+  status: 'pending' | 'accepted' | 'declined';
+  createdAt: string;
+  respondedAt?: string;
+}
+
+export interface Notification {
+  id: string;
+  userId: string;
+  type: 'friend_request' | 'friend_accepted' | 'room_invite' | 'dm' | 'system';
+  title: string;
+  message: string;
+  data?: Record<string, unknown>;
+  read: boolean;
+  createdAt: string;
+}
+
+export interface DirectMessage {
+  id: string;
+  fromUserId: string;
+  toUserId: string;
+  message: string;
+  // Attachment support
+  attachmentType?: 'image' | 'video' | 'audio' | 'gif' | 'file';
+  attachmentUrl?: string;
+  attachmentFilename?: string;
+  attachmentSize?: number;
+  attachmentMimeType?: string;
+  // Voice message specific
+  audioDuration?: number;
+  read: boolean;
   createdAt: string;
 }
 
@@ -115,6 +160,53 @@ export interface IStorage {
   createBlogPost(post: InsertBlogPost): Promise<BlogPost>;
   updateBlogPost(id: string, updates: Partial<BlogPost>): Promise<BlogPost>;
   deleteBlogPost(id: string): Promise<void>;
+
+  // Users (Authentication)
+  getAllUsers(): Promise<User[]>;
+  getUserById(id: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
+  getUserByUsername(username: string): Promise<User | undefined>;
+  createUser(user: Omit<User, 'id' | 'createdAt' | 'updatedAt'>): Promise<User>;
+  updateUser(id: string, updates: Partial<User>): Promise<User>;
+  searchUsers(query: string): Promise<User[]>;
+
+  // Friends
+  getFriends(userId: string): Promise<Friend[]>;
+  addFriend(userId: string, friendId: string): Promise<Friend>;
+  removeFriend(userId: string, friendId: string): Promise<void>;
+  areFriends(userId: string, friendId: string): Promise<boolean>;
+
+  // Friend Requests
+  getFriendRequests(userId: string): Promise<FriendRequest[]>;
+  getSentFriendRequests(userId: string): Promise<FriendRequest[]>;
+  createFriendRequest(fromUserId: string, toUserId: string): Promise<FriendRequest>;
+  getFriendRequestById(id: string): Promise<FriendRequest | undefined>;
+  updateFriendRequest(id: string, updates: Partial<FriendRequest>): Promise<FriendRequest>;
+  deleteFriendRequest(id: string): Promise<void>;
+
+  // Notifications
+  getNotifications(userId: string): Promise<Notification[]>;
+  getUnreadNotificationCount(userId: string): Promise<number>;
+  createNotification(notification: Omit<Notification, 'id' | 'createdAt'>): Promise<Notification>;
+  markNotificationRead(id: string): Promise<void>;
+  markAllNotificationsRead(userId: string): Promise<void>;
+  deleteNotification(id: string): Promise<void>;
+
+  // Direct Messages
+  getConversations(userId: string): Promise<{ friendId: string; lastMessage: DirectMessage; unreadCount: number }[]>;
+  getMessages(userId: string, friendId: string): Promise<DirectMessage[]>;
+  sendMessage(
+    fromUserId: string,
+    toUserId: string,
+    message: string,
+    attachmentType?: 'image' | 'video' | 'audio' | 'gif' | 'file',
+    attachmentUrl?: string,
+    attachmentFilename?: string,
+    attachmentSize?: number,
+    attachmentMimeType?: string,
+    audioDuration?: number
+  ): Promise<DirectMessage>;
+  markMessagesRead(userId: string, friendId: string): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
@@ -130,10 +222,18 @@ export class MemStorage implements IStorage {
   private contentRequests: Map<string, ContentRequest>;
   private issueReports: Map<string, IssueReport>;
   private blogPosts: Map<string, BlogPost>;
+  private users: Map<string, User>;
+  private friends: Map<string, Friend>;
+  private friendRequests: Map<string, FriendRequest>;
+  private notifications: Map<string, Notification>;
+  private directMessages: Map<string, DirectMessage>;
   private dataFile: string;
+  private usersFile: string;
+  private friendsFile!: string;
 
   constructor() {
     this.dataFile = join(process.cwd(), "data", "streamvault-data.json");
+    this.usersFile = join(process.cwd(), "data", "users.json");
     this.shows = new Map();
     this.episodes = new Map();
     this.movies = new Map();
@@ -145,6 +245,11 @@ export class MemStorage implements IStorage {
     this.contentRequests = new Map();
     this.issueReports = new Map();
     this.blogPosts = new Map();
+    this.users = new Map();
+    this.friends = new Map();
+    this.friendRequests = new Map();
+    this.notifications = new Map();
+    this.directMessages = new Map();
     this.categories = [
       { id: "action", name: "Action & Thriller", slug: "action" },
       { id: "drama", name: "Drama & Romance", slug: "drama" },
@@ -157,6 +262,8 @@ export class MemStorage implements IStorage {
       { id: "adventure", name: "Adventure", slug: "adventure" },
     ];
     this.loadData();
+    this.friendsFile = join(process.cwd(), "data", "friends.json");
+    this.loadFriendsData();
   }
 
   // Load data from JSON file or seed if file doesn't exist
@@ -958,7 +1065,9 @@ export class MemStorage implements IStorage {
       episodeId: comment.episodeId || null,
       movieId: comment.movieId || null,
       parentId: comment.parentId || null,
+      userId: comment.userId || null,
       userName: comment.userName,
+      avatarUrl: comment.avatarUrl || null,
       comment: comment.comment,
       createdAt: new Date(),
     };
@@ -1048,6 +1157,381 @@ export class MemStorage implements IStorage {
   async deleteBlogPost(id: string): Promise<void> {
     this.blogPosts.delete(id);
     this.saveData();
+  }
+
+  // User Authentication Methods
+  private loadUsers() {
+    try {
+      if (existsSync(this.usersFile)) {
+        const data = JSON.parse(readFileSync(this.usersFile, "utf-8"));
+        if (data.users) {
+          data.users.forEach((user: User) => this.users.set(user.id, user));
+          console.log(`✅ Loaded ${data.users.length} users`);
+        }
+      }
+    } catch (error) {
+      console.error("❌ Error loading users:", error);
+    }
+  }
+
+  private saveUsers() {
+    try {
+      const data = {
+        users: Array.from(this.users.values()),
+        lastUpdated: new Date().toISOString(),
+      };
+
+      const dataDir = join(process.cwd(), "data");
+      if (!existsSync(dataDir)) {
+        mkdirSync(dataDir, { recursive: true });
+      }
+
+      writeFileSync(this.usersFile, JSON.stringify(data, null, 2), "utf-8");
+    } catch (error) {
+      console.error("❌ Error saving users:", error);
+    }
+  }
+
+  async getAllUsers(): Promise<User[]> {
+    // Ensure users are loaded
+    if (this.users.size === 0) {
+      this.loadUsers();
+    }
+    return Array.from(this.users.values());
+  }
+
+  async getUserById(id: string): Promise<User | undefined> {
+    // Ensure users are loaded
+    if (this.users.size === 0) {
+      this.loadUsers();
+    }
+    return this.users.get(id);
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    // Ensure users are loaded
+    if (this.users.size === 0) {
+      this.loadUsers();
+    }
+    return Array.from(this.users.values()).find(
+      (user) => user.email.toLowerCase() === email.toLowerCase()
+    );
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    // Ensure users are loaded
+    if (this.users.size === 0) {
+      this.loadUsers();
+    }
+    return Array.from(this.users.values()).find(
+      (user) => user.username.toLowerCase() === username.toLowerCase()
+    );
+  }
+
+  async createUser(userData: Omit<User, 'id' | 'createdAt' | 'updatedAt'>): Promise<User> {
+    const id = randomUUID();
+    const now = new Date();
+    const user: User = {
+      ...userData,
+      id,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.users.set(id, user);
+    this.saveUsers();
+    return user;
+  }
+
+  async updateUser(id: string, updates: Partial<User>): Promise<User> {
+    const existingUser = this.users.get(id);
+    if (!existingUser) {
+      throw new Error("User not found");
+    }
+
+    const updatedUser: User = {
+      ...existingUser,
+      ...updates,
+      id: existingUser.id,
+      createdAt: existingUser.createdAt,
+      updatedAt: new Date(),
+    };
+
+    this.users.set(id, updatedUser);
+    this.saveUsers();
+    return updatedUser;
+  }
+
+  async searchUsers(query: string): Promise<User[]> {
+    const lowerQuery = query.toLowerCase();
+    return Array.from(this.users.values()).filter(
+      user => user.username.toLowerCase().includes(lowerQuery)
+    );
+  }
+
+  // Friends methods
+  async getFriends(userId: string): Promise<Friend[]> {
+    return Array.from(this.friends.values()).filter(
+      f => f.userId === userId || f.friendId === userId
+    );
+  }
+
+  async addFriend(userId: string, friendId: string): Promise<Friend> {
+    const id = randomUUID();
+    const friend: Friend = {
+      id,
+      userId,
+      friendId,
+      createdAt: new Date().toISOString(),
+    };
+    this.friends.set(id, friend);
+    this.saveFriendsData();
+    return friend;
+  }
+
+  async removeFriend(userId: string, friendId: string): Promise<void> {
+    for (const [id, friend] of this.friends) {
+      if ((friend.userId === userId && friend.friendId === friendId) ||
+        (friend.userId === friendId && friend.friendId === userId)) {
+        this.friends.delete(id);
+        break;
+      }
+    }
+    this.saveFriendsData();
+  }
+
+  async areFriends(userId: string, friendId: string): Promise<boolean> {
+    for (const friend of this.friends.values()) {
+      if ((friend.userId === userId && friend.friendId === friendId) ||
+        (friend.userId === friendId && friend.friendId === userId)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // Friend Requests methods
+  async getFriendRequests(userId: string): Promise<FriendRequest[]> {
+    return Array.from(this.friendRequests.values()).filter(
+      req => req.toUserId === userId && req.status === 'pending'
+    );
+  }
+
+  async getSentFriendRequests(userId: string): Promise<FriendRequest[]> {
+    return Array.from(this.friendRequests.values()).filter(
+      req => req.fromUserId === userId
+    );
+  }
+
+  async createFriendRequest(fromUserId: string, toUserId: string): Promise<FriendRequest> {
+    const id = randomUUID();
+    const request: FriendRequest = {
+      id,
+      fromUserId,
+      toUserId,
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+    };
+    this.friendRequests.set(id, request);
+    this.saveFriendsData();
+    return request;
+  }
+
+  async getFriendRequestById(id: string): Promise<FriendRequest | undefined> {
+    return this.friendRequests.get(id);
+  }
+
+  async updateFriendRequest(id: string, updates: Partial<FriendRequest>): Promise<FriendRequest> {
+    const existing = this.friendRequests.get(id);
+    if (!existing) {
+      throw new Error("Friend request not found");
+    }
+    const updated = { ...existing, ...updates };
+    this.friendRequests.set(id, updated);
+    this.saveFriendsData();
+    return updated;
+  }
+
+  async deleteFriendRequest(id: string): Promise<void> {
+    this.friendRequests.delete(id);
+    this.saveFriendsData();
+  }
+
+  // Notifications methods
+  async getNotifications(userId: string): Promise<Notification[]> {
+    return Array.from(this.notifications.values())
+      .filter(n => n.userId === userId)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }
+
+  async getUnreadNotificationCount(userId: string): Promise<number> {
+    return Array.from(this.notifications.values())
+      .filter(n => n.userId === userId && !n.read).length;
+  }
+
+  async createNotification(notificationData: Omit<Notification, 'id' | 'createdAt'>): Promise<Notification> {
+    const id = randomUUID();
+    const notification: Notification = {
+      ...notificationData,
+      id,
+      createdAt: new Date().toISOString(),
+    };
+    this.notifications.set(id, notification);
+    this.saveFriendsData();
+    return notification;
+  }
+
+  async markNotificationRead(id: string): Promise<void> {
+    const notification = this.notifications.get(id);
+    if (notification) {
+      notification.read = true;
+      this.notifications.set(id, notification);
+      this.saveFriendsData();
+    }
+  }
+
+  async markAllNotificationsRead(userId: string): Promise<void> {
+    for (const notification of this.notifications.values()) {
+      if (notification.userId === userId) {
+        notification.read = true;
+      }
+    }
+    this.saveFriendsData();
+  }
+
+  async deleteNotification(id: string): Promise<void> {
+    this.notifications.delete(id);
+    this.saveFriendsData();
+  }
+
+  // Direct Messages methods
+  async getConversations(userId: string): Promise<{ friendId: string; lastMessage: DirectMessage; unreadCount: number }[]> {
+    const messages = Array.from(this.directMessages.values());
+    const conversationMap = new Map<string, { lastMessage: DirectMessage; unreadCount: number }>();
+
+    for (const msg of messages) {
+      let otherId: string;
+      if (msg.fromUserId === userId) {
+        otherId = msg.toUserId;
+      } else if (msg.toUserId === userId) {
+        otherId = msg.fromUserId;
+      } else {
+        continue;
+      }
+
+      const existing = conversationMap.get(otherId);
+      if (!existing || new Date(msg.createdAt) > new Date(existing.lastMessage.createdAt)) {
+        const unreadCount = msg.toUserId === userId && !msg.read ? 1 : 0;
+        conversationMap.set(otherId, {
+          lastMessage: msg,
+          unreadCount: (existing?.unreadCount || 0) + unreadCount
+        });
+      } else if (msg.toUserId === userId && !msg.read) {
+        existing.unreadCount++;
+      }
+    }
+
+    return Array.from(conversationMap.entries()).map(([friendId, data]) => ({
+      friendId,
+      lastMessage: data.lastMessage,
+      unreadCount: data.unreadCount,
+    })).sort((a, b) => new Date(b.lastMessage.createdAt).getTime() - new Date(a.lastMessage.createdAt).getTime());
+  }
+
+  async getMessages(userId: string, friendId: string): Promise<DirectMessage[]> {
+    return Array.from(this.directMessages.values())
+      .filter(msg =>
+        (msg.fromUserId === userId && msg.toUserId === friendId) ||
+        (msg.fromUserId === friendId && msg.toUserId === userId)
+      )
+      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  }
+
+  async sendMessage(
+    fromUserId: string,
+    toUserId: string,
+    message: string,
+    attachmentType?: 'image' | 'video' | 'audio' | 'gif' | 'file',
+    attachmentUrl?: string,
+    attachmentFilename?: string,
+    attachmentSize?: number,
+    attachmentMimeType?: string,
+    audioDuration?: number
+  ): Promise<DirectMessage> {
+    const id = randomUUID();
+    const dm: DirectMessage = {
+      id,
+      fromUserId,
+      toUserId,
+      message,
+      attachmentType,
+      attachmentUrl,
+      attachmentFilename,
+      attachmentSize,
+      attachmentMimeType,
+      audioDuration,
+      read: false,
+      createdAt: new Date().toISOString(),
+    };
+    this.directMessages.set(id, dm);
+    this.saveFriendsData();
+    return dm;
+  }
+
+  async markMessagesRead(userId: string, friendId: string): Promise<void> {
+    for (const msg of this.directMessages.values()) {
+      if (msg.fromUserId === friendId && msg.toUserId === userId && !msg.read) {
+        msg.read = true;
+      }
+    }
+    this.saveFriendsData();
+  }
+
+  // Save/Load friends data
+  private saveFriendsData(): void {
+    try {
+      const friendsFile = join(process.cwd(), "data", "friends.json");
+      const data = {
+        friends: Array.from(this.friends.values()),
+        friendRequests: Array.from(this.friendRequests.values()),
+        notifications: Array.from(this.notifications.values()),
+        directMessages: Array.from(this.directMessages.values()),
+      };
+      writeFileSync(friendsFile, JSON.stringify(data, null, 2));
+    } catch (error) {
+      console.error("Error saving friends data:", error);
+    }
+  }
+
+  private loadFriendsData(): void {
+    try {
+      const friendsFile = join(process.cwd(), "data", "friends.json");
+      if (existsSync(friendsFile)) {
+        const data = JSON.parse(readFileSync(friendsFile, "utf-8"));
+        if (data.friends) {
+          for (const f of data.friends) {
+            this.friends.set(f.id, f);
+          }
+        }
+        if (data.friendRequests) {
+          for (const r of data.friendRequests) {
+            this.friendRequests.set(r.id, r);
+          }
+        }
+        if (data.notifications) {
+          for (const n of data.notifications) {
+            this.notifications.set(n.id, n);
+          }
+        }
+        if (data.directMessages) {
+          for (const m of data.directMessages) {
+            this.directMessages.set(m.id, m);
+          }
+        }
+        console.log(`✅ Loaded ${this.friends.size} friends, ${this.friendRequests.size} requests, ${this.notifications.size} notifications, ${this.directMessages.size} messages`);
+      }
+    } catch (error) {
+      console.error("Error loading friends data:", error);
+    }
   }
 }
 

@@ -3,6 +3,39 @@ import { pgTable, text, varchar, integer, boolean, timestamp } from "drizzle-orm
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+// Users table for authentication
+export const users = pgTable("users", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  email: text("email").notNull().unique(),
+  username: text("username").notNull().unique(),
+  passwordHash: text("password_hash").notNull(),
+  avatarUrl: text("avatar_url"),
+  bio: text("bio"),
+  emailVerified: boolean("email_verified").default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, updatedAt: true, passwordHash: true }).extend({
+  password: z.string().min(6, "Password must be at least 6 characters"),
+});
+
+export const loginSchema = z.object({
+  email: z.string().email("Invalid email"),
+  password: z.string().min(1, "Password is required"),
+});
+
+export const updateProfileSchema = z.object({
+  username: z.string().min(3, "Username must be at least 3 characters").optional(),
+  bio: z.string().max(500, "Bio must be under 500 characters").optional(),
+});
+
+export type User = typeof users.$inferSelect;
+export type InsertUser = z.infer<typeof insertUserSchema>;
+export type LoginInput = z.infer<typeof loginSchema>;
+export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
+
+
 // Shows table
 export const shows = pgTable("shows", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -113,7 +146,9 @@ export const comments = pgTable("comments", {
   movieId: varchar("movie_id"), // null if it's an episode comment
   animeEpisodeId: varchar("anime_episode_id"), // null if not anime comment
   parentId: varchar("parent_id"), // null if it's a top-level comment
+  userId: varchar("user_id"), // Optional: link to registered user
   userName: text("user_name").notNull(),
+  avatarUrl: text("avatar_url"), // Optional: snapshot of avatar or link
   comment: text("comment").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
