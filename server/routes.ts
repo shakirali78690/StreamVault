@@ -4018,6 +4018,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin Analytics - User Stats
+  app.get("/api/admin/stats/users", requireAdmin, async (_req, res) => {
+    try {
+      // 1. Get User Counts
+      const users = await storage.getAllUsers();
+      const totalUsers = users.length;
+      const activeUsers = users.length;
+
+      // 2. Get Guest Subscribers (Emails)
+      let subscribers: string[] = [];
+      if (existsSync(SUBSCRIBERS_FILE)) {
+        const fileContent = readFileSync(SUBSCRIBERS_FILE, 'utf-8');
+        const data = JSON.parse(fileContent);
+        if (Array.isArray(data)) {
+          subscribers = data;
+        } else if (data.subscribers && Array.isArray(data.subscribers)) {
+          subscribers = data.subscribers.map((s: any) => typeof s === 'string' ? s : s.email);
+        }
+      }
+
+      res.json({
+        totalUsers,
+        activeUsers,
+        subscribers
+      });
+    } catch (error) {
+      console.error("Error fetching user stats:", error);
+      res.status(500).json({ error: "Failed to fetch user stats" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;

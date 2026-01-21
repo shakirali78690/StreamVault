@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Trash2, Edit, Plus, Save, X, Upload, FileJson, LogOut, Mail, Send, Bell, Megaphone } from "lucide-react";
+import { Trash2, Edit, Plus, Save, X, Upload, FileJson, LogOut, Mail, Send, Bell, Megaphone, User as UserIcon } from "lucide-react";
 import type { Show, Episode, Movie, BlogPost, Anime, AnimeEpisode } from "@shared/schema";
 import { getAuthHeaders, logout as authLogout } from "@/lib/auth";
 
@@ -115,6 +115,10 @@ export default function AdminPage() {
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="flex flex-wrap h-auto gap-2 mb-8 bg-muted/50 p-1">
+            <TabsTrigger value="users" className="gap-2">
+              <UserIcon className="w-4 h-4" />
+              Users
+            </TabsTrigger>
             <TabsTrigger value="shows">Shows</TabsTrigger>
             <TabsTrigger value="movies">Movies</TabsTrigger>
             <TabsTrigger value="anime">Anime</TabsTrigger>
@@ -129,6 +133,12 @@ export default function AdminPage() {
             <TabsTrigger value="add-episode">Add Episode</TabsTrigger>
             <TabsTrigger value="import">Import</TabsTrigger>
           </TabsList>
+
+
+          {/* User Analytics Tab */}
+          <TabsContent value="users">
+            <UserAnalytics />
+          </TabsContent>
 
           {/* Manage Shows Tab */}
           <TabsContent value="shows">
@@ -199,6 +209,95 @@ export default function AdminPage() {
     </div>
   );
 }
+
+// User Analytics Component
+function UserAnalytics() {
+  const { data: stats } = useQuery<{
+    totalUsers: number;
+    activeUsers: number;
+    subscribers: string[];
+  }>({
+    queryKey: ["/api/admin/stats/users"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/stats/users", {
+        headers: getAuthHeaders(),
+      });
+      if (!res.ok) throw new Error("Failed to fetch user stats");
+      return res.json();
+    },
+  });
+
+  return (
+    <div className="space-y-8">
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Auth Accounts</CardTitle>
+            <UserIcon className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats?.totalUsers || 0}</div>
+            <p className="text-xs text-muted-foreground">
+              Registered users on the platform
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Active Accounts</CardTitle>
+            <UserIcon className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats?.activeUsers || 0}</div>
+            <p className="text-xs text-muted-foreground">
+              Users with recent activity
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Guest Subscribers</CardTitle>
+            <Mail className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats?.subscribers?.length || 0}</div>
+            <p className="text-xs text-muted-foreground">
+              Email-only subscribers
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Guest Subscribers List</CardTitle>
+          <CardDescription>
+            List of emails subscribed to the newsletter (Guest Accounts)
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="rounded-md border p-4">
+            {stats?.subscribers && stats.subscribers.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {stats.subscribers.map((email, i) => (
+                  <div key={i} className="flex items-center gap-2 p-2 rounded bg-muted/50">
+                    <Mail className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm">{email}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-6 text-muted-foreground">
+                No guest subscribers found
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 
 // Manage Shows Component
 function ManageShows({ shows }: { shows: Show[] }) {
@@ -3369,8 +3468,8 @@ function BroadcastNotificationManager({ shows, movies, anime }: { shows: Show[];
               id="customLink"
               value={customLink}
               onChange={(e) => setCustomLink(e.target.value)}
-              placeholder={notificationType === 'custom' 
-                ? "e.g., /show/stranger-things or https://example.com" 
+              placeholder={notificationType === 'custom'
+                ? "e.g., /show/stranger-things or https://example.com"
                 : "Override default link (e.g., /special-promo)"}
             />
             <p className="text-xs text-muted-foreground">
