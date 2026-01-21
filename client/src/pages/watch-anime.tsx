@@ -1,9 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRoute, useLocation, Link } from "wouter";
 import { useEffect, useState, useRef } from "react";
-import { ChevronLeft, Play, SkipForward } from "lucide-react";
+import { Download, ChevronLeft, ChevronRight, Share2, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { getGoogleDriveDownloadUrl } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { CommentsSection } from "@/components/comments-section";
@@ -390,12 +391,30 @@ export default function WatchAnime() {
 
                         {/* Episode Info */}
                         <div className="mt-4">
-                            <h1
-                                className="text-2xl md:text-3xl font-bold mb-2"
-                                data-testid="text-episode-title"
-                            >
-                                {anime.title}
-                            </h1>
+                            <div className="flex items-center justify-between gap-4 mb-2">
+                                <h1
+                                    className="text-2xl md:text-3xl font-bold"
+                                    data-testid="text-episode-title"
+                                >
+                                    {anime.title}
+                                </h1>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="gap-2"
+                                    asChild
+                                >
+                                    <a
+                                        href={getGoogleDriveDownloadUrl(currentEpisodeData.videoUrl || currentEpisodeData.googleDriveUrl)}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        download
+                                    >
+                                        <Download className="w-4 h-4" />
+                                        Download
+                                    </a>
+                                </Button>
+                            </div>
                             <h2 className="text-lg text-muted-foreground mb-3">
                                 S{currentSeason} E{currentEpisode}: {currentEpisodeData.title}
                                 {currentEpisodeData.dubbed && (

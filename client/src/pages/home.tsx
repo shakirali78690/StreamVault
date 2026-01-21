@@ -20,6 +20,10 @@ export default function Home() {
     queryKey: ["/api/anime"],
   });
 
+  const { data: recommendations = [] } = useQuery<any[]>({
+    queryKey: ["/api/recommendations"],
+  });
+
   const isLoading = showsLoading || moviesLoading;
 
   const { data: progressData = [] } = useQuery<any[]>({
@@ -142,6 +146,15 @@ export default function Home() {
             title="Trending Now"
             shows={trending}
             orientation="landscape"
+          />
+        )}
+
+        {/* Recommendations Row */}
+        {recommendations.length > 0 && (
+          <ContentRow
+            title="Recommended for You"
+            shows={recommendations}
+            orientation="portrait"
           />
         )}
 

@@ -1,8 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRoute, Link } from "wouter";
 import { useEffect, useRef, useState } from "react";
-import { ChevronLeft, Play } from "lucide-react";
+import { ChevronLeft, Play, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { getGoogleDriveDownloadUrl } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CommentsSection } from "@/components/comments-section";
@@ -303,8 +304,34 @@ export default function WatchMovie() {
 
             {/* Movie Info Below Player */}
             <div className="p-6">
-              <h1 className="text-2xl font-bold mb-2">{movie.title}</h1>
-              <div className="flex gap-4 text-sm text-muted-foreground mb-4">
+              <div className="flex items-center justify-between mb-2">
+                <h1
+                  className="text-2xl md:text-3xl font-bold"
+                  data-testid="text-episode-title"
+                >
+                  {movie.title}
+                </h1>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                  asChild
+                >
+                  <a
+                    href={getGoogleDriveDownloadUrl(movie.googleDriveUrl)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    download
+                  >
+                    <Download className="w-4 h-4" />
+                    Download
+                  </a>
+                </Button>
+              </div>
+              <p className="text-muted-foreground mb-4">
+                {movie.description}
+              </p>
+              <div className="flex items-center gap-4 text-sm text-muted-foreground">
                 <span>{movie.year}</span>
                 <span>•</span>
                 <span>{movie.duration} min</span>

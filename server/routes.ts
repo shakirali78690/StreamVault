@@ -1201,11 +1201,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Viewing progress endpoints
+  // Viewing progress endpoints with Auth Support
+  const getProgressKey = (req: Request): string => {
+    // Check for auth token first
+    const token = req.cookies?.authToken;
+    if (token) {
+      // We need to import verifyToken or use a shared helper. 
+      // Assuming verifyToken is imported from ./auth or similar scope
+      // Since verifyToken is used in this file (e.g. comment creation), we can use it.
+      try {
+        const payload = verifyToken(token);
+        if (payload && payload.userId) {
+          return `user:${payload.userId}`;
+        }
+      } catch (e) {
+        // invalid token, fall back to session
+      }
+    }
+    return getSessionId(req);
+  };
+
   app.get("/api/progress", async (req, res) => {
     try {
-      const sessionId = getSessionId(req);
-      const progress = await storage.getViewingProgress(sessionId);
+      const key = getProgressKey(req);
+      const progress = await storage.getViewingProgress(key);
       res.json(progress);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch viewing progress" });
@@ -1214,15 +1233,107 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/progress", async (req, res) => {
     try {
-      const sessionId = getSessionId(req);
+      const key = getProgressKey(req);
       const progress = viewingProgressSchema.parse(req.body);
-      const entry = await storage.updateViewingProgress(sessionId, progress);
+
+      // If user is authenticated, we might want to merge guest progress? 
+      // For now, simpler is better: just save to current key.
+      const entry = await storage.updateViewingProgress(key, progress);
       res.json(entry);
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: "Invalid progress data", details: error.errors });
       }
       res.status(500).json({ error: "Failed to update viewing progress" });
+    }
+  });
+
+  // ========== RECOMMENDATIONS SYSTEM ==========
+  app.get("/api/recommendations", async (req, res) => {
+    try {
+      const key = getProgressKey(req);
+      // Only provide personalized recommendations for logged-in users? 
+      // Actually, we can do it for guests too if they have history!
+
+      const history = await storage.getViewingProgress(key);
+
+      // 1. Analyze user preferences
+      const genreCounts: Record<string, number> = {};
+      const watchedIds = new Set<string>();
+
+      history.forEach(p => {
+        if (p.showId) watchedIds.add(p.showId);
+        if (p.movieId) watchedIds.add(p.movieId);
+        if (p.animeId) watchedIds.add(p.animeId);
+      });
+
+      // Fetch all content to analyze genres of watched items and find new ones
+      const [allShows, allMovies, allAnime] = await Promise.all([
+        storage.getAllShows(),
+        storage.getAllMovies(),
+        storage.getAllAnime()
+      ]);
+
+      // Count genres from watched content
+      // Helper to process genres
+      const processGenres = (itemStart: any, itemId: string) => {
+        // Find the item in full lists
+        const item = allShows.find(s => s.id === itemId) ||
+          allMovies.find(m => m.id === itemId) ||
+          allAnime.find(a => a.id === itemId);
+
+        if (item && item.genres) {
+          const genres = item.genres.split(',').map(g => g.trim());
+          genres.forEach(g => {
+            genreCounts[g] = (genreCounts[g] || 0) + 1;
+          });
+        }
+      };
+
+      history.forEach(p => {
+        processGenres(p, p.showId || p.movieId || p.animeId || '');
+      });
+
+      // Get top 3 genres
+      const topGenres = Object.entries(genreCounts)
+        .sort(([, a], [, b]) => b - a)
+        .slice(0, 3)
+        .map(([g]) => g);
+
+      // 2. Score unwatched content
+      const scoreItem = (item: Show | Movie | Anime) => {
+        if (watchedIds.has(item.id)) return 0; // Already watched
+
+        let score = 0;
+        const itemGenres = item.genres.split(',').map(g => g.trim());
+
+        // Genre match bonus
+        itemGenres.forEach(g => {
+          if (topGenres.includes(g)) score += 2;
+          else if (genreCounts[g]) score += 0.5; // Minor bonus for other liked genres
+        });
+
+        // Rating bonus (prioritize highly rated content)
+        if (item.imdbRating && parseFloat(item.imdbRating) > 7.5) score += 1;
+        if (item.trending) score += 1;
+
+        return score;
+      };
+
+      // 3. Aggregate and sort
+      const recommendations = [
+        ...allShows.map(s => ({ ...s, type: 'show', score: scoreItem(s) })),
+        ...allMovies.map(m => ({ ...m, type: 'movie', score: scoreItem(m) })),
+        ...allAnime.map(a => ({ ...a, type: 'anime', score: scoreItem(a) }))
+      ]
+        .filter(item => item.score > 0)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 15); // Return top 15
+
+      res.json(recommendations);
+    } catch (error) {
+      console.error("Recommendation error:", error);
+      res.status(500).json({ error: "Failed to generate recommendations" });
     }
   });
 

@@ -333,6 +333,21 @@ export class MemStorage implements IStorage {
           data.blogPosts.forEach((post: BlogPost) => this.blogPosts.set(post.id, post));
           console.log(`✅ Loaded ${data.blogPosts.length} blog posts`);
         }
+
+        // Restore viewing progress
+        // viewingProgress structure: Map<sessionId, Map<contentId, ProgressEntry>>
+        if (data.viewingProgress) {
+          let progressCount = 0;
+          Object.entries(data.viewingProgress).forEach(([sessionId, progressMap]: [string, any]) => {
+            const innerMap = new Map<string, ProgressEntry>();
+            Object.values(progressMap).forEach((entry: any) => {
+              innerMap.set(entry.showId || entry.movieId || entry.animeId, entry);
+              progressCount++;
+            });
+            this.viewingProgress.set(sessionId, innerMap);
+          });
+          console.log(`✅ Loaded viewing progress for ${this.viewingProgress.size} users`);
+        }
       } else {
         console.log("📦 No data file found, seeding initial data...");
         this.seedData();
@@ -348,6 +363,15 @@ export class MemStorage implements IStorage {
   // Save data to JSON file
   private saveData() {
     try {
+      // Convert viewingProgress Map<Map> to Object for JSON
+      const progressObj: Record<string, Record<string, ProgressEntry>> = {};
+      this.viewingProgress.forEach((innerMap, sessionId) => {
+        progressObj[sessionId] = {};
+        innerMap.forEach((entry, contentId) => {
+          progressObj[sessionId][contentId] = entry;
+        });
+      });
+
       const data = {
         shows: Array.from(this.shows.values()),
         episodes: Array.from(this.episodes.values()),
@@ -358,6 +382,7 @@ export class MemStorage implements IStorage {
         contentRequests: Array.from(this.contentRequests.values()),
         issueReports: Array.from(this.issueReports.values()),
         blogPosts: Array.from(this.blogPosts.values()),
+        viewingProgress: progressObj,
         lastUpdated: new Date().toISOString(),
       };
 
@@ -368,7 +393,7 @@ export class MemStorage implements IStorage {
       }
 
       writeFileSync(this.dataFile, JSON.stringify(data, null, 2), "utf-8");
-      console.log("💾 Data saved to file");
+      // console.log("💾 Data saved to file"); // Commented out to reduce noise
     } catch (error) {
       console.error("❌ Error saving data:", error);
     }

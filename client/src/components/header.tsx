@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Search, Moon, Sun, Play, Menu, X, Bookmark, Users, User, LogOut, PartyPopper, UserPlus } from "lucide-react";
+import { Search, Moon, Sun, Play, Menu, X, Bookmark, Users, User, LogOut, PartyPopper, UserPlus, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useTheme } from "./theme-provider";
@@ -307,6 +307,10 @@ export function Header() {
                 <DropdownMenuItem onClick={() => navigate('/friends')}>
                   <Users className="mr-2 h-4 w-4" />
                   Friends
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate('/downloads')}>
+                  <Download className="mr-2 h-4 w-4" />
+                  Downloads
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => logout()} className="text-destructive focus:text-destructive">

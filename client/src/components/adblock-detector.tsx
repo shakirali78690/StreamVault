@@ -1,38 +1,47 @@
 import { useState, useEffect } from "react";
 import { ShieldOff, Heart, RefreshCw, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useLocation } from "wouter";
 
 export function AdBlockDetector() {
   const [adBlockDetected, setAdBlockDetected] = useState(false);
   const [checking, setChecking] = useState(false);
+  const [location] = useLocation();
 
   const checkAdBlocker = async (): Promise<boolean> => {
+    // Don't check on downloads page or if offline
+    if (location === '/downloads' || !navigator.onLine) {
+      return false;
+    }
+
     try {
       // Method 1: Try to fetch a known ad script
       await fetch(
         "https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js",
         { method: "HEAD", mode: "no-cors" }
       );
-      
+
       // Method 2: Create a bait element
       const bait = document.createElement("div");
       bait.className = "adsbox ad-banner textads banner-ads";
       bait.style.cssText = "position:absolute;left:-9999px;width:1px;height:1px;";
       bait.innerHTML = "&nbsp;";
       document.body.appendChild(bait);
-      
+
       await new Promise((resolve) => setTimeout(resolve, 100));
-      
-      const isBlocked = bait.offsetHeight === 0 || 
-                        bait.offsetWidth === 0 || 
-                        bait.clientHeight === 0 ||
-                        getComputedStyle(bait).display === "none" ||
-                        getComputedStyle(bait).visibility === "hidden";
-      
+
+      const isBlocked = bait.offsetHeight === 0 ||
+        bait.offsetWidth === 0 ||
+        bait.clientHeight === 0 ||
+        getComputedStyle(bait).display === "none" ||
+        getComputedStyle(bait).visibility === "hidden";
+
       document.body.removeChild(bait);
-      
+
       return isBlocked;
     } catch {
+      // If offline, don't consider it blocked
+      if (!navigator.onLine) return false;
       return true;
     }
   };
@@ -61,7 +70,7 @@ export function AdBlockDetector() {
   const handleRefresh = async () => {
     setChecking(true);
     const stillBlocked = await checkAdBlocker();
-    
+
     if (!stillBlocked) {
       window.location.reload();
     } else {
@@ -69,7 +78,7 @@ export function AdBlockDetector() {
     }
   };
 
-  if (!adBlockDetected) {
+  if (!adBlockDetected || location === '/downloads') {
     return null;
   }
 

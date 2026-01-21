@@ -21,6 +21,7 @@ import Search from "@/pages/search";
 import Category from "@/pages/category";
 import Watchlist from "@/pages/watchlist";
 import Admin from "@/pages/admin";
+import DownloadsPage from "@/pages/downloads";
 import AdminLogin from "@/pages/admin-login";
 import Privacy from "@/pages/privacy";
 import About from "@/pages/about";
@@ -84,6 +85,7 @@ function Router() {
           <Route path="/admin/widget" component={WidgetDashboard} />
           <Route path="/admin/analytics" component={SiteAnalytics} />
           <Route path="/admin" component={Admin} />
+          <Route path="/downloads" component={DownloadsPage} />
           <Route path="/privacy" component={Privacy} />
           <Route path="/about" component={About} />
           <Route path="/contact" component={Contact} />

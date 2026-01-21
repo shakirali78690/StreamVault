@@ -49,6 +49,9 @@ const isJWPlayerUrl = (url: string): boolean => {
 };
 
 const isDirectVideoUrl = (url: string): boolean => {
+    // Return true for blob URLs (local file playback)
+    if (url.startsWith('blob:')) return true;
+
     const videoExtensions = ['.mp4', '.webm', '.ogg', '.m3u8', '.mpd'];
     return videoExtensions.some(ext => url.toLowerCase().includes(ext));
 };
@@ -202,12 +205,21 @@ const JWPlayerWrapper = forwardRef<VideoPlayerRef, JWPlayerWrapperProps>(({
         // Initialize JW Player with full settings
         // Use proxy for protected external URLs
         const finalVideoUrl = getProxiedUrl(videoUrl);
-        const player = window.jwplayer(playerId).setup({
+        const playerConfig: any = {
             file: finalVideoUrl,
             width: '100%',
             height: '100%',
             autostart: autoplay,
             controls: true, // Always show controls, but we'll handle sync via events
+        };
+
+        // If explicitly a blob URL, force type to mp4 to help JW Player
+        if (finalVideoUrl.startsWith('blob:')) {
+            playerConfig.type = 'mp4';
+        }
+
+        const player = window.jwplayer(playerId).setup({
+            ...playerConfig,
             primary: 'html5',
             stretching: 'fill',
             playbackRateControls: true,
@@ -361,7 +373,7 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(({
     subtitleTracks = []
 }, ref) => {
     const jwPlayerRef = useRef<VideoPlayerRef>(null);
-    const [playerType, setPlayerType] = useState<'drive' | 'jwplayer' | 'direct' | 'embed' | 'none'>('none');
+    const [playerType, setPlayerType] = useState<'drive' | 'jwplayer' | 'direct' | 'embed' | 'local' | 'none'>('none');
     const [processedUrl, setProcessedUrl] = useState<string | null>(null);
 
     // Forward ref to internal player
@@ -392,7 +404,7 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(({
         }
 
         // Check if it's a full URL or just a Drive ID
-        const isAbsoluteUrl = videoUrl.startsWith('http://') || videoUrl.startsWith('https://');
+        const isAbsoluteUrl = videoUrl.startsWith('http://') || videoUrl.startsWith('https://') || videoUrl.startsWith('blob:');
 
         // If it's just a Google Drive ID (alphanumeric with dashes/underscores, typically 30-40 chars)
         const isDriveId = /^[a-zA-Z0-9_-]{20,60}$/.test(videoUrl);
@@ -414,7 +426,10 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(({
         }
 
         // Detect URL type and process accordingly
-        if (isGoogleDriveUrl(videoUrl)) {
+        if (videoUrl.startsWith('blob:')) {
+            setPlayerType('local');
+            setProcessedUrl(videoUrl);
+        } else if (isGoogleDriveUrl(videoUrl)) {
             setPlayerType('drive');
             const driveId = extractDriveId(videoUrl);
             setProcessedUrl(`https://drive.google.com/file/d/${driveId}/preview?autoplay=0&controls=1&modestbranding=1`);
@@ -467,6 +482,20 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(({
                 allowFullScreen
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 style={{ border: 'none' }}
+            />
+        );
+    }
+
+    // Local Native Player (for offline blob playback)
+    if (playerType === 'local') {
+        return (
+            <video
+                src={processedUrl!}
+                className={`w-full h-full bg-black ${className}`}
+                controls
+                autoPlay={autoplay}
+                playsInline
+                controlsList="nodownload"
             />
         );
     }
