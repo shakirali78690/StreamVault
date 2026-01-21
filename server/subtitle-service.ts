@@ -52,7 +52,7 @@ async function fetchWithTimeout(url: string, timeoutMs: number = 8000): Promise<
         const response = await fetch(url, {
             signal: controller.signal,
             headers: {
-                'User-Agent': 'StreamVault/1.0',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                 'Accept': 'application/json'
             }
         });
@@ -74,6 +74,7 @@ export async function searchSubtitles(
     language: string = 'en'
 ): Promise<SubtitleSearchResponse> {
     console.log(`🔍 Subtitle search: imdbId=${imdbId}, season=${season}, episode=${episode}, lang=${language}`);
+
 
     // Try each API in order
     for (let i = 0; i < SUBTITLE_APIS.length; i++) {
@@ -102,7 +103,7 @@ export async function searchSubtitles(
             const response = await fetchWithTimeout(url, 8000);
 
             if (!response.ok) {
-                console.log(`⚠️ Provider ${i + 1} returned ${response.status}, trying next...`);
+                console.log(`⚠️ Provider ${i + 1} (${baseUrl}) returned ${response.status} ${response.statusText}, trying next...`);
                 continue;
             }
 
@@ -137,15 +138,18 @@ export async function searchSubtitles(
                 }));
             }
 
+            // Filter out empty URLs
+            subtitles = subtitles.filter(s => s.url && s.url.startsWith('http'));
+
             if (subtitles.length > 0) {
                 console.log(`✅ Found ${subtitles.length} subtitles from provider ${i + 1}`);
                 return { subtitles };
             } else {
-                console.log(`⚠️ No subtitles found from provider ${i + 1}, trying next...`);
+                console.log(`⚠️ No valid subtitles found from provider ${i + 1}, trying next...`);
             }
 
         } catch (error: any) {
-            console.log(`⚠️ Provider ${i + 1} failed: ${error.message}, trying next...`);
+            console.log(`⚠️ Provider ${i + 1} (${baseUrl}) failed: ${error.message}, trying next...`);
             continue;
         }
     }
@@ -176,7 +180,8 @@ export async function downloadSubtitle(subtitleUrl: string): Promise<string | nu
 
         const response = await fetch(subtitleUrl, {
             headers: {
-                'User-Agent': 'StreamVault/1.0'
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Referer': 'https://www.opensubtitles.org/'
             }
         });
 

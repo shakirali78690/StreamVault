@@ -59,6 +59,8 @@ function requireAdmin(req: any, res: any, next: any) {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  const SUBSCRIBERS_FILE = path.join(__dirname, "..", "data", "subscribers.json");
+
   // Setup dynamic sitemaps
   setupSitemaps(app, storage);
 
@@ -167,6 +169,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         username: user.username,
       });
       setAuthCookie(res, token);
+
+      // Auto-subscribe to newsletter
+      try {
+        let data = { subscribers: [] as any[] };
+        if (existsSync(SUBSCRIBERS_FILE)) {
+          data = JSON.parse(readFileSync(SUBSCRIBERS_FILE, "utf-8"));
+        }
+
+        const isSubscribed = data.subscribers.some((s: any) => s.email === email);
+        if (!isSubscribed) {
+          data.subscribers.push({
+            email,
+            subscribedAt: new Date().toISOString(),
+            source: "signup"
+          });
+          writeFileSync(SUBSCRIBERS_FILE, JSON.stringify(data, null, 2));
+          console.log(`📧 Auto-subscribed new user to newsletter: ${email}`);
+        }
+      } catch (subError) {
+        console.error("Failed to auto-subscribe user:", subError);
+        // Don't fail registration if subscription fails
+      }
 
       res.status(201).json({
         user: {
@@ -2230,8 +2254,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ========== NEWSLETTER SUBSCRIPTION ==========
-
-  const SUBSCRIBERS_FILE = path.join(__dirname, "..", "data", "subscribers.json");
 
   // Subscribe to newsletter
   app.post("/api/newsletter/subscribe", async (req, res) => {

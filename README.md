@@ -76,6 +76,15 @@ A professional Netflix-inspired streaming platform for both TV shows and movies,
 - **Speaking indicators** - See who's talking in voice chat
 - **Room sharing** - Easy room code sharing via link
 
+### 👥 **Social Features (NEW!)**
+- **Friend System** - Add friends, view online status, and track what they're watching
+- **Direct Messaging** - Real-time private chat with friends
+- **Rich Chat** - Send GIFs, emojis, and file attachments
+- **Activity Feed** - See your friends' activity directly on the dashboard
+- **User Profiles** - Customizable profiles with avatars 
+- **Notifications** - Real-time alerts for friend requests and messages
+
+
 ### 🛠️ **Tech Stack**
 - **Frontend:** React 18 + TypeScript
 - **Styling:** TailwindCSS + shadcn/ui
@@ -439,6 +448,13 @@ MIT License - feel free to use for personal or commercial projects
 - ✅ **Speaking Indicators** - Visual feedback for active speakers
 - ✅ **Mobile Landscape Overlay** - Prompts users to rotate for better viewing
 - ✅ **Audio Autoplay Unlock** - Handles browser autoplay restrictions
+
+### Previous Updates (v3.5) - January 2026 (Mid-Month)
+- ✅ **Friend System** - Add/Remove friends, online status tracking
+- ✅ **Direct Messaging** - Private real-time chat with friends
+- ✅ **Notification Links** - Admin broadcast notifications now support custom destination links
+- ✅ **Subtitle Improvements** - Enhanced subtitle fetching reliability with fallback providers
+- ✅ **User Avatars** - Custom user avatars in comments
 
 ### Previous Updates (v3.0) - December 2024
 - ✅ **SEO Blog System** - Auto-generated rich blog articles for all content

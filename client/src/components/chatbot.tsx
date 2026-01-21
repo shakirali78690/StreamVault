@@ -84,7 +84,7 @@ export function Chatbot() {
   });
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
-  const [, navigate] = useLocation();
+  const [location, navigate] = useLocation();
 
   const { data: shows } = useQuery<Show[]>({
     queryKey: ["/api/shows"],
@@ -885,22 +885,163 @@ export function Chatbot() {
       };
     }
 
-    // ===== GREETINGS =====
-    if (
-      lowerMessage.match(/^(hi|hello|hey|yo|sup|hola|howdy)/i)
-    ) {
+    // Determine context from current URL
+    const getCurrentPageContent = (): (Show | Movie | Anime) | null => {
+      // Helper to extract slug from path
+      const getSlug = (pattern: RegExp) => {
+        const match = (location as string).match(pattern);
+        return match ? match[1] : null;
+      };
+
+      const showSlug = getSlug(/^\/show\/([^\/]+)/) || getSlug(/^\/watch\/([^\/]+)/);
+      const movieSlug = getSlug(/^\/movie\/([^\/]+)/) || getSlug(/^\/watch-movie\/([^\/]+)/);
+      const animeSlug = getSlug(/^\/anime\/([^\/]+)/) || getSlug(/^\/watch-anime\/([^\/]+)/);
+
+      if (showSlug) return shows?.find(s => s.slug === showSlug) || null;
+      if (movieSlug) return movies?.find(m => m.slug === movieSlug) || null;
+      if (animeSlug) return anime?.find(a => a.slug === animeSlug) || null;
+
+      return null;
+    };
+
+    const currentPageItem = getCurrentPageContent();
+
+    // ===== CONTEXT: "THIS", "HERE", "CURRENT" =====
+    if (currentPageItem && (
+      lowerMessage.includes("this") ||
+      lowerMessage.includes("it") ||
+      lowerMessage.includes("here")
+    )) {
+      // "Play this" / "Watch this"
+      if (lowerMessage.match(/(play|watch|start)/)) {
+        const type = isAnime(currentPageItem) ? 'anime' : isMovie(currentPageItem) ? 'movie' : 'show';
+        const url = type === 'movie' ? `/watch-movie/${currentPageItem.slug}` : type === 'anime' ? `/watch-anime/${currentPageItem.slug}` : `/watch/${currentPageItem.slug}`;
+
+        if (!(location as string).includes('watch')) {
+          navigate(url);
+          return {
+            id: Date.now().toString(),
+            text: `▶️ Starting "${currentPageItem.title}"...`,
+            isBot: true,
+            suggestions: ["Similar content", "🎲 Surprise me"],
+          };
+        } else {
+          return {
+            id: Date.now().toString(),
+            text: `You're already watching "${currentPageItem.title}"! Enjoy the show! 🍿`,
+            isBot: true,
+            suggestions: ["Similar content", "Show details"],
+          };
+        }
+      }
+
+      // "What is this" / "Tell me about this"
+      if (lowerMessage.match(/(what|about|info|details|describe)/)) {
+        let details = `📝 **${currentPageItem.title}**\n\n`;
+        details += `${currentPageItem.description || "No description available."}\n\n`;
+        if (currentPageItem.imdbRating) details += `⭐ **Rating:** ${currentPageItem.imdbRating}\n`;
+        if (currentPageItem.year) details += `📅 **Year:** ${currentPageItem.year}`;
+
+        return {
+          id: Date.now().toString(),
+          text: details,
+          isBot: true,
+          suggestions: ["Play this", "Who is in this?", "Similar to this"],
+        };
+      }
+
+      // "Who is in this" / "Cast"
+      if (lowerMessage.match(/(who|cast|actor|star)/)) {
+        return {
+          id: Date.now().toString(),
+          text: `👥 **Cast of ${currentPageItem.title}:**\n\n${currentPageItem.cast || "Cast information not available."}`,
+          isBot: true,
+          suggestions: ["Play this", "Similar to this"],
+        };
+      }
+    }
+
+    // ===== CHIT-CHAT & PERSONALITY =====
+    // Greetings
+    if (lowerMessage.match(/^(hi|hello|hey|yo|sup|hola|greetings)/i)) {
       return {
         id: Date.now().toString(),
-        text: "👋 Hey! Ready to find something awesome to watch?\n\nI can help you:\n• 🎲 Get a random recommendation\n• 🔍 Find specific titles\n• 🎭 Browse by genre or mood\n• ⭐ See top rated content",
+        text: "👋 Hey there! I'm Vault AI. How can I entertain you today?",
         isBot: true,
         suggestions: ["🎲 Surprise me", "🔥 What's hot", "⭐ Top rated", "Browse genres"],
+      };
+    }
+
+    // Status
+    if (lowerMessage.match(/(how are you|hows it going|whats up)/i)) {
+      return {
+        id: Date.now().toString(),
+        text: "I'm functioning perfectly and ready to stream! 🚀 Thanks for asking. What are you in the mood for?",
+        isBot: true,
+        suggestions: ["Recommend something", "Tell me a joke", "New movies"],
+      };
+    }
+
+    // Identity
+    if (lowerMessage.match(/(who are you|what are you|your name)/i)) {
+      return {
+        id: Date.now().toString(),
+        text: "I'm **Vault AI**, your personal streaming assistant built for StreamVault. I can help you find movies, shows, and anime, or just chat about what to watch next! 🤖",
+        isBot: true,
+        suggestions: ["What can you do?", "Best movies", "Best anime"],
+      };
+    }
+
+    // Creator / Origin
+    if (lowerMessage.match(/(who made you|who created you|developer)/i)) {
+      return {
+        id: Date.now().toString(),
+        text: "I was created by the **StreamVault Engineering Team** to make your streaming experience smoother and more fun! 🛠️",
+        isBot: true,
+        suggestions: ["Cool!", "Show me features"],
+      };
+    }
+
+    // Jokes
+    if (lowerMessage.includes("joke")) {
+      const jokes = [
+        "Why did the movie file break up with the audio file? Because they weren't in sync! 🥁",
+        "Why don't skeletons watch horror movies? They don't have the guts! 💀",
+        "What looks like half a movie? The trailer! 🚛",
+        "Why did the anime character go to school? To improve their 'character development'! 🎌"
+      ];
+      return {
+        id: Date.now().toString(),
+        text: jokes[Math.floor(Math.random() * jokes.length)],
+        isBot: true,
+        suggestions: ["Another one", "Good one", "Show me comedies"],
+      };
+    }
+
+    // Appreciation
+    if (lowerMessage.match(/(thanks|thank you|good bot|awesome|cool|nice)/i)) {
+      return {
+        id: Date.now().toString(),
+        text: "You're welcome! Happy streaming! 🍿✨",
+        isBot: true,
+        suggestions: ["🔥 What's trending", "Evaluate my mood"],
+      };
+    }
+
+    // Love/Flirty (Common bot edge case)
+    if (lowerMessage.match(/(i love you|marry me|date me)/i)) {
+      return {
+        id: Date.now().toString(),
+        text: "Aww, you're sweet! But I'm just a few lines of code... our love is forbidden! 💔🤖",
+        isBot: true,
+        suggestions: ["Show me romance movies", "Tell me a joke"],
       };
     }
 
     // ===== DEFAULT RESPONSE =====
     return {
       id: Date.now().toString(),
-      text: "🤔 I'm not sure what you're looking for. Try:\n\n• **\"Surprise me\"** - Random pick\n• **\"Something like Breaking Bad\"** - Similar content\n• **\"I'm feeling happy\"** - Mood-based\n• **\"Best horror movies\"** - Genre search\n• **\"Stranger Things s1e1\"** - Specific episode",
+      text: "🤔 I'm not sure I understand. I can help you find content, or you can use context commands like **'Play this'** if you're on a show page.\n\nTry:\n• **\"Surprise me\"**\n• **\"Best action movies\"**\n• **\"Who is in this?\"** (on a movie page)",
       isBot: true,
       suggestions: ["🎲 Surprise me", "🔥 Trending", "⭐ Top rated", "Browse genres"],
     };
