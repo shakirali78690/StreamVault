@@ -48,6 +48,7 @@ export function useSocialSocket() {
     // Callbacks for events
     const dmReceivedCallbackRef = useRef<((dm: DMReceivedEvent) => void) | null>(null);
     const notificationCallbackRef = useRef<((notification: NotificationEvent) => void) | null>(null);
+    const friendRequestCallbackRef = useRef<(() => void) | null>(null);
 
     useEffect(() => {
         if (!isAuthenticated || !user?.id) {
@@ -113,6 +114,14 @@ export function useSocialSocket() {
         socket.on('notification:new', (notification: NotificationEvent) => {
             if (notificationCallbackRef.current) {
                 notificationCallbackRef.current(notification);
+            }
+            // Auto-refresh friend requests when a friend_request notification is received
+            if (notification.type === 'friend_request' && friendRequestCallbackRef.current) {
+                friendRequestCallbackRef.current();
+            }
+            // Auto-refresh friends list when friend_accepted notification is received
+            if (notification.type === 'friend_accepted' && friendRequestCallbackRef.current) {
+                friendRequestCallbackRef.current();
             }
         });
 
@@ -201,6 +210,10 @@ export function useSocialSocket() {
         notificationCallbackRef.current = callback;
     }, []);
 
+    const onFriendRequestReceived = useCallback((callback: () => void) => {
+        friendRequestCallbackRef.current = callback;
+    }, []);
+
     const isFriendOnline = useCallback((friendId: string) => {
         return onlineFriends.has(friendId);
     }, [onlineFriends]);
@@ -273,6 +286,7 @@ export function useSocialSocket() {
         notifyFriendAccepted,
         onDMReceived,
         onNotification,
+        onFriendRequestReceived,
         startActivity,
         stopActivity,
         requestFriendActivities

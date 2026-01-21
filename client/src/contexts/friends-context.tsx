@@ -5,6 +5,7 @@ import { useSocialSocket } from '@/hooks/use-social-socket';
 
 interface Friend {
     id: string;
+    friendId: string;
     username: string;
     avatarUrl: string | null;
 }
@@ -38,7 +39,7 @@ const FriendsContext = createContext<FriendsContextType | undefined>(undefined);
 export function FriendsProvider({ children }: { children: ReactNode }) {
     const { user, isAuthenticated } = useAuth();
     const { toast } = useToast();
-    const { notifyFriendRequest, notifyFriendAccepted } = useSocialSocket();
+    const { notifyFriendRequest, notifyFriendAccepted, onFriendRequestReceived } = useSocialSocket();
     const [friends, setFriends] = useState<Friend[]>([]);
     const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -53,8 +54,8 @@ export function FriendsProvider({ children }: { children: ReactNode }) {
 
         try {
             const [friendsRes, requestsRes] = await Promise.all([
-                fetch('/api/friends'),
-                fetch('/api/friends/requests')
+                fetch('/api/friends', { credentials: 'include' }),
+                fetch('/api/friends/requests', { credentials: 'include' })
             ]);
 
             if (friendsRes.ok) {
@@ -77,11 +78,19 @@ export function FriendsProvider({ children }: { children: ReactNode }) {
         fetchFriends();
     }, [fetchFriends]);
 
+    // Auto-refresh when friend request is received via socket
+    useEffect(() => {
+        onFriendRequestReceived(() => {
+            fetchFriends();
+        });
+    }, [onFriendRequestReceived, fetchFriends]);
+
     const sendFriendRequest = async (userId: string) => {
         try {
             const response = await fetch('/api/friends/request', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
                 body: JSON.stringify({ toUserId: userId }),
             });
 
@@ -109,23 +118,28 @@ export function FriendsProvider({ children }: { children: ReactNode }) {
         }
     };
 
-    const acceptFriendRequest = async (userId: string) => {
+    const acceptFriendRequest = async (requestId: string) => {
         try {
-            const response = await fetch(`/api/friends/request/${userId}/accept`, {
+            const response = await fetch(`/api/friends/accept/${requestId}`, {
                 method: 'POST',
+                credentials: 'include',
             });
 
             if (!response.ok) {
                 throw new Error('Failed to accept friend request');
             }
 
+            const data = await response.json();
+
             toast({
                 title: 'Success',
                 description: 'Friend request accepted',
             });
 
-            // Notify via socket
-            notifyFriendAccepted(userId);
+            // Notify via socket - use fromUserId from the response if available
+            if (data.fromUserId) {
+                notifyFriendAccepted(data.fromUserId);
+            }
 
             fetchFriends();
         } catch (error: any) {
@@ -137,10 +151,11 @@ export function FriendsProvider({ children }: { children: ReactNode }) {
         }
     };
 
-    const declineFriendRequest = async (userId: string) => {
+    const declineFriendRequest = async (requestId: string) => {
         try {
-            const response = await fetch(`/api/friends/request/${userId}/decline`, {
+            const response = await fetch(`/api/friends/decline/${requestId}`, {
                 method: 'POST',
+                credentials: 'include',
             });
 
             if (!response.ok) {
@@ -166,6 +181,7 @@ export function FriendsProvider({ children }: { children: ReactNode }) {
         try {
             const response = await fetch(`/api/friends/${userId}`, {
                 method: 'DELETE',
+                credentials: 'include',
             });
 
             if (!response.ok) {
@@ -189,7 +205,7 @@ export function FriendsProvider({ children }: { children: ReactNode }) {
 
     const searchUsers = async (query: string) => {
         try {
-            const response = await fetch(`/api/users/search?q=${encodeURIComponent(query)}`);
+            const response = await fetch(`/api/users/search?q=${encodeURIComponent(query)}`, { credentials: 'include' });
             if (response.ok) {
                 return await response.json();
             }

@@ -303,7 +303,7 @@ function WatchTogetherContent() {
                 stopActivity();
             }
         };
-    }, [roomInfo?.roomCode, isAuthenticated, startActivity, stopActivity]);
+    }, [roomInfo?.roomCode, roomInfo?.contentTitle, isAuthenticated, startActivity, stopActivity]);
 
     // Countdown timer for scheduled rooms
     useEffect(() => {
@@ -609,7 +609,7 @@ function WatchTogetherContent() {
             sessionStorage.removeItem('watchTogether_isCreator');
 
             setUsername(storedUsername);
-            joinRoom(roomCode, storedUsername, urlPassword || undefined);
+            joinRoom(roomCode, storedUsername, user?.avatarUrl, urlPassword || undefined, user?.id);
             setShowJoinModal(false);
         }
     }, [isConnected, roomCode, roomInfo, joinRoom, createRoom, urlPassword]);
@@ -653,7 +653,7 @@ function WatchTogetherContent() {
             setUsername(user.username);
             // Small delay to ensure socket is ready
             setTimeout(() => {
-                joinRoom(roomCode, user.username, user.avatarUrl);
+                joinRoom(roomCode, user.username, user.avatarUrl, undefined, user.id);
                 setShowJoinModal(false);
             }, 500);
         }
@@ -1239,6 +1239,12 @@ function WatchTogetherContent() {
                                                             <div className="flex items-center gap-1">
                                                                 {roomUser.isHost && <Crown className="h-3 w-3 text-yellow-500" />}
                                                                 <span className="text-sm font-medium">{roomUser.username}</span>
+                                                                {/* Friend indicator */}
+                                                                {isAuthenticated && roomUser.authUserId && roomUser.authUserId !== user?.id?.toString() && friends.some(f => f.friendId === roomUser.authUserId) && (
+                                                                    <span className="text-green-500" title={`${roomUser.username} is your friend`}>
+                                                                        <Users className="h-3 w-3" />
+                                                                    </span>
+                                                                )}
                                                             </div>
                                                             {isRoomUserSpeaking && (
                                                                 <span className="text-xs text-green-500">Speaking...</span>

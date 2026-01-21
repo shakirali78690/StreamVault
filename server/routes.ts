@@ -544,7 +544,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         read: false,
       });
 
-      res.json({ success: true });
+      res.json({ success: true, fromUserId: request.fromUserId });
     } catch (error) {
       console.error("Accept friend request error:", error);
       res.status(500).json({ error: "Failed to accept friend request" });
