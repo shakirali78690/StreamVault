@@ -11,6 +11,8 @@ export const users = pgTable("users", {
   passwordHash: text("password_hash").notNull(),
   avatarUrl: text("avatar_url"),
   bio: text("bio"),
+  socialLinks: text("social_links"), // JSON string: { twitter, instagram, youtube, tiktok, discord }
+  favorites: text("favorites"), // JSON string: { shows: [], movies: [], anime: [] }
   emailVerified: boolean("email_verified").default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -25,11 +27,31 @@ export const loginSchema = z.object({
   password: z.string().min(1, "Password is required"),
 });
 
+// Social links schema
+export const socialLinksSchema = z.object({
+  twitter: z.string().optional(),
+  instagram: z.string().optional(),
+  youtube: z.string().optional(),
+  tiktok: z.string().optional(),
+  discord: z.string().optional(),
+}).optional();
+
+// Favorites schema
+export const favoritesSchema = z.object({
+  shows: z.array(z.string()).optional(),
+  movies: z.array(z.string()).optional(),
+  anime: z.array(z.string()).optional(),
+}).optional();
+
 export const updateProfileSchema = z.object({
   username: z.string().min(3, "Username must be at least 3 characters").optional(),
   bio: z.string().max(500, "Bio must be under 500 characters").optional(),
+  socialLinks: socialLinksSchema,
+  favorites: favoritesSchema,
 });
 
+export type SocialLinks = z.infer<typeof socialLinksSchema>;
+export type Favorites = z.infer<typeof favoritesSchema>;
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;

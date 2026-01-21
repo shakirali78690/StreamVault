@@ -28,6 +28,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import { formatDistanceToNow } from 'date-fns';
 import { DMPanel } from '@/components/dm-panel';
+import { UserProfileModal } from '@/components/user-profile-modal';
 import { useSocialSocket } from '@/hooks/use-social-socket';
 
 export default function Friends() {
@@ -52,6 +53,24 @@ export default function Friends() {
     const [isSearching, setIsSearching] = useState(false);
     const [pendingRequests, setPendingRequests] = useState<Set<string>>(new Set());
     const [selectedDMFriendId, setSelectedDMFriendId] = useState<string | null>(null);
+    const [selectedProfileUser, setSelectedProfileUser] = useState<{
+        username: string;
+        avatarUrl?: string;
+        authUserId?: string;
+        bio?: string;
+        socialLinks?: {
+            twitter?: string;
+            instagram?: string;
+            youtube?: string;
+            tiktok?: string;
+            discord?: string;
+        } | null;
+        favorites?: {
+            shows?: Array<{ id: string; title: string; posterUrl: string | null }>;
+            movies?: Array<{ id: string; title: string; posterUrl: string | null }>;
+            anime?: Array<{ id: string; title: string; posterUrl: string | null }>;
+        } | null;
+    } | null>(null);
 
     // Handle ?dm=friendId URL parameter
     const searchString = useSearch();
@@ -78,6 +97,34 @@ export default function Friends() {
             requestFriendActivities();
         }
     }, [isConnected, isAuthenticated, requestFriendActivities]);
+
+    // View friend profile
+    const handleViewProfile = async (friendId: string, username: string, avatarUrl?: string | null) => {
+        let bio: string | undefined;
+        let socialLinks: any = null;
+        let favorites: any = null;
+
+        try {
+            const response = await fetch(`/api/users/${friendId}/profile`);
+            if (response.ok) {
+                const profile = await response.json();
+                bio = profile.bio;
+                socialLinks = profile.socialLinks;
+                favorites = profile.favorites;
+            }
+        } catch (error) {
+            console.error('Failed to fetch user profile:', error);
+        }
+
+        setSelectedProfileUser({
+            username,
+            avatarUrl: avatarUrl || undefined,
+            authUserId: friendId,
+            bio,
+            socialLinks,
+            favorites,
+        });
+    };
 
     // Search users with debounce
     useEffect(() => {
@@ -212,9 +259,12 @@ export default function Friends() {
                                     key={friend.id}
                                     className="flex items-center gap-4 p-4 bg-card rounded-lg border hover:border-primary/50 transition-colors"
                                 >
-                                    {/* Avatar */}
-                                    <div className="relative">
-                                        <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden">
+                                    {/* Avatar - Clickable to view profile */}
+                                    <button
+                                        className="relative cursor-pointer"
+                                        onClick={() => handleViewProfile(friend.friendId, friend.username, friend.avatarUrl)}
+                                    >
+                                        <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden hover:ring-2 hover:ring-primary/50 transition-all">
                                             {friend.avatarUrl ? (
                                                 <img src={friend.avatarUrl} alt={friend.username} className="w-full h-full object-cover" />
                                             ) : (
@@ -224,7 +274,7 @@ export default function Friends() {
                                         {isFriendOnline(friend.friendId) && (
                                             <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-background" />
                                         )}
-                                    </div>
+                                    </button>
 
                                     {/* Info and Activity */}
                                     <div className="flex-1 min-w-0">
@@ -458,6 +508,16 @@ export default function Friends() {
                         avatarUrl: friends.find(f => f.friendId === selectedDMFriendId)!.avatarUrl,
                     } : null}
                     onClose={() => setSelectedDMFriendId(null)}
+                />
+            )}
+
+            {/* User Profile Modal */}
+            {selectedProfileUser && (
+                <UserProfileModal
+                    isOpen={!!selectedProfileUser}
+                    onClose={() => setSelectedProfileUser(null)}
+                    user={selectedProfileUser}
+                    isFriend={true}
                 />
             )}
         </div>

@@ -321,8 +321,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (result.data.bio !== undefined) {
         updates.bio = result.data.bio;
       }
+      if (result.data.socialLinks !== undefined) {
+        updates.socialLinks = JSON.stringify(result.data.socialLinks);
+      }
+      if (result.data.favorites !== undefined) {
+        updates.favorites = JSON.stringify(result.data.favorites);
+      }
 
       const user = await storage.updateUser(payload.userId, updates);
+
+      // Parse JSON fields for response
+      let socialLinks = null;
+      let favorites = null;
+      try {
+        socialLinks = user.socialLinks ? JSON.parse(user.socialLinks as string) : null;
+      } catch (e) { }
+      try {
+        favorites = user.favorites ? JSON.parse(user.favorites as string) : null;
+      } catch (e) { }
 
       res.json({
         user: {
@@ -331,6 +347,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           username: user.username,
           avatarUrl: user.avatarUrl,
           bio: user.bio,
+          socialLinks,
+          favorites,
         },
       });
     } catch (error) {
@@ -639,6 +657,105 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Remove friend error:", error);
       res.status(500).json({ error: "Failed to remove friend" });
+    }
+  });
+
+  // ============================================
+  // USER PROFILE ROUTES
+  // ============================================
+
+  // Get public user profile
+  app.get("/api/users/:userId/profile", async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const user = await storage.getUserById(userId);
+
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Parse JSON fields
+      let socialLinks = null;
+      let favorites = null;
+
+      try {
+        socialLinks = user.socialLinks ? JSON.parse(user.socialLinks as string) : null;
+      } catch (e) {
+        socialLinks = null;
+      }
+
+      try {
+        favorites = user.favorites ? JSON.parse(user.favorites as string) : null;
+      } catch (e) {
+        favorites = null;
+      }
+
+      // Enrich favorites with content data
+      let enrichedFavorites = null;
+      if (favorites) {
+        enrichedFavorites = {
+          shows: [] as Array<{ id: string; title: string; posterUrl: string | null; slug: string }>,
+          movies: [] as Array<{ id: string; title: string; posterUrl: string | null; slug: string }>,
+          anime: [] as Array<{ id: string; title: string; posterUrl: string | null; slug: string }>,
+        };
+
+        // Get show details
+        if (favorites.shows?.length) {
+          for (const showId of favorites.shows.slice(0, 5)) {
+            const show = await storage.getShowById(showId);
+            if (show) {
+              enrichedFavorites.shows.push({
+                id: show.id,
+                title: show.title,
+                posterUrl: show.posterUrl,
+                slug: show.slug,
+              });
+            }
+          }
+        }
+
+        if (favorites.movies?.length) {
+          for (const movieId of favorites.movies.slice(0, 5)) {
+            const movie = await storage.getMovieById(movieId);
+            if (movie) {
+              enrichedFavorites.movies.push({
+                id: movie.id,
+                title: movie.title,
+                posterUrl: movie.posterUrl,
+                slug: movie.slug,
+              });
+            }
+          }
+        }
+
+        if (favorites.anime?.length) {
+          for (const animeId of favorites.anime.slice(0, 5)) {
+            const anime = await storage.getAnimeById(animeId);
+            if (anime) {
+              enrichedFavorites.anime.push({
+                id: anime.id,
+                title: anime.title,
+                posterUrl: anime.posterUrl,
+                slug: anime.slug,
+              });
+            }
+          }
+        }
+      }
+
+      // Return public profile data with social links and favorites
+      res.json({
+        id: user.id,
+        username: user.username,
+        avatarUrl: user.avatarUrl,
+        bio: user.bio || null,
+        socialLinks,
+        favorites: enrichedFavorites,
+        createdAt: user.createdAt,
+      });
+    } catch (error) {
+      console.error("Get user profile error:", error);
+      res.status(500).json({ error: "Failed to get user profile" });
     }
   });
 

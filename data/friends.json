@@ -75,7 +75,28 @@
       "read": true,
       "id": "40d9457f-a313-42a4-9ae4-cc703914ea79",
       "createdAt": "2026-01-21T12:42:22.394Z"
+    },
+    {
+      "userId": "b59fe60c-35c8-4689-b83a-feda335caa19",
+      "type": "dm",
+      "title": "New Message",
+      "message": "admin: 🤣",
+      "data": {
+        "fromUserId": "c480dcef-3488-4083-b326-00920fdbc1e1"
+      },
+      "read": true,
+      "id": "cce786aa-7563-44fc-be4c-5287e6936f82",
+      "createdAt": "2026-01-21T16:25:00.338Z"
     }
   ],
-  "directMessages": []
+  "directMessages": [
+    {
+      "id": "26b07d2f-ff2a-45c1-8aa8-8878d921d7fe",
+      "fromUserId": "c480dcef-3488-4083-b326-00920fdbc1e1",
+      "toUserId": "b59fe60c-35c8-4689-b83a-feda335caa19",
+      "message": "🤣",
+      "read": true,
+      "createdAt": "2026-01-21T16:25:00.336Z"
+    }
+  ]
 }

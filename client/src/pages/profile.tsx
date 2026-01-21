@@ -7,8 +7,10 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Loader2, Camera, User, Save, LogOut, FileVideo } from 'lucide-react';
+import { Loader2, Camera, User, Save, LogOut, FileVideo, Eye, Twitter, Instagram, Youtube, Heart } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { SiTiktok, SiDiscord } from 'react-icons/si';
+import { FavoritesPicker } from '@/components/favorites-picker';
 
 export default function ProfilePage() {
     const [, navigate] = useLocation();
@@ -20,6 +22,23 @@ export default function ProfilePage() {
     const [bio, setBio] = useState(user?.bio || '');
     const [isUpdating, setIsUpdating] = useState(false);
     const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+    const [showFullAvatar, setShowFullAvatar] = useState(false);
+
+    // Social links state
+    const [socialLinks, setSocialLinks] = useState({
+        twitter: user?.socialLinks?.twitter || '',
+        instagram: user?.socialLinks?.instagram || '',
+        youtube: user?.socialLinks?.youtube || '',
+        tiktok: user?.socialLinks?.tiktok || '',
+        discord: user?.socialLinks?.discord || '',
+    });
+
+    // Favorites state
+    const [favorites, setFavorites] = useState({
+        shows: user?.favorites?.shows || [],
+        movies: user?.favorites?.movies || [],
+        anime: user?.favorites?.anime || [],
+    });
 
     // Redirect if not logged in
     if (!authLoading && !isAuthenticated) {
@@ -64,7 +83,18 @@ export default function ProfilePage() {
     const handleSave = async () => {
         setIsUpdating(true);
         try {
-            await updateProfile({ username, bio });
+            // Filter out empty social links
+            const filteredSocialLinks = Object.fromEntries(
+                Object.entries(socialLinks).filter(([_, v]) => v.trim() !== '')
+            );
+            await updateProfile({
+                username,
+                bio,
+                socialLinks: Object.keys(filteredSocialLinks).length > 0 ? filteredSocialLinks : undefined,
+                favorites: (favorites.shows.length || favorites.movies.length || favorites.anime.length)
+                    ? favorites
+                    : undefined,
+            });
             toast({
                 title: 'Profile updated!',
                 description: 'Your profile has been saved.',
@@ -110,20 +140,34 @@ export default function ProfilePage() {
                         {/* Avatar Section */}
                         <div className="flex items-center gap-6">
                             <div className="relative group">
-                                <Avatar className="h-24 w-24 cursor-pointer" onClick={handleAvatarClick}>
+                                <Avatar className="h-24 w-24 cursor-pointer" onClick={() => user?.avatarUrl && setShowFullAvatar(true)}>
                                     <AvatarImage src={user?.avatarUrl || undefined} />
                                     <AvatarFallback className="text-2xl bg-primary/10">
                                         {user?.username ? getInitials(user.username) : <User className="h-10 w-10" />}
                                     </AvatarFallback>
                                 </Avatar>
-                                <div
-                                    className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-                                    onClick={handleAvatarClick}
-                                >
-                                    {isUploadingAvatar ? (
-                                        <Loader2 className="h-6 w-6 text-white animate-spin" />
-                                    ) : (
-                                        <Camera className="h-6 w-6 text-white" />
+                                {user?.avatarUrl && (
+                                    <div
+                                        className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                                        onClick={() => setShowFullAvatar(true)}
+                                    >
+                                        <Eye className="h-6 w-6 text-white" />
+                                    </div>
+                                )}
+                            </div>
+                            <div>
+                                <h3 className="font-semibold text-lg">{user?.username}</h3>
+                                <p className="text-sm text-muted-foreground">{user?.email}</p>
+                                <div className="flex gap-2 mt-2">
+                                    <Button variant="outline" size="sm" onClick={handleAvatarClick}>
+                                        <Camera className="h-4 w-4 mr-1" />
+                                        Change
+                                    </Button>
+                                    {user?.avatarUrl && (
+                                        <Button variant="ghost" size="sm" onClick={() => setShowFullAvatar(true)}>
+                                            <Eye className="h-4 w-4 mr-1" />
+                                            View
+                                        </Button>
                                     )}
                                 </div>
                                 <input
@@ -133,13 +177,6 @@ export default function ProfilePage() {
                                     className="hidden"
                                     onChange={handleAvatarChange}
                                 />
-                            </div>
-                            <div>
-                                <h3 className="font-semibold text-lg">{user?.username}</h3>
-                                <p className="text-sm text-muted-foreground">{user?.email}</p>
-                                <p className="text-xs text-muted-foreground mt-1">
-                                    Click avatar to change photo
-                                </p>
                             </div>
                         </div>
 
@@ -169,6 +206,83 @@ export default function ProfilePage() {
                             <p className="text-xs text-muted-foreground text-right">
                                 {bio.length}/500 characters
                             </p>
+                        </div>
+
+                        {/* Social Links */}
+                        <div className="space-y-4">
+                            <Label>Social Links</Label>
+                            <div className="grid gap-3">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-10 h-10 rounded-lg bg-[#1DA1F2]/10 flex items-center justify-center">
+                                        <Twitter className="h-5 w-5 text-[#1DA1F2]" />
+                                    </div>
+                                    <Input
+                                        value={socialLinks.twitter}
+                                        onChange={(e) => setSocialLinks(prev => ({ ...prev, twitter: e.target.value }))}
+                                        placeholder="Twitter/X username"
+                                        className="flex-1"
+                                    />
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500/10 to-pink-500/10 flex items-center justify-center">
+                                        <Instagram className="h-5 w-5 text-pink-500" />
+                                    </div>
+                                    <Input
+                                        value={socialLinks.instagram}
+                                        onChange={(e) => setSocialLinks(prev => ({ ...prev, instagram: e.target.value }))}
+                                        placeholder="Instagram username"
+                                        className="flex-1"
+                                    />
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <div className="w-10 h-10 rounded-lg bg-[#FF0000]/10 flex items-center justify-center">
+                                        <Youtube className="h-5 w-5 text-[#FF0000]" />
+                                    </div>
+                                    <Input
+                                        value={socialLinks.youtube}
+                                        onChange={(e) => setSocialLinks(prev => ({ ...prev, youtube: e.target.value }))}
+                                        placeholder="YouTube channel URL or username"
+                                        className="flex-1"
+                                    />
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <div className="w-10 h-10 rounded-lg bg-black/10 flex items-center justify-center">
+                                        <SiTiktok className="h-5 w-5" />
+                                    </div>
+                                    <Input
+                                        value={socialLinks.tiktok}
+                                        onChange={(e) => setSocialLinks(prev => ({ ...prev, tiktok: e.target.value }))}
+                                        placeholder="TikTok username"
+                                        className="flex-1"
+                                    />
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <div className="w-10 h-10 rounded-lg bg-[#5865F2]/10 flex items-center justify-center">
+                                        <SiDiscord className="h-5 w-5 text-[#5865F2]" />
+                                    </div>
+                                    <Input
+                                        value={socialLinks.discord}
+                                        onChange={(e) => setSocialLinks(prev => ({ ...prev, discord: e.target.value }))}
+                                        placeholder="Discord username"
+                                        className="flex-1"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Favorites */}
+                        <div className="space-y-4">
+                            <Label className="flex items-center gap-2">
+                                <Heart className="h-4 w-4 text-red-500" />
+                                Favorite Content
+                            </Label>
+                            <p className="text-xs text-muted-foreground">
+                                Select up to 5 favorites in each category. These will be displayed on your profile.
+                            </p>
+                            <FavoritesPicker
+                                favorites={favorites}
+                                onFavoritesChange={setFavorites}
+                            />
                         </div>
 
                         {/* Save Button */}
@@ -202,6 +316,21 @@ export default function ProfilePage() {
                     </CardContent>
                 </Card>
             </div>
+
+            {/* Full Avatar Preview - Click anywhere to close */}
+            {showFullAvatar && user?.avatarUrl && (
+                <div
+                    className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center cursor-pointer"
+                    onClick={() => setShowFullAvatar(false)}
+                >
+                    <img
+                        src={user.avatarUrl}
+                        alt={user.username}
+                        className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg"
+                        onClick={(e) => e.stopPropagation()}
+                    />
+                </div>
+            )}
         </div>
     );
 }

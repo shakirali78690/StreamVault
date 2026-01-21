@@ -2,12 +2,28 @@ import { createContext, useContext, useState, useEffect, ReactNode } from 'react
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 
+interface SocialLinks {
+    twitter?: string;
+    instagram?: string;
+    youtube?: string;
+    tiktok?: string;
+    discord?: string;
+}
+
+interface Favorites {
+    shows?: string[];
+    movies?: string[];
+    anime?: string[];
+}
+
 interface User {
     id: string;
     email: string;
     username: string;
     avatarUrl: string | null;
     bio: string | null;
+    socialLinks?: SocialLinks | null;
+    favorites?: Favorites | null;
 }
 
 interface AuthContextType {
@@ -17,7 +33,7 @@ interface AuthContextType {
     login: (email: string, password: string) => Promise<void>;
     register: (email: string, username: string, password: string) => Promise<void>;
     logout: () => Promise<void>;
-    updateProfile: (data: { username?: string; bio?: string }) => Promise<void>;
+    updateProfile: (data: { username?: string; bio?: string; socialLinks?: SocialLinks; favorites?: Favorites }) => Promise<void>;
     uploadAvatar: (file: File) => Promise<string>;
     refetchUser: () => void;
 }
@@ -73,7 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Update profile mutation
     const updateProfileMutation = useMutation({
-        mutationFn: async (data: { username?: string; bio?: string }) => {
+        mutationFn: async (data: { username?: string; bio?: string; socialLinks?: SocialLinks; favorites?: Favorites }) => {
             const response = await apiRequest('PUT', '/api/auth/profile', data);
             return response.json();
         },
@@ -121,7 +137,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await logoutMutation.mutateAsync();
     };
 
-    const updateProfile = async (data: { username?: string; bio?: string }) => {
+    const updateProfile = async (data: { username?: string; bio?: string; socialLinks?: SocialLinks; favorites?: Favorites }) => {
         const result = await updateProfileMutation.mutateAsync(data);
         if (result.error) {
             throw new Error(result.error);

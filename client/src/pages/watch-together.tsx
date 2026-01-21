@@ -48,6 +48,7 @@ import { RoomPolls } from '@/components/room-polls';
 import { useFriends } from '@/contexts/friends-context';
 import { useToast } from '@/hooks/use-toast';
 import { useSocialSocket } from '@/hooks/use-social-socket';
+import { UserProfileModal } from '@/components/user-profile-modal';
 import type { Show, Movie, Episode } from '@shared/schema';
 
 // Emoji reactions
@@ -220,6 +221,25 @@ function WatchTogetherContent() {
     const [isOverlayChatMinimized, setIsOverlayChatMinimized] = useState(false);
     const [chatPosition, setChatPosition] = useState({ x: 16, y: 16 }); // top-right position in pixels from top-right
     const [pendingFriendRequests, setPendingFriendRequests] = useState<Set<string>>(new Set());
+    const [selectedProfileUser, setSelectedProfileUser] = useState<{
+        username: string;
+        avatarUrl?: string;
+        authUserId?: string;
+        isHost?: boolean;
+        bio?: string;
+        socialLinks?: {
+            twitter?: string;
+            instagram?: string;
+            youtube?: string;
+            tiktok?: string;
+            discord?: string;
+        } | null;
+        favorites?: {
+            shows?: Array<{ id: string; title: string; posterUrl: string | null }>;
+            movies?: Array<{ id: string; title: string; posterUrl: string | null }>;
+            anime?: Array<{ id: string; title: string; posterUrl: string | null }>;
+        } | null;
+    } | null>(null);
 
     // Friends system hooks
     const { sendFriendRequest, friends } = useFriends();
@@ -795,6 +815,39 @@ function WatchTogetherContent() {
         });
     };
 
+    // View user profile
+    const handleViewProfile = async (roomUser: { username: string; avatarUrl?: string; authUserId?: string; isHost: boolean }) => {
+
+        // If user has authUserId, fetch their full profile from API
+        let bio: string | undefined;
+        let socialLinks: any = null;
+        let favorites: any = null;
+
+        if (roomUser.authUserId) {
+            try {
+                const response = await fetch(`/api/users/${roomUser.authUserId}/profile`);
+                if (response.ok) {
+                    const profile = await response.json();
+                    bio = profile.bio;
+                    socialLinks = profile.socialLinks;
+                    favorites = profile.favorites;
+                }
+            } catch (error) {
+                console.error('Failed to fetch user profile:', error);
+            }
+        }
+
+        setSelectedProfileUser({
+            username: roomUser.username,
+            avatarUrl: roomUser.avatarUrl,
+            authUserId: roomUser.authUserId,
+            isHost: roomUser.isHost,
+            bio,
+            socialLinks,
+            favorites,
+        });
+    };
+
     // Share room link via WhatsApp
     const shareViaWhatsApp = () => {
         if (roomInfo?.roomCode) {
@@ -1225,16 +1278,19 @@ function WatchTogetherContent() {
                                                         }`}
                                                 >
                                                     <div className="flex items-center gap-2">
-                                                        {/* Avatar */}
-                                                        {/* Avatar */}
-                                                        <div className={`w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium overflow-hidden ${isRoomUserSpeaking ? 'ring-2 ring-green-400' : ''
-                                                            }`}>
+                                                        {/* Avatar - Clickable to view profile */}
+                                                        <button
+                                                            onClick={() => handleViewProfile(roomUser)}
+                                                            className={`w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all ${isRoomUserSpeaking ? 'ring-2 ring-green-400' : ''
+                                                                }`}
+                                                            title={`View ${roomUser.username}'s profile`}
+                                                        >
                                                             {roomUser.avatarUrl ? (
                                                                 <img src={roomUser.avatarUrl} alt={roomUser.username} className="w-full h-full object-cover" />
                                                             ) : (
                                                                 roomUser.username.slice(0, 2).toUpperCase()
                                                             )}
-                                                        </div>
+                                                        </button>
                                                         <div className="flex flex-col">
                                                             <div className="flex items-center gap-1">
                                                                 {roomUser.isHost && <Crown className="h-3 w-3 text-yellow-500" />}
@@ -1879,6 +1935,16 @@ function WatchTogetherContent() {
           }
         }
       `}</style>
+
+            {/* User Profile Modal */}
+            {selectedProfileUser && (
+                <UserProfileModal
+                    isOpen={!!selectedProfileUser}
+                    onClose={() => setSelectedProfileUser(null)}
+                    user={selectedProfileUser}
+                    isFriend={selectedProfileUser.authUserId ? friends.some(f => f.friendId === selectedProfileUser.authUserId) : false}
+                />
+            )}
         </div>
     );
 }
