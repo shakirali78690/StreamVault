@@ -153,7 +153,7 @@ async function submitBatchToGoogle(
     console.log(`[${i + 1}/${urls.length}] Submitting: ${url}`);
 
     const success = await submitUrlToGoogle(url);
-    
+
     if (success) {
       successCount++;
     } else {
@@ -183,6 +183,13 @@ async function generateAllUrls(): Promise<string[]> {
   // Import storage dynamically
   const { storage } = await import('../server/storage.js');
 
+  // URLs to skip
+  const SKIP_PATTERNS = [
+    '/watch/',           // Skip all watch pages
+    '/watch-movie/',     // Skip watch-movie pages
+    'tu-meri-main-tera', // Skip specific content
+  ];
+
   // Static pages
   const staticPages = [
     '',
@@ -209,26 +216,30 @@ async function generateAllUrls(): Promise<string[]> {
   // Get all shows
   const shows = await storage.getAllShows();
   console.log(`   Found ${shows.length} shows`);
-  
+
   for (const show of shows) {
-    // Add show detail page
+    // Skip specific content
+    if (SKIP_PATTERNS.some(pattern => show.slug.includes(pattern.replace('/', '')))) {
+      console.log(`   ⏭️  Skipping: ${show.slug}`);
+      continue;
+    }
+    // Add show detail page only (skip watch pages)
     urls.push(`${SITE_URL}/show/${show.slug}`);
-    
-    // Get all episodes for this show
-    const episodes = await storage.getEpisodesByShowId(show.id);
-    episodes.forEach(episode => {
-      urls.push(`${SITE_URL}/watch/${show.slug}?season=${episode.season}&episode=${episode.episodeNumber}`);
-    });
   }
 
   console.log('🎬 Fetching movies from database...');
   // Get all movies
   const movies = await storage.getAllMovies();
   console.log(`   Found ${movies.length} movies`);
-  
+
   movies.forEach(movie => {
+    // Skip specific content
+    if (SKIP_PATTERNS.some(pattern => movie.slug.includes(pattern.replace('/', '')))) {
+      console.log(`   ⏭️  Skipping: ${movie.slug}`);
+      return;
+    }
+    // Add movie detail page only (skip watch-movie pages)
     urls.push(`${SITE_URL}/movie/${movie.slug}`);
-    urls.push(`${SITE_URL}/watch-movie/${movie.slug}`);
   });
 
   return urls;
@@ -251,11 +262,20 @@ async function main() {
     // Get all URLs
     const allUrls = await generateAllUrls();
     console.log(`\n📋 Total URLs found: ${allUrls.length}`);
-    
-    // Filter out already submitted URLs
-    const pendingUrls = allUrls.filter(url => !tracking.submittedUrls.includes(url));
-    console.log(`✅ Already submitted: ${allUrls.length - pendingUrls.length} URLs`);
-    console.log(`⏳ Pending submission: ${pendingUrls.length} URLs\n`);
+
+    // RESUBMIT MODE: Submit all URLs (ignore already submitted)
+    const RESUBMIT_ALL = true;
+
+    let pendingUrls: string[];
+    if (RESUBMIT_ALL) {
+      pendingUrls = allUrls;
+      console.log(`🔄 RESUBMIT MODE: Submitting all ${pendingUrls.length} URLs\n`);
+    } else {
+      // Filter out already submitted URLs
+      pendingUrls = allUrls.filter(url => !tracking.submittedUrls.includes(url));
+      console.log(`✅ Already submitted: ${allUrls.length - pendingUrls.length} URLs`);
+      console.log(`⏳ Pending submission: ${pendingUrls.length} URLs\n`);
+    }
 
     if (pendingUrls.length === 0) {
       console.log('🎉 All URLs have already been submitted to Google!');
@@ -279,7 +299,7 @@ async function main() {
 
     console.log(`\n📊 Progress: ${tracking.totalSubmitted}/${allUrls.length} URLs submitted (${Math.round(tracking.totalSubmitted / allUrls.length * 100)}%)`);
     console.log(`⏳ Remaining: ${allUrls.length - tracking.totalSubmitted} URLs`);
-    
+
     if (tracking.totalSubmitted < allUrls.length) {
       const daysRemaining = Math.ceil((allUrls.length - tracking.totalSubmitted) / 200);
       console.log(`📅 Estimated days to complete: ${daysRemaining} days (at 200 URLs/day)`);
