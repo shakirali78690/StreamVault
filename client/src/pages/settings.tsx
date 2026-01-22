@@ -6,9 +6,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Settings, Bot, Bell, Eye, Volume2, Moon, Palette, Shield, Trash2 } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Loader2, Settings, Bot, Bell, Volume2, Palette, Shield, Trash2, Key, Copy, Plus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useTheme } from '@/components/theme-provider';
+import { apiRequest } from '@/lib/queryClient';
 
 // Settings stored in localStorage
 const SETTINGS_KEY = 'streamvault_settings';
@@ -37,6 +39,16 @@ const defaultSettings: AppSettings = {
     subtitlesEnabled: true,
 };
 
+interface ApiKey {
+    id: string;
+    key: string;
+    name: string;
+    scope: string;
+    createdAt: string;
+    lastUsed?: string;
+    requestsToday: number;
+}
+
 export default function SettingsPage() {
     const [, navigate] = useLocation();
     const { user, isLoading: authLoading, isAuthenticated } = useAuth();
@@ -45,6 +57,12 @@ export default function SettingsPage() {
 
     const [settings, setSettings] = useState<AppSettings>(defaultSettings);
     const [isSaving, setIsSaving] = useState(false);
+
+    // API Keys state
+    const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
+    const [newKeyName, setNewKeyName] = useState('');
+    const [isCreatingKey, setIsCreatingKey] = useState(false);
+    const [newlyCreatedKey, setNewlyCreatedKey] = useState<string | null>(null);
 
     // Load settings from localStorage
     useEffect(() => {
@@ -58,6 +76,58 @@ export default function SettingsPage() {
             }
         }
     }, []);
+
+    // Fetch API keys
+    useEffect(() => {
+        if (isAuthenticated) {
+            fetchApiKeys();
+        }
+    }, [isAuthenticated]);
+
+    const fetchApiKeys = async () => {
+        try {
+            const response = await apiRequest('GET', '/api/keys');
+            const keys = await response.json();
+            setApiKeys(keys);
+        } catch (error) {
+            console.error('Failed to fetch API keys:', error);
+        }
+    };
+
+    const createApiKey = async () => {
+        if (!newKeyName.trim()) {
+            toast({ title: 'Error', description: 'Please enter a name for the API key', variant: 'destructive' });
+            return;
+        }
+        setIsCreatingKey(true);
+        try {
+            const response = await apiRequest('POST', '/api/keys', { name: newKeyName.trim() });
+            const key = await response.json();
+            setNewlyCreatedKey(key.key);
+            setNewKeyName('');
+            fetchApiKeys();
+            toast({ title: 'API Key Created', description: 'Copy your key now - it won\'t be shown again!' });
+        } catch (error: any) {
+            toast({ title: 'Error', description: error.message || 'Failed to create API key', variant: 'destructive' });
+        } finally {
+            setIsCreatingKey(false);
+        }
+    };
+
+    const deleteApiKey = async (id: string) => {
+        try {
+            await apiRequest('DELETE', `/api/keys/${id}`);
+            setApiKeys(apiKeys.filter(k => k.id !== id));
+            toast({ title: 'API Key Deleted', description: 'The API key has been revoked' });
+        } catch (error) {
+            toast({ title: 'Error', description: 'Failed to delete API key', variant: 'destructive' });
+        }
+    };
+
+    const copyToClipboard = (text: string) => {
+        navigator.clipboard.writeText(text);
+        toast({ title: 'Copied!', description: 'API key copied to clipboard' });
+    };
 
     // Redirect if not logged in
     if (!authLoading && !isAuthenticated) {
@@ -301,6 +371,96 @@ export default function SettingsPage() {
                                 onCheckedChange={(checked) => updateSetting('showAdultContent', checked)}
                             />
                         </div>
+                    </CardContent>
+                </Card>
+
+                {/* API Keys */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                            <Key className="h-5 w-5" />
+                            API Keys
+                        </CardTitle>
+                        <CardDescription>
+                            Generate API keys for external access (read-only). Rate limited to 10 req/min, 50 req/day.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        {/* Create new key */}
+                        <div className="flex gap-2">
+                            <Input
+                                placeholder="Key name (e.g., My Bot)"
+                                value={newKeyName}
+                                onChange={(e) => setNewKeyName(e.target.value)}
+                                className="flex-1"
+                            />
+                            <Button onClick={createApiKey} disabled={isCreatingKey}>
+                                {isCreatingKey ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                    <>
+                                        <Plus className="h-4 w-4 mr-1" />
+                                        Create
+                                    </>
+                                )}
+                            </Button>
+                        </div>
+
+                        {/* Newly created key (show once) */}
+                        {newlyCreatedKey && (
+                            <div className="p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
+                                <p className="text-sm font-medium text-green-500 mb-1">🎉 New API Key Created!</p>
+                                <p className="text-xs text-muted-foreground mb-2">Copy this key now - it won't be shown again:</p>
+                                <div className="flex gap-2">
+                                    <code className="flex-1 p-2 bg-background rounded text-xs break-all">{newlyCreatedKey}</code>
+                                    <Button size="sm" variant="outline" onClick={() => copyToClipboard(newlyCreatedKey)}>
+                                        <Copy className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="mt-2 text-xs"
+                                    onClick={() => setNewlyCreatedKey(null)}
+                                >
+                                    Dismiss
+                                </Button>
+                            </div>
+                        )}
+
+                        {/* Existing keys */}
+                        {apiKeys.length > 0 ? (
+                            <div className="space-y-2">
+                                {apiKeys.map((key) => (
+                                    <div key={key.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                                        <div className="flex-1 min-w-0">
+                                            <p className="font-medium text-sm">{key.name}</p>
+                                            <p className="text-xs text-muted-foreground font-mono">{key.key}</p>
+                                            <p className="text-xs text-muted-foreground mt-1">
+                                                Created {new Date(key.createdAt).toLocaleDateString()} •
+                                                {key.requestsToday} requests today
+                                            </p>
+                                        </div>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="text-destructive hover:text-destructive"
+                                            onClick={() => deleteApiKey(key.id)}
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <p className="text-sm text-muted-foreground text-center py-4">
+                                No API keys yet. Create one to access the API externally.
+                            </p>
+                        )}
+
+                        <p className="text-xs text-muted-foreground">
+                            Use your API key by including the <code className="bg-muted px-1 rounded">X-API-Key</code> header in your requests.
+                        </p>
                     </CardContent>
                 </Card>
 

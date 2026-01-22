@@ -87,6 +87,138 @@
       "read": true,
       "id": "cce786aa-7563-44fc-be4c-5287e6936f82",
       "createdAt": "2026-01-21T16:25:00.338Z"
+    },
+    {
+      "userId": "c480dcef-3488-4083-b326-00920fdbc1e1",
+      "type": "dm",
+      "title": "New Message",
+      "message": "elton galeech: ayeni",
+      "data": {
+        "fromUserId": "b59fe60c-35c8-4689-b83a-feda335caa19"
+      },
+      "read": false,
+      "id": "93d400f0-be90-4397-b6b5-10d7804d5d30",
+      "createdAt": "2026-01-22T10:33:16.633Z"
+    },
+    {
+      "userId": "c480dcef-3488-4083-b326-00920fdbc1e1",
+      "type": "dm",
+      "title": "New Message",
+      "message": "elton galeech: what",
+      "data": {
+        "fromUserId": "b59fe60c-35c8-4689-b83a-feda335caa19"
+      },
+      "read": false,
+      "id": "aa7d8a3f-0cdf-411a-aba3-efe367ac69d8",
+      "createdAt": "2026-01-22T10:33:21.811Z"
+    },
+    {
+      "userId": "c480dcef-3488-4083-b326-00920fdbc1e1",
+      "type": "dm",
+      "title": "New Message",
+      "message": "elton galeech: nah still",
+      "data": {
+        "fromUserId": "b59fe60c-35c8-4689-b83a-feda335caa19"
+      },
+      "read": false,
+      "id": "285e6865-e40e-4b20-a062-b56cc5adf77f",
+      "createdAt": "2026-01-22T10:33:25.258Z"
+    },
+    {
+      "userId": "c480dcef-3488-4083-b326-00920fdbc1e1",
+      "type": "dm",
+      "title": "New Message",
+      "message": "elton galeech: lol",
+      "data": {
+        "fromUserId": "b59fe60c-35c8-4689-b83a-feda335caa19"
+      },
+      "read": false,
+      "id": "af9ff910-cbec-4904-a0f1-491f6afc19b4",
+      "createdAt": "2026-01-22T10:34:52.691Z"
+    },
+    {
+      "userId": "c480dcef-3488-4083-b326-00920fdbc1e1",
+      "type": "dm",
+      "title": "New Message",
+      "message": "elton galeech: nah tho",
+      "data": {
+        "fromUserId": "b59fe60c-35c8-4689-b83a-feda335caa19"
+      },
+      "read": false,
+      "id": "afffa0ea-1625-4f54-940d-314355310ef1",
+      "createdAt": "2026-01-22T10:35:00.699Z"
+    },
+    {
+      "userId": "c480dcef-3488-4083-b326-00920fdbc1e1",
+      "type": "dm",
+      "title": "New Message",
+      "message": "elton galeech: hmm",
+      "data": {
+        "fromUserId": "b59fe60c-35c8-4689-b83a-feda335caa19"
+      },
+      "read": false,
+      "id": "beee31cd-051b-4ea6-9f07-e8df8942e441",
+      "createdAt": "2026-01-22T10:35:34.342Z"
+    },
+    {
+      "userId": "c480dcef-3488-4083-b326-00920fdbc1e1",
+      "type": "dm",
+      "title": "New Message",
+      "message": "elton galeech: wow",
+      "data": {
+        "fromUserId": "b59fe60c-35c8-4689-b83a-feda335caa19"
+      },
+      "read": false,
+      "id": "fdb59723-8ca5-4fb6-ad96-b6a407a77527",
+      "createdAt": "2026-01-22T10:35:36.241Z"
+    },
+    {
+      "userId": "c480dcef-3488-4083-b326-00920fdbc1e1",
+      "type": "dm",
+      "title": "New Message",
+      "message": "elton galeech: now",
+      "data": {
+        "fromUserId": "b59fe60c-35c8-4689-b83a-feda335caa19"
+      },
+      "read": false,
+      "id": "09d93994-d43b-4565-b453-2808209d1504",
+      "createdAt": "2026-01-22T10:35:38.235Z"
+    },
+    {
+      "userId": "c480dcef-3488-4083-b326-00920fdbc1e1",
+      "type": "dm",
+      "title": "New Message",
+      "message": "elton galeech: fixed",
+      "data": {
+        "fromUserId": "b59fe60c-35c8-4689-b83a-feda335caa19"
+      },
+      "read": false,
+      "id": "84b879b5-9d21-4864-a41e-0216882e2c2c",
+      "createdAt": "2026-01-22T10:35:40.883Z"
+    },
+    {
+      "userId": "c480dcef-3488-4083-b326-00920fdbc1e1",
+      "type": "dm",
+      "title": "New Message",
+      "message": "elton galeech: finally",
+      "data": {
+        "fromUserId": "b59fe60c-35c8-4689-b83a-feda335caa19"
+      },
+      "read": false,
+      "id": "1e79bbf8-de2a-489c-a455-55b9b4c464d7",
+      "createdAt": "2026-01-22T10:35:42.947Z"
+    },
+    {
+      "userId": "c480dcef-3488-4083-b326-00920fdbc1e1",
+      "type": "dm",
+      "title": "New Message",
+      "message": "elton galeech: lol",
+      "data": {
+        "fromUserId": "b59fe60c-35c8-4689-b83a-feda335caa19"
+      },
+      "read": false,
+      "id": "fc360882-3996-4cb2-81a2-391806700c07",
+      "createdAt": "2026-01-22T10:35:44.042Z"
     }
   ],
   "directMessages": [
@@ -97,6 +229,94 @@
       "message": "🤣",
       "read": true,
       "createdAt": "2026-01-21T16:25:00.336Z"
+    },
+    {
+      "id": "fcea81e1-09d3-4f16-9f8c-ae1dbf297723",
+      "fromUserId": "b59fe60c-35c8-4689-b83a-feda335caa19",
+      "toUserId": "c480dcef-3488-4083-b326-00920fdbc1e1",
+      "message": "ayeni",
+      "read": false,
+      "createdAt": "2026-01-22T10:33:16.631Z"
+    },
+    {
+      "id": "8a3f9130-51bd-4eb4-838c-8188c45cc896",
+      "fromUserId": "b59fe60c-35c8-4689-b83a-feda335caa19",
+      "toUserId": "c480dcef-3488-4083-b326-00920fdbc1e1",
+      "message": "what",
+      "read": false,
+      "createdAt": "2026-01-22T10:33:21.809Z"
+    },
+    {
+      "id": "e6e8d263-3981-49e2-9df0-34792095c445",
+      "fromUserId": "b59fe60c-35c8-4689-b83a-feda335caa19",
+      "toUserId": "c480dcef-3488-4083-b326-00920fdbc1e1",
+      "message": "nah still",
+      "read": false,
+      "createdAt": "2026-01-22T10:33:25.257Z"
+    },
+    {
+      "id": "404fc2d6-c908-4d0b-ae3d-a8515f4fa9a9",
+      "fromUserId": "b59fe60c-35c8-4689-b83a-feda335caa19",
+      "toUserId": "c480dcef-3488-4083-b326-00920fdbc1e1",
+      "message": "lol",
+      "read": false,
+      "createdAt": "2026-01-22T10:34:52.689Z"
+    },
+    {
+      "id": "213499ce-cdaa-4137-b9ec-a4f3bfa46924",
+      "fromUserId": "b59fe60c-35c8-4689-b83a-feda335caa19",
+      "toUserId": "c480dcef-3488-4083-b326-00920fdbc1e1",
+      "message": "nah tho",
+      "read": false,
+      "createdAt": "2026-01-22T10:35:00.697Z"
+    },
+    {
+      "id": "bcc2a0af-6ce1-4f04-bb69-5d30448369ba",
+      "fromUserId": "b59fe60c-35c8-4689-b83a-feda335caa19",
+      "toUserId": "c480dcef-3488-4083-b326-00920fdbc1e1",
+      "message": "hmm",
+      "read": false,
+      "createdAt": "2026-01-22T10:35:34.341Z"
+    },
+    {
+      "id": "8cb709e0-3334-46d3-be33-20894f947cf9",
+      "fromUserId": "b59fe60c-35c8-4689-b83a-feda335caa19",
+      "toUserId": "c480dcef-3488-4083-b326-00920fdbc1e1",
+      "message": "wow",
+      "read": false,
+      "createdAt": "2026-01-22T10:35:36.240Z"
+    },
+    {
+      "id": "3684db1b-724d-452b-b93b-1e1ea4b35456",
+      "fromUserId": "b59fe60c-35c8-4689-b83a-feda335caa19",
+      "toUserId": "c480dcef-3488-4083-b326-00920fdbc1e1",
+      "message": "now",
+      "read": false,
+      "createdAt": "2026-01-22T10:35:38.234Z"
+    },
+    {
+      "id": "29d84e57-a7a2-4805-8aa0-b7f670fda8e4",
+      "fromUserId": "b59fe60c-35c8-4689-b83a-feda335caa19",
+      "toUserId": "c480dcef-3488-4083-b326-00920fdbc1e1",
+      "message": "fixed",
+      "read": false,
+      "createdAt": "2026-01-22T10:35:40.881Z"
+    },
+    {
+      "id": "c7cb2005-0755-4d8c-a58b-7c411966e2ef",
+      "fromUserId": "b59fe60c-35c8-4689-b83a-feda335caa19",
+      "toUserId": "c480dcef-3488-4083-b326-00920fdbc1e1",
+      "message": "finally",
+      "read": false,
+      "createdAt": "2026-01-22T10:35:42.945Z"
+    },
+    {
+      "id": "56a90174-28bc-42bf-b748-429b88e22612",
+      "fromUserId": "b59fe60c-35c8-4689-b83a-feda335caa19",
+      "toUserId": "c480dcef-3488-4083-b326-00920fdbc1e1",
+      "message": "lol",
+      "read": false,
+      "createdAt": "2026-01-22T10:35:44.040Z"
     }
   ]
 }

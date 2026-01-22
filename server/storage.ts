@@ -80,6 +80,21 @@ export interface DirectMessage {
   createdAt: string;
 }
 
+export interface ApiKey {
+  id: string;
+  key: string;
+  name: string;
+  userId: string;
+  scope: 'read-only';
+  createdAt: string;
+  lastUsed?: string;
+  // Rate limiting
+  requestsToday: number;
+  requestsThisMinute: number;
+  lastMinuteReset: string;
+  lastDayReset: string;
+}
+
 export interface IStorage {
   // Shows
   getAllShows(): Promise<Show[]>;
@@ -207,6 +222,13 @@ export interface IStorage {
     audioDuration?: number
   ): Promise<DirectMessage>;
   markMessagesRead(userId: string, friendId: string): Promise<void>;
+
+  // API Keys
+  getApiKeysByUserId(userId: string): Promise<ApiKey[]>;
+  getApiKeyByKey(key: string): Promise<ApiKey | undefined>;
+  createApiKey(userId: string, name: string): Promise<ApiKey>;
+  deleteApiKey(id: string, userId: string): Promise<void>;
+  updateApiKeyUsage(id: string): Promise<{ allowed: boolean; reason?: string }>;
 }
 
 export class MemStorage implements IStorage {
@@ -227,9 +249,11 @@ export class MemStorage implements IStorage {
   private friendRequests: Map<string, FriendRequest>;
   private notifications: Map<string, Notification>;
   private directMessages: Map<string, DirectMessage>;
+  private apiKeys: Map<string, ApiKey>;
   private dataFile: string;
   private usersFile: string;
   private friendsFile!: string;
+  private apiKeysFile!: string;
 
   constructor() {
     this.dataFile = join(process.cwd(), "data", "streamvault-data.json");
@@ -250,6 +274,7 @@ export class MemStorage implements IStorage {
     this.friendRequests = new Map();
     this.notifications = new Map();
     this.directMessages = new Map();
+    this.apiKeys = new Map();
     this.categories = [
       { id: "action", name: "Action & Thriller", slug: "action" },
       { id: "drama", name: "Drama & Romance", slug: "drama" },
@@ -264,6 +289,8 @@ export class MemStorage implements IStorage {
     this.loadData();
     this.friendsFile = join(process.cwd(), "data", "friends.json");
     this.loadFriendsData();
+    this.apiKeysFile = join(process.cwd(), "data", "api-keys.json");
+    this.loadApiKeys();
   }
 
   // Load data from JSON file or seed if file doesn't exist
@@ -1557,6 +1584,112 @@ export class MemStorage implements IStorage {
     } catch (error) {
       console.error("Error loading friends data:", error);
     }
+  }
+
+  private loadApiKeys(): void {
+    try {
+      if (existsSync(this.apiKeysFile)) {
+        const data = JSON.parse(readFileSync(this.apiKeysFile, "utf-8"));
+        for (const key of data) {
+          this.apiKeys.set(key.id, key);
+        }
+        console.log(`🔑 Loaded ${this.apiKeys.size} API keys`);
+      }
+    } catch (error) {
+      console.error("Error loading API keys:", error);
+    }
+  }
+
+  private saveApiKeys(): void {
+    try {
+      const data = Array.from(this.apiKeys.values());
+      writeFileSync(this.apiKeysFile, JSON.stringify(data, null, 2));
+    } catch (error) {
+      console.error("Error saving API keys:", error);
+    }
+  }
+
+  async getApiKeysByUserId(userId: string): Promise<ApiKey[]> {
+    return Array.from(this.apiKeys.values()).filter(k => k.userId === userId);
+  }
+
+  async getApiKeyByKey(key: string): Promise<ApiKey | undefined> {
+    return Array.from(this.apiKeys.values()).find(k => k.key === key);
+  }
+
+  async createApiKey(userId: string, name: string): Promise<ApiKey> {
+    // Generate a secure random key (32 chars hex)
+    const key = randomUUID().replace(/-/g, '') + randomUUID().replace(/-/g, '').slice(0, 8);
+    const now = new Date().toISOString();
+
+    const apiKey: ApiKey = {
+      id: randomUUID(),
+      key: `sv_${key}`, // Prefix for easy identification
+      name,
+      userId,
+      scope: 'read-only',
+      createdAt: now,
+      requestsToday: 0,
+      requestsThisMinute: 0,
+      lastMinuteReset: now,
+      lastDayReset: now,
+    };
+
+    this.apiKeys.set(apiKey.id, apiKey);
+    this.saveApiKeys();
+    return apiKey;
+  }
+
+  async deleteApiKey(id: string, userId: string): Promise<void> {
+    const apiKey = this.apiKeys.get(id);
+    if (apiKey && apiKey.userId === userId) {
+      this.apiKeys.delete(id);
+      this.saveApiKeys();
+    }
+  }
+
+  async updateApiKeyUsage(id: string): Promise<{ allowed: boolean; reason?: string }> {
+    const apiKey = this.apiKeys.get(id);
+    if (!apiKey) {
+      return { allowed: false, reason: 'Invalid API key' };
+    }
+
+    const now = new Date();
+    const nowIso = now.toISOString();
+
+    // Check and reset minute counter
+    const lastMinuteReset = new Date(apiKey.lastMinuteReset);
+    const minuteAgo = new Date(now.getTime() - 60000);
+    if (lastMinuteReset < minuteAgo) {
+      apiKey.requestsThisMinute = 0;
+      apiKey.lastMinuteReset = nowIso;
+    }
+
+    // Check and reset day counter
+    const lastDayReset = new Date(apiKey.lastDayReset);
+    const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    if (lastDayReset < dayAgo) {
+      apiKey.requestsToday = 0;
+      apiKey.lastDayReset = nowIso;
+    }
+
+    // Check rate limits
+    if (apiKey.requestsThisMinute >= 10) {
+      return { allowed: false, reason: 'Rate limit exceeded: 10 requests per minute' };
+    }
+    if (apiKey.requestsToday >= 50) {
+      return { allowed: false, reason: 'Rate limit exceeded: 50 requests per day' };
+    }
+
+    // Increment counters
+    apiKey.requestsThisMinute++;
+    apiKey.requestsToday++;
+    apiKey.lastUsed = nowIso;
+
+    this.apiKeys.set(id, apiKey);
+    this.saveApiKeys();
+
+    return { allowed: true };
   }
 }
 

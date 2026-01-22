@@ -58,6 +58,47 @@ function requireAdmin(req: any, res: any, next: any) {
   next();
 }
 
+// API Key authentication middleware for external access
+async function requireApiKey(req: any, res: any, next: any) {
+  // Skip API key check for same-origin (frontend) requests
+  const origin = req.headers.origin || req.headers.referer;
+  const host = req.headers.host;
+  if (origin && host) {
+    const originUrl = new URL(origin).host;
+    if (originUrl === host || originUrl.includes('localhost') || originUrl.includes('127.0.0.1')) {
+      return next(); // Frontend request, skip API key check
+    }
+  }
+
+  // Check for API key in header
+  const apiKey = req.headers['x-api-key'];
+  if (!apiKey) {
+    return res.status(401).json({
+      error: 'API key required',
+      message: 'Include X-API-Key header with your API key'
+    });
+  }
+
+  // Validate API key
+  const keyData = await storage.getApiKeyByKey(apiKey);
+  if (!keyData) {
+    return res.status(401).json({ error: 'Invalid API key' });
+  }
+
+  // Check rate limits and update usage
+  const usageResult = await storage.updateApiKeyUsage(keyData.id);
+  if (!usageResult.allowed) {
+    return res.status(429).json({
+      error: 'Rate limit exceeded',
+      message: usageResult.reason
+    });
+  }
+
+  // Attach API key info to request for logging
+  req.apiKey = keyData;
+  next();
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   const SUBSCRIBERS_FILE = path.join(__dirname, "..", "data", "subscribers.json");
 
@@ -781,8 +822,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // CONTENT BY ID ROUTES (for favorites)
   // ============================================
 
-  // Get show by ID
-  app.get("/api/shows/:id", async (req, res) => {
+  // Get show by ID (use /api/content/shows to avoid conflict with /api/shows/:slug)
+  app.get("/api/content/shows/:id", async (req, res) => {
     try {
       const { id } = req.params;
       const show = await storage.getShowById(id);
@@ -797,7 +838,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get movie by ID
-  app.get("/api/movies/:id", async (req, res) => {
+  app.get("/api/content/movies/:id", async (req, res) => {
     try {
       const { id } = req.params;
       const movie = await storage.getMovieById(id);
@@ -812,7 +853,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get anime by ID
-  app.get("/api/anime/:id", async (req, res) => {
+  app.get("/api/content/anime/:id", async (req, res) => {
     try {
       const { id } = req.params;
       const anime = await storage.getAnimeById(id);
@@ -823,6 +864,88 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Get anime by ID error:", error);
       res.status(500).json({ error: "Failed to get anime" });
+    }
+  });
+
+  // ============================================
+  // API KEY ROUTES
+  // ============================================
+
+  // Get user's API keys
+  app.get("/api/keys", async (req, res) => {
+    try {
+      const token = req.cookies.authToken;
+      if (!token) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const payload = verifyToken(token);
+      if (!payload) {
+        return res.status(401).json({ error: "Invalid token" });
+      }
+
+      const keys = await storage.getApiKeysByUserId(payload.userId);
+      // Don't return the full key for security, just the first/last chars
+      const maskedKeys = keys.map(k => ({
+        ...k,
+        key: k.key.slice(0, 7) + '...' + k.key.slice(-4),
+      }));
+      res.json(maskedKeys);
+    } catch (error) {
+      console.error("Get API keys error:", error);
+      res.status(500).json({ error: "Failed to get API keys" });
+    }
+  });
+
+  // Create new API key
+  app.post("/api/keys", async (req, res) => {
+    try {
+      const token = req.cookies.authToken;
+      if (!token) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const payload = verifyToken(token);
+      if (!payload) {
+        return res.status(401).json({ error: "Invalid token" });
+      }
+
+      const { name } = req.body;
+      if (!name || typeof name !== 'string' || name.trim().length < 1) {
+        return res.status(400).json({ error: "API key name is required" });
+      }
+
+      // Limit to 5 keys per user
+      const existingKeys = await storage.getApiKeysByUserId(payload.userId);
+      if (existingKeys.length >= 5) {
+        return res.status(400).json({ error: "Maximum 5 API keys per user" });
+      }
+
+      const apiKey = await storage.createApiKey(payload.userId, name.trim());
+      // Return full key only on creation
+      res.status(201).json(apiKey);
+    } catch (error) {
+      console.error("Create API key error:", error);
+      res.status(500).json({ error: "Failed to create API key" });
+    }
+  });
+
+  // Delete API key
+  app.delete("/api/keys/:id", async (req, res) => {
+    try {
+      const token = req.cookies.authToken;
+      if (!token) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const payload = verifyToken(token);
+      if (!payload) {
+        return res.status(401).json({ error: "Invalid token" });
+      }
+
+      const { id } = req.params;
+      await storage.deleteApiKey(id, payload.userId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Delete API key error:", error);
+      res.status(500).json({ error: "Failed to delete API key" });
     }
   });
 
@@ -1159,8 +1282,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get all shows
-  app.get("/api/shows", async (_req, res) => {
+  // Get all shows (requires API key for external access)
+  app.get("/api/shows", requireApiKey, async (_req, res) => {
     try {
       const shows = await storage.getAllShows();
       res.json(shows);
@@ -1222,8 +1345,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Movie routes
-  // Get all movies
-  app.get("/api/movies", async (_req, res) => {
+  // Get all movies (requires API key for external access)
+  app.get("/api/movies", requireApiKey, async (_req, res) => {
     try {
       const movies = await storage.getAllMovies();
       res.json(movies);
@@ -1260,8 +1383,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Anime routes
-  // Get all anime
-  app.get("/api/anime", async (_req, res) => {
+  // Get all anime (requires API key for external access)
+  app.get("/api/anime", requireApiKey, async (_req, res) => {
     try {
       const anime = await storage.getAllAnime();
       res.json(anime);

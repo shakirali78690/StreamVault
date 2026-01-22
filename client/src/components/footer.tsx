@@ -73,6 +73,7 @@ export function Footer() {
     { name: "FAQs", path: "/faq" },
     { name: "Report Issue", path: "/report" },
     { name: "Request Content", path: "/request" },
+    { name: "API", path: "/settings" },
   ];
 
   return (

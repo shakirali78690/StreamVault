@@ -63,7 +63,7 @@ export function FavoritesPicker({ favorites, onFavoritesChange }: FavoritesPicke
             // Fetch shows
             for (const id of showIds) {
                 try {
-                    const res = await fetch(`/api/shows/${id}`);
+                    const res = await fetch(`/api/content/shows/${id}`);
                     if (res.ok) {
                         const show = await res.json();
                         newSelected.shows.push({ id: show.id, title: show.title, posterUrl: show.posterUrl });
@@ -74,7 +74,7 @@ export function FavoritesPicker({ favorites, onFavoritesChange }: FavoritesPicke
             // Fetch movies
             for (const id of movieIds) {
                 try {
-                    const res = await fetch(`/api/movies/${id}`);
+                    const res = await fetch(`/api/content/movies/${id}`);
                     if (res.ok) {
                         const movie = await res.json();
                         newSelected.movies.push({ id: movie.id, title: movie.title, posterUrl: movie.posterUrl });
@@ -85,7 +85,7 @@ export function FavoritesPicker({ favorites, onFavoritesChange }: FavoritesPicke
             // Fetch anime
             for (const id of animeIds) {
                 try {
-                    const res = await fetch(`/api/anime/${id}`);
+                    const res = await fetch(`/api/content/anime/${id}`);
                     if (res.ok) {
                         const anime = await res.json();
                         newSelected.anime.push({ id: anime.id, title: anime.title, posterUrl: anime.posterUrl });

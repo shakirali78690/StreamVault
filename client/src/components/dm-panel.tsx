@@ -87,6 +87,9 @@ export function DMPanel({ friendId, friend, onClose }: DMPanelProps) {
     // File input ref
     const fileInputRef = useRef<HTMLInputElement>(null);
 
+    // Message input ref for refocusing after send
+    const inputRef = useRef<HTMLInputElement>(null);
+
     // Friends system hooks
     const { sendFriendRequest, friends, startTyping, stopTyping, typingFriends, isFriendOnline } = useSocialSocket();
 
@@ -325,6 +328,10 @@ export function DMPanel({ friendId, friend, onClose }: DMPanelProps) {
             console.error('Failed to send message:', error);
         } finally {
             setIsSending(false);
+            // Refocus the input after sending (use setTimeout to wait for state update)
+            setTimeout(() => {
+                inputRef.current?.focus();
+            }, 0);
         }
     };
 
@@ -518,9 +525,19 @@ export function DMPanel({ friendId, friend, onClose }: DMPanelProps) {
                                             )}
                                             {renderAttachment(msg)}
                                         </div>
-                                        <p className={`text-[10px] mt-1 px-1 opacity-70 ${isMe ? 'text-right' : 'text-left'}`}>
-                                            {formatDistanceToNow(new Date(msg.createdAt), { addSuffix: true })}
-                                        </p>
+                                        <div className={`flex items-center gap-1.5 mt-1 px-1 ${isMe ? 'justify-end' : 'justify-start'}`}>
+                                            <span className="text-[10px] opacity-70">
+                                                {formatDistanceToNow(new Date(msg.createdAt), { addSuffix: true })}
+                                            </span>
+                                            {/* Seen receipt - show for last sent message that was read */}
+                                            {isMe && msg.read && index === messages.length - 1 && (
+                                                <span className="text-[10px] text-primary font-medium">• Seen</span>
+                                            )}
+                                            {/* Delivery indicator for unread messages */}
+                                            {isMe && !msg.read && (
+                                                <span className="text-[10px] opacity-50">• Sent</span>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             );
@@ -686,6 +703,7 @@ export function DMPanel({ friendId, friend, onClose }: DMPanelProps) {
                         {/* Message input */}
                         <form onSubmit={handleSend} className="flex-1 relative flex items-end gap-2">
                             <Input
+                                ref={inputRef}
                                 value={newMessage}
                                 onChange={(e) => setNewMessage(e.target.value)}
                                 placeholder="Type a message..."

@@ -1,0 +1,14 @@
+[
+  {
+    "id": "23e212fe-8829-4a53-9f08-b88310436134",
+    "key": "sv_2608cd3d218f4d76bd2cb82b5244064c91a9b9c6",
+    "name": "oo",
+    "userId": "b59fe60c-35c8-4689-b83a-feda335caa19",
+    "scope": "read-only",
+    "createdAt": "2026-01-22T11:40:39.910Z",
+    "requestsToday": 0,
+    "requestsThisMinute": 0,
+    "lastMinuteReset": "2026-01-22T11:40:39.910Z",
+    "lastDayReset": "2026-01-22T11:40:39.910Z"
+  }
+]
