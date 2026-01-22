@@ -205,6 +205,7 @@ export interface IStorage {
   createNotification(notification: Omit<Notification, 'id' | 'createdAt'>): Promise<Notification>;
   markNotificationRead(id: string): Promise<void>;
   markAllNotificationsRead(userId: string): Promise<void>;
+  markDmNotificationsRead(userId: string, fromUserId: string): Promise<void>;
   deleteNotification(id: string): Promise<void>;
 
   // Direct Messages
@@ -1444,6 +1445,19 @@ export class MemStorage implements IStorage {
   async markAllNotificationsRead(userId: string): Promise<void> {
     for (const notification of this.notifications.values()) {
       if (notification.userId === userId) {
+        notification.read = true;
+      }
+    }
+    this.saveFriendsData();
+  }
+
+  async markDmNotificationsRead(userId: string, fromUserId: string): Promise<void> {
+    for (const notification of this.notifications.values()) {
+      if (
+        notification.userId === userId &&
+        notification.type === 'dm' &&
+        notification.data?.fromUserId === fromUserId
+      ) {
         notification.read = true;
       }
     }

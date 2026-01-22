@@ -1098,6 +1098,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Mark messages as read
       await storage.markMessagesRead(payload.userId, friendId);
 
+      // Also mark DM notifications from this friend as read
+      await storage.markDmNotificationsRead(payload.userId, friendId);
+
       res.json(messages);
     } catch (error) {
       console.error("Get messages error:", error);

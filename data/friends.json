@@ -96,7 +96,7 @@
       "data": {
         "fromUserId": "b59fe60c-35c8-4689-b83a-feda335caa19"
       },
-      "read": false,
+      "read": true,
       "id": "93d400f0-be90-4397-b6b5-10d7804d5d30",
       "createdAt": "2026-01-22T10:33:16.633Z"
     },
@@ -108,7 +108,7 @@
       "data": {
         "fromUserId": "b59fe60c-35c8-4689-b83a-feda335caa19"
       },
-      "read": false,
+      "read": true,
       "id": "aa7d8a3f-0cdf-411a-aba3-efe367ac69d8",
       "createdAt": "2026-01-22T10:33:21.811Z"
     },
@@ -120,7 +120,7 @@
       "data": {
         "fromUserId": "b59fe60c-35c8-4689-b83a-feda335caa19"
       },
-      "read": false,
+      "read": true,
       "id": "285e6865-e40e-4b20-a062-b56cc5adf77f",
       "createdAt": "2026-01-22T10:33:25.258Z"
     },
@@ -132,7 +132,7 @@
       "data": {
         "fromUserId": "b59fe60c-35c8-4689-b83a-feda335caa19"
       },
-      "read": false,
+      "read": true,
       "id": "af9ff910-cbec-4904-a0f1-491f6afc19b4",
       "createdAt": "2026-01-22T10:34:52.691Z"
     },
@@ -144,7 +144,7 @@
       "data": {
         "fromUserId": "b59fe60c-35c8-4689-b83a-feda335caa19"
       },
-      "read": false,
+      "read": true,
       "id": "afffa0ea-1625-4f54-940d-314355310ef1",
       "createdAt": "2026-01-22T10:35:00.699Z"
     },
@@ -156,7 +156,7 @@
       "data": {
         "fromUserId": "b59fe60c-35c8-4689-b83a-feda335caa19"
       },
-      "read": false,
+      "read": true,
       "id": "beee31cd-051b-4ea6-9f07-e8df8942e441",
       "createdAt": "2026-01-22T10:35:34.342Z"
     },
@@ -168,7 +168,7 @@
       "data": {
         "fromUserId": "b59fe60c-35c8-4689-b83a-feda335caa19"
       },
-      "read": false,
+      "read": true,
       "id": "fdb59723-8ca5-4fb6-ad96-b6a407a77527",
       "createdAt": "2026-01-22T10:35:36.241Z"
     },
@@ -180,7 +180,7 @@
       "data": {
         "fromUserId": "b59fe60c-35c8-4689-b83a-feda335caa19"
       },
-      "read": false,
+      "read": true,
       "id": "09d93994-d43b-4565-b453-2808209d1504",
       "createdAt": "2026-01-22T10:35:38.235Z"
     },
@@ -192,7 +192,7 @@
       "data": {
         "fromUserId": "b59fe60c-35c8-4689-b83a-feda335caa19"
       },
-      "read": false,
+      "read": true,
       "id": "84b879b5-9d21-4864-a41e-0216882e2c2c",
       "createdAt": "2026-01-22T10:35:40.883Z"
     },
@@ -204,7 +204,7 @@
       "data": {
         "fromUserId": "b59fe60c-35c8-4689-b83a-feda335caa19"
       },
-      "read": false,
+      "read": true,
       "id": "1e79bbf8-de2a-489c-a455-55b9b4c464d7",
       "createdAt": "2026-01-22T10:35:42.947Z"
     },
@@ -216,9 +216,21 @@
       "data": {
         "fromUserId": "b59fe60c-35c8-4689-b83a-feda335caa19"
       },
-      "read": false,
+      "read": true,
       "id": "fc360882-3996-4cb2-81a2-391806700c07",
       "createdAt": "2026-01-22T10:35:44.042Z"
+    },
+    {
+      "userId": "b59fe60c-35c8-4689-b83a-feda335caa19",
+      "type": "dm",
+      "title": "New Message",
+      "message": "admin: oh hi",
+      "data": {
+        "fromUserId": "c480dcef-3488-4083-b326-00920fdbc1e1"
+      },
+      "read": true,
+      "id": "bea8ffbc-55a8-4bf4-97db-28c0dc191728",
+      "createdAt": "2026-01-22T11:43:20.955Z"
     }
   ],
   "directMessages": [
@@ -235,7 +247,7 @@
       "fromUserId": "b59fe60c-35c8-4689-b83a-feda335caa19",
       "toUserId": "c480dcef-3488-4083-b326-00920fdbc1e1",
       "message": "ayeni",
-      "read": false,
+      "read": true,
       "createdAt": "2026-01-22T10:33:16.631Z"
     },
     {
@@ -243,7 +255,7 @@
       "fromUserId": "b59fe60c-35c8-4689-b83a-feda335caa19",
       "toUserId": "c480dcef-3488-4083-b326-00920fdbc1e1",
       "message": "what",
-      "read": false,
+      "read": true,
       "createdAt": "2026-01-22T10:33:21.809Z"
     },
     {
@@ -251,7 +263,7 @@
       "fromUserId": "b59fe60c-35c8-4689-b83a-feda335caa19",
       "toUserId": "c480dcef-3488-4083-b326-00920fdbc1e1",
       "message": "nah still",
-      "read": false,
+      "read": true,
       "createdAt": "2026-01-22T10:33:25.257Z"
     },
     {
@@ -259,7 +271,7 @@
       "fromUserId": "b59fe60c-35c8-4689-b83a-feda335caa19",
       "toUserId": "c480dcef-3488-4083-b326-00920fdbc1e1",
       "message": "lol",
-      "read": false,
+      "read": true,
       "createdAt": "2026-01-22T10:34:52.689Z"
     },
     {
@@ -267,7 +279,7 @@
       "fromUserId": "b59fe60c-35c8-4689-b83a-feda335caa19",
       "toUserId": "c480dcef-3488-4083-b326-00920fdbc1e1",
       "message": "nah tho",
-      "read": false,
+      "read": true,
       "createdAt": "2026-01-22T10:35:00.697Z"
     },
     {
@@ -275,7 +287,7 @@
       "fromUserId": "b59fe60c-35c8-4689-b83a-feda335caa19",
       "toUserId": "c480dcef-3488-4083-b326-00920fdbc1e1",
       "message": "hmm",
-      "read": false,
+      "read": true,
       "createdAt": "2026-01-22T10:35:34.341Z"
     },
     {
@@ -283,7 +295,7 @@
       "fromUserId": "b59fe60c-35c8-4689-b83a-feda335caa19",
       "toUserId": "c480dcef-3488-4083-b326-00920fdbc1e1",
       "message": "wow",
-      "read": false,
+      "read": true,
       "createdAt": "2026-01-22T10:35:36.240Z"
     },
     {
@@ -291,7 +303,7 @@
       "fromUserId": "b59fe60c-35c8-4689-b83a-feda335caa19",
       "toUserId": "c480dcef-3488-4083-b326-00920fdbc1e1",
       "message": "now",
-      "read": false,
+      "read": true,
       "createdAt": "2026-01-22T10:35:38.234Z"
     },
     {
@@ -299,7 +311,7 @@
       "fromUserId": "b59fe60c-35c8-4689-b83a-feda335caa19",
       "toUserId": "c480dcef-3488-4083-b326-00920fdbc1e1",
       "message": "fixed",
-      "read": false,
+      "read": true,
       "createdAt": "2026-01-22T10:35:40.881Z"
     },
     {
@@ -307,7 +319,7 @@
       "fromUserId": "b59fe60c-35c8-4689-b83a-feda335caa19",
       "toUserId": "c480dcef-3488-4083-b326-00920fdbc1e1",
       "message": "finally",
-      "read": false,
+      "read": true,
       "createdAt": "2026-01-22T10:35:42.945Z"
     },
     {
@@ -315,8 +327,16 @@
       "fromUserId": "b59fe60c-35c8-4689-b83a-feda335caa19",
       "toUserId": "c480dcef-3488-4083-b326-00920fdbc1e1",
       "message": "lol",
-      "read": false,
+      "read": true,
       "createdAt": "2026-01-22T10:35:44.040Z"
+    },
+    {
+      "id": "f3a81351-7f09-47df-8392-0882315d127f",
+      "fromUserId": "c480dcef-3488-4083-b326-00920fdbc1e1",
+      "toUserId": "b59fe60c-35c8-4689-b83a-feda335caa19",
+      "message": "oh hi",
+      "read": true,
+      "createdAt": "2026-01-22T11:43:20.952Z"
     }
   ]
 }
