@@ -81,8 +81,17 @@ A professional Netflix-inspired streaming platform for both TV shows and movies,
 - **Direct Messaging** - Real-time private chat with friends
 - **Rich Chat** - Send GIFs, emojis, and file attachments
 - **Activity Feed** - See your friends' activity directly on the dashboard
-- **User Profiles** - Customizable profiles with avatars 
+- **User Profiles** - Customizable profiles with avatars, social links & favorite content
+- **Profile Favorites** - Showcase your favorite shows, movies, and anime on your profile
 - **Notifications** - Real-time alerts for friend requests and messages
+
+### ⚙️ **Settings & Preferences (NEW!)**
+- **Dedicated Settings Page** - `/settings` for all app preferences
+- **Chatbot Toggle** - Enable/disable AI assistant
+- **Theme Selection** - Light/Dark/System themes
+- **Notification Controls** - Push and email notification toggles
+- **Privacy Settings** - Control friend activity visibility
+- **Playback Preferences** - Default video quality and autoplay settings
 
 
 ### 🛠️ **Tech Stack**
@@ -427,7 +436,16 @@ MIT License - feel free to use for personal or commercial projects
 
 ## 🎉 What's New
 
-### Latest Updates (v5.0) - January 2026
+### Latest Updates (v5.1) - January 2026
+- ✅ **Settings Page** - Dedicated `/settings` page with app preferences
+- ✅ **Chatbot Toggle** - Disable AI assistant from settings
+- ✅ **Profile Favorites** - Display favorite shows/movies/anime on your profile
+- ✅ **Profile Social Links** - Add Twitter, Instagram, YouTube, TikTok, Discord
+- ✅ **Friend Activity Fix** - Joiner activity no longer shows as "Unknown"
+- ✅ **Activity Cleanup** - Activity properly clears when users disconnect
+- ✅ **Content by ID APIs** - New `/api/shows/:id`, `/api/movies/:id`, `/api/anime/:id` endpoints
+
+### Previous Updates (v5.0) - January 2026
 - ✅ **Anime Support** - Full anime integration with 98+ titles
 - ✅ **Anime Streaming** - Dedicated anime pages with episode players
 - ✅ **Anime Blog Posts** - Rich blog content with season trailers
