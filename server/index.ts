@@ -110,7 +110,7 @@ app.get('/430747cadbbf78f339306f7049a8f3c5.txt', (_req, res) => {
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || '5000', 10);
-  const host = process.env.NODE_ENV === 'production' ? '0.0.0.0' : '127.0.0.1';
+  const host = '0.0.0.0';
   server.listen(port, host, () => {
     log(`serving on ${host}:${port}`);
 

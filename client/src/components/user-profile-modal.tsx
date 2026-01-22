@@ -120,7 +120,7 @@ export function UserProfileModal({ isOpen, onClose, user, isFriend }: UserProfil
         <>
             {/* Profile Modal */}
             <Dialog open={isOpen} onOpenChange={onClose}>
-                <DialogContent className="sm:max-w-md max-h-[85vh] overflow-y-auto">
+                <DialogContent className="sm:max-w-md max-h-[85vh] overflow-y-auto scrollbar-hide">
 
                     <div className="flex flex-col items-center gap-4 py-4">
                         {/* Clickable Avatar */}
@@ -206,7 +206,7 @@ export function UserProfileModal({ isOpen, onClose, user, isFriend }: UserProfil
                                 {user.favorites?.shows && user.favorites.shows.length > 0 && (
                                     <div>
                                         <p className="text-xs text-muted-foreground mb-1">TV Shows</p>
-                                        <div className="flex gap-3 overflow-x-auto pb-2 pt-1 px-1">
+                                        <div className="flex gap-3 overflow-x-auto pb-2 pt-1 px-1 scrollbar-hide">
                                             {user.favorites.shows.map((item) => {
                                                 const slug = item.slug || item.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
                                                 return (
@@ -230,7 +230,7 @@ export function UserProfileModal({ isOpen, onClose, user, isFriend }: UserProfil
                                 {user.favorites?.movies && user.favorites.movies.length > 0 && (
                                     <div>
                                         <p className="text-xs text-muted-foreground mb-1">Movies</p>
-                                        <div className="flex gap-3 overflow-x-auto pb-2 pt-1 px-1">
+                                        <div className="flex gap-3 overflow-x-auto pb-2 pt-1 px-1 scrollbar-hide">
                                             {user.favorites.movies.map((item) => {
                                                 const slug = item.slug || item.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
                                                 return (
@@ -254,7 +254,7 @@ export function UserProfileModal({ isOpen, onClose, user, isFriend }: UserProfil
                                 {user.favorites?.anime && user.favorites.anime.length > 0 && (
                                     <div>
                                         <p className="text-xs text-muted-foreground mb-1">Anime</p>
-                                        <div className="flex gap-3 overflow-x-auto pb-2 pt-1 px-1">
+                                        <div className="flex gap-3 overflow-x-auto pb-2 pt-1 px-1 scrollbar-hide">
                                             {user.favorites.anime.map((item) => {
                                                 const slug = item.slug || item.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
                                                 return (

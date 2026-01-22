@@ -1,11 +1,11 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import http from "http";
 import https from "https";
 import { storage } from "./storage";
 import { z } from "zod";
 import { watchlistSchema, viewingProgressSchema, insertBlogPostSchema, insertUserSchema, loginSchema, updateProfileSchema } from "@shared/schema";
-import type { InsertEpisode, BlogPost } from "@shared/schema";
+import type { InsertEpisode, BlogPost, Show, Movie, Anime } from "@shared/schema";
 import { readFileSync, existsSync, writeFileSync, mkdirSync } from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -201,6 +201,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         avatarUrl: null,
         bio: null,
         emailVerified: false,
+        socialLinks: null,
+        favorites: null,
       });
 
       // Generate token and set cookie
@@ -1514,7 +1516,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Viewing progress endpoints with Auth Support
   const getProgressKey = (req: Request): string => {
     // Check for auth token first
-    const token = req.cookies?.authToken;
+    const token = (req as any).cookies?.authToken;
     if (token) {
       // We need to import verifyToken or use a shared helper. 
       // Assuming verifyToken is imported from ./auth or similar scope
@@ -1615,7 +1617,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (watchedIds.has(item.id)) return 0; // Already watched
 
         let score = 0;
-        const itemGenres = item.genres.split(',').map(g => g.trim());
+        const itemGenres = item.genres.split(',').map((g: string) => g.trim());
 
         // Genre match bonus
         itemGenres.forEach(g => {

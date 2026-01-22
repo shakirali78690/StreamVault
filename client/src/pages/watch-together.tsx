@@ -954,31 +954,56 @@ function WatchTogetherContent() {
         }
     };
 
-    // Drag handlers for fullscreen chat overlay
-    const handleDragStart = (e: React.MouseEvent) => {
+    // Unified drag handlers for Mouse and Touch
+    const handleDragStart = (e: React.MouseEvent | React.TouchEvent) => {
         if (!chatOverlayRef.current) return;
-        e.preventDefault();
+        // Don't prevent default on touch to allow scrolling inside the chat if needed
+        // but we need to stop propagation to avoid triggering other click handlers
         e.stopPropagation();
+
         setIsDragging(true);
         hasDraggedRef.current = false; // Reset drag tracking
         const rect = chatOverlayRef.current.getBoundingClientRect();
+
+        let clientX, clientY;
+        if ('touches' in e) {
+            clientX = e.touches[0].clientX;
+            clientY = e.touches[0].clientY;
+        } else {
+            e.preventDefault(); // Prevent text selection on mouse drag
+            clientX = (e as React.MouseEvent).clientX;
+            clientY = (e as React.MouseEvent).clientY;
+        }
+
         setDragOffset({
-            x: e.clientX - rect.left,
-            y: e.clientY - rect.top
+            x: clientX - rect.left,
+            y: clientY - rect.top
         });
     };
 
-    const handleDragMove = (e: React.MouseEvent) => {
+    const handleDragMove = (e: React.MouseEvent | React.TouchEvent) => {
         if (!isDragging || !containerRef.current) return;
-        e.preventDefault();
+
+        let clientX, clientY;
+        if ('touches' in e) {
+            // Prevent scrolling page while dragging chat
+            e.preventDefault();
+            clientX = e.touches[0].clientX;
+            clientY = e.touches[0].clientY;
+        } else {
+            e.preventDefault();
+            clientX = (e as React.MouseEvent).clientX;
+            clientY = (e as React.MouseEvent).clientY;
+        }
+
         hasDraggedRef.current = true; // Mark that drag motion occurred
         const containerRect = containerRef.current.getBoundingClientRect();
         const chatWidth = chatOverlayRef.current?.offsetWidth || 320;
         const chatHeight = chatOverlayRef.current?.offsetHeight || 400;
 
         // Calculate new position (clamped to container bounds)
-        let newX = e.clientX - containerRect.left - dragOffset.x;
-        let newY = e.clientY - containerRect.top - dragOffset.y;
+        let newX = clientX - containerRect.left - dragOffset.x;
+        let newY = clientY - containerRect.top - dragOffset.y;
 
         // Clamp to bounds
         newX = Math.max(0, Math.min(containerRect.width - chatWidth, newX));
@@ -1072,6 +1097,8 @@ function WatchTogetherContent() {
             onMouseMove={handleDragMove}
             onMouseUp={handleDragEnd}
             onMouseLeave={handleDragEnd}
+            onTouchMove={handleDragMove}
+            onTouchEnd={handleDragEnd}
         >
             <Helmet>
                 <title>Watch Together: {title} | StreamVault</title>
@@ -1396,7 +1423,7 @@ function WatchTogetherContent() {
 
             <div className={`flex ${isFullscreen ? 'h-screen' : 'h-[calc(100vh-65px)]'}`}>
                 {/* Main Content */}
-                <div className="flex-1 flex flex-col overflow-hidden">
+                <div className="flex-1 flex flex-col overflow-hidden min-w-0">
                     {/* Video Player - fills available space */}
                     <div className="flex-1 relative bg-black flex items-center justify-center min-h-0">
                         <div className="w-full h-full max-h-full flex items-center justify-center">
@@ -1598,7 +1625,7 @@ function WatchTogetherContent() {
                     <div
                         ref={chatOverlayRef}
                         className={`flex flex-col transition-all ${isDragging ? 'duration-0' : 'duration-300'} ${isFullscreen
-                            ? `fixed z-[9999] ${isOverlayChatMinimized ? 'w-12 h-12' : 'w-80 max-h-[70vh]'} rounded-2xl bg-black/40 backdrop-blur-xl border border-white/10 shadow-2xl`
+                            ? `fixed z-[9999] ${isOverlayChatMinimized ? 'w-12 h-12' : 'w-80 h-[60vh] max-h-[600px]'} rounded-2xl bg-black/40 backdrop-blur-xl border border-white/10 shadow-2xl`
                             : 'w-80 flex-shrink-0 bg-card border-l border-border h-full'
                             }`}
                         style={isFullscreen ? { left: `${chatPosition.x}px`, top: `${chatPosition.y}px` } : undefined}
@@ -1606,8 +1633,9 @@ function WatchTogetherContent() {
                         {/* Fullscreen Overlay: Drag Handle + Minimize Toggle */}
                         {isFullscreen && !isOverlayChatMinimized && (
                             <div
-                                className="flex items-center justify-between px-3 py-2 border-b border-white/10 cursor-move select-none"
+                                className="flex items-center justify-between px-3 py-2 border-b border-white/10 cursor-move select-none touch-none"
                                 onMouseDown={handleDragStart}
+                                onTouchStart={handleDragStart}
                             >
                                 <div className="flex items-center gap-2 text-white/60 text-xs">
                                     <span className="w-8 h-1 bg-white/30 rounded-full" />

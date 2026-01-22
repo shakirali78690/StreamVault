@@ -231,6 +231,30 @@
       "read": true,
       "id": "bea8ffbc-55a8-4bf4-97db-28c0dc191728",
       "createdAt": "2026-01-22T11:43:20.955Z"
+    },
+    {
+      "userId": "c480dcef-3488-4083-b326-00920fdbc1e1",
+      "type": "dm",
+      "title": "New Message",
+      "message": "elton galeech: hiii",
+      "data": {
+        "fromUserId": "b59fe60c-35c8-4689-b83a-feda335caa19"
+      },
+      "read": true,
+      "id": "558a16d0-b463-48cc-a918-51692eb39415",
+      "createdAt": "2026-01-22T18:14:03.331Z"
+    },
+    {
+      "userId": "b59fe60c-35c8-4689-b83a-feda335caa19",
+      "type": "dm",
+      "title": "New Message",
+      "message": "admin: Lol",
+      "data": {
+        "fromUserId": "c480dcef-3488-4083-b326-00920fdbc1e1"
+      },
+      "read": true,
+      "id": "fb07ed51-e2bb-4c65-bbb3-552bded09356",
+      "createdAt": "2026-01-22T19:03:23.825Z"
     }
   ],
   "directMessages": [
@@ -337,6 +361,22 @@
       "message": "oh hi",
       "read": true,
       "createdAt": "2026-01-22T11:43:20.952Z"
+    },
+    {
+      "id": "89595b82-5c03-4d7d-bef2-d31fab5e3a6a",
+      "fromUserId": "b59fe60c-35c8-4689-b83a-feda335caa19",
+      "toUserId": "c480dcef-3488-4083-b326-00920fdbc1e1",
+      "message": "hiii",
+      "read": true,
+      "createdAt": "2026-01-22T18:14:03.330Z"
+    },
+    {
+      "id": "acb32eab-5edc-4e22-87ad-2e93fea20154",
+      "fromUserId": "c480dcef-3488-4083-b326-00920fdbc1e1",
+      "toUserId": "b59fe60c-35c8-4689-b83a-feda335caa19",
+      "message": "Lol",
+      "read": false,
+      "createdAt": "2026-01-22T19:03:23.824Z"
     }
   ]
 }

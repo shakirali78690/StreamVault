@@ -47,5 +47,6 @@ export default defineConfig({
       strict: true,
       deny: ["**/.*"],
     },
+    host: "0.0.0.0",
   },
 });

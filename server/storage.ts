@@ -56,7 +56,7 @@ export interface FriendRequest {
 export interface Notification {
   id: string;
   userId: string;
-  type: 'friend_request' | 'friend_accepted' | 'room_invite' | 'dm' | 'system';
+  type: 'friend_request' | 'friend_accepted' | 'room_invite' | 'dm' | 'system' | 'announcement' | 'content_update';
   title: string;
   message: string;
   data?: Record<string, unknown>;
