@@ -2155,6 +2155,9 @@ function EditMovieForm({
 
 // Content Requests Component
 function ContentRequests() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
   const { data: requests = [], isLoading } = useQuery<any[]>({
     queryKey: ["/api/admin/content-requests"],
     queryFn: async () => {
@@ -2163,6 +2166,25 @@ function ContentRequests() {
       });
       if (!res.ok) throw new Error("Failed to fetch content requests");
       return res.json();
+    },
+  });
+
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      const res = await fetch(`/api/admin/content-requests/${id}`, {
+        method: "PATCH",
+        headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+      if (!res.ok) throw new Error("Failed to update status");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/content-requests"] });
+      toast({ title: "Status updated successfully" });
+    },
+    onError: () => {
+      toast({ title: "Failed to update status", variant: "destructive" });
     },
   });
 
@@ -2195,9 +2217,17 @@ function ContentRequests() {
                         {request.contentType} • {request.year || "Year not specified"}
                       </CardDescription>
                     </div>
-                    <Badge variant="secondary">
-                      {request.requestCount} request{request.requestCount > 1 ? "s" : ""}
-                    </Badge>
+                    <div className="flex flex-col items-end gap-2">
+                      <Badge variant={
+                        request.status === 'filled' ? 'default' :
+                          request.status === 'rejected' ? 'destructive' : 'secondary'
+                      } className={request.status === 'filled' ? 'bg-green-600 hover:bg-green-700' : ''}>
+                        {request.status?.toUpperCase() || 'PENDING'}
+                      </Badge>
+                      <Badge variant="outline">
+                        {request.requestCount} request{request.requestCount > 1 ? "s" : ""}
+                      </Badge>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-2">
@@ -2224,6 +2254,27 @@ function ContentRequests() {
                   <div className="text-sm text-muted-foreground">
                     Submitted: {new Date(request.createdAt).toLocaleString()}
                   </div>
+
+                  <div className="flex gap-2 mt-4 pt-4 border-t border-border/50">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-green-500 hover:text-green-600 borderColor-green-500 hover:bg-green-500/10"
+                      onClick={() => updateStatusMutation.mutate({ id: request.id, status: 'filled' })}
+                      disabled={request.status === 'filled' || updateStatusMutation.isPending}
+                    >
+                      Mark as Filled
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-red-500 hover:text-red-600 borderColor-red-500 hover:bg-red-500/10"
+                      onClick={() => updateStatusMutation.mutate({ id: request.id, status: 'rejected' })}
+                      disabled={request.status === 'rejected' || updateStatusMutation.isPending}
+                    >
+                      Reject
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             ))}
@@ -2236,6 +2287,9 @@ function ContentRequests() {
 
 // Issue Reports Component
 function IssueReports() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
   const { data: reports = [], isLoading } = useQuery<any[]>({
     queryKey: ["/api/admin/issue-reports"],
     queryFn: async () => {
@@ -2244,6 +2298,25 @@ function IssueReports() {
       });
       if (!res.ok) throw new Error("Failed to fetch issue reports");
       return res.json();
+    },
+  });
+
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      const res = await fetch(`/api/admin/issue-reports/${id}`, {
+        method: "PATCH",
+        headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+      if (!res.ok) throw new Error("Failed to update status");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/issue-reports"] });
+      toast({ title: "Status updated successfully" });
+    },
+    onError: () => {
+      toast({ title: "Failed to update status", variant: "destructive" });
     },
   });
 
@@ -2276,8 +2349,8 @@ function IssueReports() {
                         {report.issueType.replace(/_/g, " ")}
                       </CardDescription>
                     </div>
-                    <Badge variant={report.status === "pending" ? "destructive" : "secondary"}>
-                      {report.status}
+                    <Badge variant={report.status === "pending" ? "destructive" : "secondary"} className={report.status === 'resolved' ? 'bg-green-600 hover:bg-green-700 text-white' : ''}>
+                      {report.status.toUpperCase()}
                     </Badge>
                   </div>
                 </CardHeader>
@@ -2305,6 +2378,20 @@ function IssueReports() {
                   )}
                   <div className="text-sm text-muted-foreground">
                     Submitted: {new Date(report.createdAt).toLocaleString()}
+                  </div>
+
+                  <div className="flex gap-2 mt-4 pt-4 border-t border-border/50">
+                    {report.status !== 'resolved' && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-green-500 hover:text-green-600 borderColor-green-500 hover:bg-green-500/10"
+                        onClick={() => updateStatusMutation.mutate({ id: report.id, status: 'resolved' })}
+                        disabled={updateStatusMutation.isPending}
+                      >
+                        Mark as Resolved
+                      </Button>
+                    )}
                   </div>
                 </CardContent>
               </Card>

@@ -4,14 +4,14 @@ import { SEO } from "@/components/seo";
 export default function DMCA() {
   return (
     <div className="min-h-screen bg-background">
-      <SEO 
+      <SEO
         title="DMCA Policy"
         description="StreamVault's DMCA policy. Learn how to report copyright infringement and our process for handling takedown requests."
         canonical="https://streamvault.live/dmca"
       />
       <div className="container mx-auto px-4 py-12 max-w-4xl">
         <h1 className="text-4xl font-bold mb-8">DMCA Policy</h1>
-        
+
         <div className="prose prose-invert max-w-none space-y-6">
           <p className="text-muted-foreground">
             Last updated: {new Date().toLocaleDateString()}
@@ -22,7 +22,7 @@ export default function DMCA() {
             <div>
               <h3 className="text-lg font-semibold mb-2">Important Notice</h3>
               <p className="text-sm">
-                StreamVault respects the intellectual property rights of others and expects its users to do the same. 
+                StreamVault respects the intellectual property rights of others and expects its users to do the same.
                 We respond to notices of alleged copyright infringement that comply with the Digital Millennium Copyright Act (DMCA).
               </p>
             </div>
@@ -31,7 +31,7 @@ export default function DMCA() {
           <section className="space-y-4">
             <h2 className="text-2xl font-semibold">Copyright Infringement Notice</h2>
             <p>
-              If you believe that your copyrighted work has been copied in a way that constitutes copyright 
+              If you believe that your copyrighted work has been copied in a way that constitutes copyright
               infringement and is accessible on StreamVault, please notify our copyright agent as set forth below.
             </p>
           </section>
@@ -43,27 +43,27 @@ export default function DMCA() {
             </p>
             <ol className="list-decimal pl-6 space-y-3">
               <li>
-                <strong>Identification of the copyrighted work:</strong> A description of the copyrighted work 
+                <strong>Identification of the copyrighted work:</strong> A description of the copyrighted work
                 that you claim has been infringed.
               </li>
               <li>
-                <strong>Location of infringing material:</strong> The URL or other specific location on StreamVault 
+                <strong>Location of infringing material:</strong> The URL or other specific location on StreamVault
                 where the material you claim is infringing is located.
               </li>
               <li>
                 <strong>Your contact information:</strong> Your name, address, telephone number, and email address.
               </li>
               <li>
-                <strong>Good faith statement:</strong> A statement that you have a good faith belief that the 
+                <strong>Good faith statement:</strong> A statement that you have a good faith belief that the
                 disputed use is not authorized by the copyright owner, its agent, or the law.
               </li>
               <li>
-                <strong>Accuracy statement:</strong> A statement, made under penalty of perjury, that the above 
-                information in your notice is accurate and that you are the copyright owner or authorized to act 
+                <strong>Accuracy statement:</strong> A statement, made under penalty of perjury, that the above
+                information in your notice is accurate and that you are the copyright owner or authorized to act
                 on the copyright owner's behalf.
               </li>
               <li>
-                <strong>Physical or electronic signature:</strong> An electronic or physical signature of the 
+                <strong>Physical or electronic signature:</strong> An electronic or physical signature of the
                 person authorized to act on behalf of the owner of the copyright interest.
               </li>
             </ol>
@@ -78,7 +78,7 @@ export default function DMCA() {
                   <h3 className="text-lg font-semibold mb-2">Copyright Agent Contact</h3>
                   <p className="mb-2">Send your DMCA notice to:</p>
                   <div className="space-y-1 text-sm">
-                    <p><strong>Email:</strong> <a href="mailto:contact@streamvault.live" className="text-primary hover:underline">contact@streamvault.live</a></p>
+                    <p><strong>Email:</strong> <a href="mailto:streamvault.live@gmail.com" className="text-primary hover:underline">streamvault.live@gmail.com</a></p>
                     <p><strong>Subject Line:</strong> DMCA Takedown Request</p>
                   </div>
                 </div>
@@ -92,7 +92,7 @@ export default function DMCA() {
           <section className="space-y-4">
             <h2 className="text-2xl font-semibold">Counter-Notification</h2>
             <p>
-              If you believe that your content was removed by mistake or misidentification, you may file a 
+              If you believe that your content was removed by mistake or misidentification, you may file a
               counter-notification with us. To be effective, a counter-notification must include:
             </p>
             <ul className="list-disc pl-6 space-y-2">
@@ -107,7 +107,7 @@ export default function DMCA() {
           <section className="space-y-4">
             <h2 className="text-2xl font-semibold">Repeat Infringer Policy</h2>
             <p>
-              In accordance with the DMCA and other applicable law, StreamVault has adopted a policy of 
+              In accordance with the DMCA and other applicable law, StreamVault has adopted a policy of
               terminating, in appropriate circumstances, users who are deemed to be repeat infringers.
             </p>
           </section>
@@ -115,13 +115,13 @@ export default function DMCA() {
           <section className="space-y-4">
             <h2 className="text-2xl font-semibold">Content Hosting Disclaimer</h2>
             <p>
-              StreamVault does not host any video content on its servers. All content is embedded from 
-              third-party sources such as Google Drive and other video hosting platforms. We act as a search 
+              StreamVault does not host any video content on its servers. All content is embedded from
+              third-party sources such as Google Drive and other video hosting platforms. We act as a search
               engine and aggregator of publicly available content.
             </p>
             <p>
-              If you are a copyright owner and believe that content accessible through StreamVault infringes 
-              your copyright, please contact us immediately with a proper DMCA notice, and we will remove 
+              If you are a copyright owner and believe that content accessible through StreamVault infringes
+              your copyright, please contact us immediately with a proper DMCA notice, and we will remove
               the links to the infringing content.
             </p>
           </section>
@@ -129,7 +129,7 @@ export default function DMCA() {
           <section className="space-y-4">
             <h2 className="text-2xl font-semibold">Response Time</h2>
             <p>
-              We take copyright infringement seriously and will respond to all valid DMCA notices within 
+              We take copyright infringement seriously and will respond to all valid DMCA notices within
               24-48 hours. Upon receiving a valid notice, we will:
             </p>
             <ul className="list-disc pl-6 space-y-2">
@@ -142,7 +142,7 @@ export default function DMCA() {
           <section className="space-y-4">
             <h2 className="text-2xl font-semibold">False Claims</h2>
             <p>
-              Please note that under Section 512(f) of the DMCA, any person who knowingly materially 
+              Please note that under Section 512(f) of the DMCA, any person who knowingly materially
               misrepresents that material or activity is infringing may be subject to liability for damages.
             </p>
           </section>
@@ -150,12 +150,12 @@ export default function DMCA() {
           <section className="mt-12 p-6 bg-muted rounded-lg">
             <h3 className="text-xl font-semibold mb-3">Need Help?</h3>
             <p className="mb-4">
-              If you have questions about our DMCA policy or need assistance with filing a notice, 
+              If you have questions about our DMCA policy or need assistance with filing a notice,
               please contact us through our{" "}
               <a href="/contact" className="text-primary hover:underline">contact page</a>.
             </p>
             <p className="text-sm text-muted-foreground">
-              We are committed to protecting intellectual property rights and will work with copyright 
+              We are committed to protecting intellectual property rights and will work with copyright
               owners to resolve any issues promptly.
             </p>
           </section>

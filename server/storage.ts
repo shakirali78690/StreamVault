@@ -21,6 +21,7 @@ export interface ContentRequest {
   reason?: string;
   email?: string;
   requestCount: number;
+  status: 'pending' | 'filled' | 'rejected';
   createdAt: string;
 }
 
@@ -155,10 +156,12 @@ export interface IStorage {
   getAllContentRequests(): Promise<ContentRequest[]>;
   getTopContentRequests(limit: number): Promise<ContentRequest[]>;
   createContentRequest(request: Omit<ContentRequest, 'id' | 'requestCount' | 'createdAt'>): Promise<ContentRequest>;
+  updateContentRequest(id: string, updates: Partial<ContentRequest>): Promise<ContentRequest>;
 
   // Issue Reports
   getAllIssueReports(): Promise<IssueReport[]>;
   createIssueReport(report: Omit<IssueReport, 'id' | 'status' | 'createdAt'>): Promise<IssueReport>;
+  updateIssueReport(id: string, updates: Partial<IssueReport>): Promise<IssueReport>;
 
   // Comments
   getCommentsByEpisodeId(episodeId: string): Promise<Comment[]>;
@@ -1054,7 +1057,7 @@ export class MemStorage implements IStorage {
       .slice(0, limit);
   }
 
-  async createContentRequest(request: Omit<ContentRequest, 'id' | 'requestCount' | 'createdAt'>): Promise<ContentRequest> {
+  async createContentRequest(request: Omit<ContentRequest, 'id' | 'requestCount' | 'status' | 'createdAt'>): Promise<ContentRequest> {
     // Check if similar request already exists
     const existing = Array.from(this.contentRequests.values()).find(
       r => r.title.toLowerCase() === request.title.toLowerCase() && r.contentType === request.contentType
@@ -1073,11 +1076,23 @@ export class MemStorage implements IStorage {
       ...request,
       id,
       requestCount: 1,
+      status: 'pending',
       createdAt: new Date().toISOString(),
     };
     this.contentRequests.set(id, newRequest);
     this.saveData();
     return newRequest;
+  }
+
+  async updateContentRequest(id: string, updates: Partial<ContentRequest>): Promise<ContentRequest> {
+    const request = this.contentRequests.get(id);
+    if (!request) {
+      throw new Error(`Content request with id ${id} not found`);
+    }
+    const updated = { ...request, ...updates };
+    this.contentRequests.set(id, updated);
+    this.saveData();
+    return updated;
   }
 
   // Issue Reports
@@ -1097,6 +1112,18 @@ export class MemStorage implements IStorage {
     this.saveData();
     return newReport;
   }
+
+  async updateIssueReport(id: string, updates: Partial<IssueReport>): Promise<IssueReport> {
+    const report = this.issueReports.get(id);
+    if (!report) {
+      throw new Error(`Issue report with id ${id} not found`);
+    }
+    const updated = { ...report, ...updates };
+    this.issueReports.set(id, updated);
+    this.saveData();
+    return updated;
+  }
+
 
   // Comments
   async getCommentsByEpisodeId(episodeId: string): Promise<Comment[]> {

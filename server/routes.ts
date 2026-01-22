@@ -2507,6 +2507,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin - Get all content requests
+  app.get("/api/admin/content-requests", async (_req, res) => {
+    try {
+      const requests = await storage.getAllContentRequests();
+      res.json(requests);
+    } catch (error) {
+      console.error('Error fetching content requests:', error);
+      res.status(500).json({ error: "Failed to fetch content requests" });
+    }
+  });
+
+  // Admin - Update content request status
+  app.patch("/api/admin/content-requests/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const updates = req.body;
+      const updated = await storage.updateContentRequest(id, updates);
+      res.json(updated);
+    } catch (error) {
+      console.error('Error updating content request:', error);
+      res.status(500).json({ error: "Failed to update content request" });
+    }
+  });
+
+  // Admin - Get all issue reports
+  app.get("/api/admin/issue-reports", async (_req, res) => {
+    try {
+      const reports = await storage.getAllIssueReports();
+      res.json(reports);
+    } catch (error) {
+      console.error('Error fetching issue reports:', error);
+      res.status(500).json({ error: "Failed to fetch issue reports" });
+    }
+  });
+
+  // Admin - Update issue report status
+  app.patch("/api/admin/issue-reports/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const updates = req.body;
+      const updated = await storage.updateIssueReport(id, updates);
+      res.json(updated);
+    } catch (error) {
+      console.error('Error updating issue report:', error);
+      res.status(500).json({ error: "Failed to update issue report" });
+    }
+  });
+
   // Comments - Get comments for an episode
   app.get("/api/comments/episode/:episodeId", async (req, res) => {
     try {
