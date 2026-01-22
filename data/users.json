@@ -9,7 +9,8 @@
       "emailVerified": false,
       "id": "b59fe60c-35c8-4689-b83a-feda335caa19",
       "createdAt": "2026-01-20T13:03:43.162Z",
-      "updatedAt": "2026-01-20T14:05:11.021Z"
+      "updatedAt": "2026-01-22T08:04:23.103Z",
+      "favorites": "{\"shows\":[\"3a8ff251-ed95-41a9-9cac-8246ab2e59d5\"],\"movies\":[],\"anime\":[]}"
     },
     {
       "email": "legend12@email.com",
@@ -20,10 +21,10 @@
       "emailVerified": false,
       "id": "c480dcef-3488-4083-b326-00920fdbc1e1",
       "createdAt": "2026-01-20T13:34:41.090Z",
-      "updatedAt": "2026-01-21T17:35:36.668Z",
+      "updatedAt": "2026-01-22T07:50:30.666Z",
       "socialLinks": "{\"twitter\":\"streamvault\",\"instagram\":\"streamvault\",\"youtube\":\"streamvault\",\"tiktok\":\"streamvault\",\"discord\":\"streamvault\"}",
-      "favorites": "{\"shows\":[\"3a8ff251-ed95-41a9-9cac-8246ab2e59d5\",\"3e3b9c62-956b-48bf-b455-4b43471436a1\",\"f5248645-e522-42ca-99df-abb6df5ccb54\",\"show-1764226509318\",\"9f8e05b5-2b22-425c-8cdd-db21bbf8d5fd\"],\"movies\":[],\"anime\":[]}"
+      "favorites": "{\"shows\":[\"3a8ff251-ed95-41a9-9cac-8246ab2e59d5\",\"3e3b9c62-956b-48bf-b455-4b43471436a1\",\"f5248645-e522-42ca-99df-abb6df5ccb54\"],\"movies\":[],\"anime\":[]}"
     }
   ],
-  "lastUpdated": "2026-01-21T17:35:36.668Z"
+  "lastUpdated": "2026-01-22T08:04:23.104Z"
 }

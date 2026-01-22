@@ -276,6 +276,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "User not found" });
       }
 
+      // Parse JSON fields
+      let socialLinks = null;
+      let favorites = null;
+
+      try {
+        socialLinks = user.socialLinks ? JSON.parse(user.socialLinks as string) : null;
+      } catch (e) {
+        socialLinks = null;
+      }
+
+      try {
+        favorites = user.favorites ? JSON.parse(user.favorites as string) : null;
+      } catch (e) {
+        favorites = null;
+      }
+
       res.json({
         user: {
           id: user.id,
@@ -283,6 +299,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           username: user.username,
           avatarUrl: user.avatarUrl,
           bio: user.bio,
+          socialLinks,
+          favorites,
         },
       });
     } catch (error) {
@@ -756,6 +774,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Get user profile error:", error);
       res.status(500).json({ error: "Failed to get user profile" });
+    }
+  });
+
+  // ============================================
+  // CONTENT BY ID ROUTES (for favorites)
+  // ============================================
+
+  // Get show by ID
+  app.get("/api/shows/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const show = await storage.getShowById(id);
+      if (!show) {
+        return res.status(404).json({ error: "Show not found" });
+      }
+      res.json(show);
+    } catch (error) {
+      console.error("Get show by ID error:", error);
+      res.status(500).json({ error: "Failed to get show" });
+    }
+  });
+
+  // Get movie by ID
+  app.get("/api/movies/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const movie = await storage.getMovieById(id);
+      if (!movie) {
+        return res.status(404).json({ error: "Movie not found" });
+      }
+      res.json(movie);
+    } catch (error) {
+      console.error("Get movie by ID error:", error);
+      res.status(500).json({ error: "Failed to get movie" });
+    }
+  });
+
+  // Get anime by ID
+  app.get("/api/anime/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const anime = await storage.getAnimeById(id);
+      if (!anime) {
+        return res.status(404).json({ error: "Anime not found" });
+      }
+      res.json(anime);
+    } catch (error) {
+      console.error("Get anime by ID error:", error);
+      res.status(500).json({ error: "Failed to get anime" });
     }
   });
 

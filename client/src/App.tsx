@@ -55,6 +55,7 @@ import NotFound from "@/pages/not-found";
 import Login from "@/pages/login";
 import Register from "@/pages/register";
 import Profile from "@/pages/profile";
+import Settings from "@/pages/settings";
 import Friends from "@/pages/friends";
 import { AuthProvider } from "@/contexts/auth-context";
 import { NotificationsProvider } from "@/contexts/notifications-context";
@@ -112,6 +113,7 @@ function Router() {
           <Route path="/login" component={Login} />
           <Route path="/register" component={Register} />
           <Route path="/profile" component={Profile} />
+          <Route path="/settings" component={Settings} />
           <Route path="/friends" component={Friends} />
           <Route component={NotFound} />
         </Switch>

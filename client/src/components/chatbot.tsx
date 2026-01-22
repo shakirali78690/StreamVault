@@ -48,6 +48,16 @@ interface UserPreferences {
 
 export function Chatbot() {
   const [isOpen, setIsOpen] = useState(false);
+  const [isEnabled, setIsEnabled] = useState(() => {
+    try {
+      const settings = localStorage.getItem('streamvault_settings');
+      if (settings) {
+        const parsed = JSON.parse(settings);
+        return parsed.chatbotEnabled !== false; // Default to true
+      }
+      return true;
+    } catch { return true; }
+  });
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "1",
@@ -85,6 +95,18 @@ export function Chatbot() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
   const [location, navigate] = useLocation();
+
+  // Listen for settings changes
+  useEffect(() => {
+    const handleSettingsChange = (e: CustomEvent) => {
+      if (e.detail.key === 'chatbotEnabled') {
+        setIsEnabled(e.detail.value);
+      }
+    };
+
+    window.addEventListener('settings-changed', handleSettingsChange as EventListener);
+    return () => window.removeEventListener('settings-changed', handleSettingsChange as EventListener);
+  }, []);
 
   const { data: shows } = useQuery<Show[]>({
     queryKey: ["/api/shows"],
@@ -142,6 +164,11 @@ export function Chatbot() {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // If chatbot is disabled, don't render (must be after all hooks)
+  if (!isEnabled) {
+    return null;
+  }
 
   // Fuzzy search with scoring
   const fuzzyMatch = (text: string, query: string): number => {

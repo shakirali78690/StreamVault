@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { useAuth } from '@/contexts/auth-context';
 import { Button } from '@/components/ui/button';
@@ -39,6 +39,26 @@ export default function ProfilePage() {
         movies: user?.favorites?.movies || [],
         anime: user?.favorites?.anime || [],
     });
+
+    // Sync state when user data loads
+    useEffect(() => {
+        if (user) {
+            setUsername(user.username || '');
+            setBio(user.bio || '');
+            setSocialLinks({
+                twitter: user.socialLinks?.twitter || '',
+                instagram: user.socialLinks?.instagram || '',
+                youtube: user.socialLinks?.youtube || '',
+                tiktok: user.socialLinks?.tiktok || '',
+                discord: user.socialLinks?.discord || '',
+            });
+            setFavorites({
+                shows: user.favorites?.shows || [],
+                movies: user.favorites?.movies || [],
+                anime: user.favorites?.anime || [],
+            });
+        }
+    }, [user]);
 
     // Redirect if not logged in
     if (!authLoading && !isAuthenticated) {

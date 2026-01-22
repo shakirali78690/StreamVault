@@ -249,6 +249,17 @@ export function initSocialSocket(server: HttpServer, socketio?: Server) {
                 // If user has no more connections, they're offline
                 if (!onlineUsers.get(userId) || onlineUsers.get(userId)!.size === 0) {
                     onlineUsers.delete(userId);
+
+                    // Clear their watch activity and notify friends
+                    const hadActivity = userActivities.has(userId);
+                    userActivities.delete(userId);
+
+                    if (hadActivity) {
+                        // Notify friends that user stopped watching
+                        await broadcastActivityToFriends(userId, null);
+                        console.log(`⏹️ User ${userId} activity cleared on disconnect`);
+                    }
+
                     await notifyFriendsOfStatus(userId, false);
                     console.log(`❌ User ${userId} is now offline`);
                 }

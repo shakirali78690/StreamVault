@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Search, X, Film, Tv, Sparkles, Plus } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -33,14 +33,35 @@ export function FavoritesPicker({ favorites, onFavoritesChange }: FavoritesPicke
         anime: [],
     });
     const [isLoading, setIsLoading] = useState(false);
+    const lastLoadedKeyRef = useRef<string>('');
 
-    // Fetch content details for initial favorites
+    // Fetch content details when favorites change from server (not from user selection)
+    const favoritesKey = JSON.stringify([favorites.shows, favorites.movies, favorites.anime]);
+    const totalFavorites = favorites.shows.length + favorites.movies.length + favorites.anime.length;
+    const totalSelected = selectedContent.shows.length + selectedContent.movies.length + selectedContent.anime.length;
+
     useEffect(() => {
-        const fetchFavoriteDetails = async () => {
+        // Skip if no favorites to load
+        if (totalFavorites === 0) {
+            return;
+        }
+
+        // Skip if we already loaded this exact data
+        if (lastLoadedKeyRef.current === favoritesKey) {
+            return;
+        }
+
+        // Skip if user has made local selections (more items selected than in prop)
+        // This means user is adding items, don't overwrite
+        if (totalSelected > totalFavorites) {
+            return;
+        }
+
+        const fetchFavoriteDetails = async (showIds: string[], movieIds: string[], animeIds: string[]) => {
             const newSelected = { shows: [] as ContentItem[], movies: [] as ContentItem[], anime: [] as ContentItem[] };
 
             // Fetch shows
-            for (const id of favorites.shows) {
+            for (const id of showIds) {
                 try {
                     const res = await fetch(`/api/shows/${id}`);
                     if (res.ok) {
@@ -51,7 +72,7 @@ export function FavoritesPicker({ favorites, onFavoritesChange }: FavoritesPicke
             }
 
             // Fetch movies
-            for (const id of favorites.movies) {
+            for (const id of movieIds) {
                 try {
                     const res = await fetch(`/api/movies/${id}`);
                     if (res.ok) {
@@ -62,7 +83,7 @@ export function FavoritesPicker({ favorites, onFavoritesChange }: FavoritesPicke
             }
 
             // Fetch anime
-            for (const id of favorites.anime) {
+            for (const id of animeIds) {
                 try {
                     const res = await fetch(`/api/anime/${id}`);
                     if (res.ok) {
@@ -73,12 +94,11 @@ export function FavoritesPicker({ favorites, onFavoritesChange }: FavoritesPicke
             }
 
             setSelectedContent(newSelected);
+            lastLoadedKeyRef.current = favoritesKey;
         };
 
-        if (favorites.shows.length || favorites.movies.length || favorites.anime.length) {
-            fetchFavoriteDetails();
-        }
-    }, []);
+        fetchFavoriteDetails(favorites.shows, favorites.movies, favorites.anime);
+    }, [favoritesKey, totalFavorites, totalSelected]);
 
     // Search content
     useEffect(() => {
