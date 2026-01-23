@@ -216,6 +216,7 @@ function WatchTogetherContent() {
     const [selectedGif, setSelectedGif] = useState<string | null>(null);
     const [attachment, setAttachment] = useState<{ file: File; preview: string; type: 'image' | 'video' | 'audio' } | null>(null);
     const [isPortrait, setIsPortrait] = useState(false);
+    const [isSmallHeight, setIsSmallHeight] = useState(false);
     const [dismissedLandscapeHint, setDismissedLandscapeHint] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [isOverlayChatMinimized, setIsOverlayChatMinimized] = useState(false);
@@ -264,6 +265,7 @@ function WatchTogetherContent() {
             const isMobile = window.innerWidth < 768;
             const isPortraitMode = window.innerHeight > window.innerWidth;
             setIsPortrait(isMobile && isPortraitMode);
+            setIsSmallHeight(window.innerHeight < 600); // Detect landscape mobile or small screens
         };
 
         checkOrientation();
@@ -1625,7 +1627,7 @@ function WatchTogetherContent() {
                     <div
                         ref={chatOverlayRef}
                         className={`flex flex-col transition-all ${isDragging ? 'duration-0' : 'duration-300'} ${isFullscreen
-                            ? `fixed z-[9999] ${isOverlayChatMinimized ? 'w-12 h-12' : 'w-80 h-[60vh] max-h-[600px]'} rounded-2xl bg-black/40 backdrop-blur-xl border border-white/10 shadow-2xl`
+                            ? `fixed z-[9999] ${isOverlayChatMinimized ? 'w-12 h-12' : `w-72 md:w-80 ${isSmallHeight ? 'h-[85vh] max-h-[90vh]' : 'h-[60vh] max-h-[600px]'}`} rounded-2xl bg-black/40 backdrop-blur-xl border border-white/10 shadow-2xl`
                             : 'w-80 flex-shrink-0 bg-card border-l border-border h-full'
                             }`}
                         style={isFullscreen ? { left: `${chatPosition.x}px`, top: `${chatPosition.y}px` } : undefined}
@@ -1654,8 +1656,9 @@ function WatchTogetherContent() {
                         {/* Minimized state - draggable icon */}
                         {isFullscreen && isOverlayChatMinimized ? (
                             <div
-                                className="w-full h-full flex items-center justify-center cursor-move"
+                                className="w-full h-full flex items-center justify-center cursor-move touch-none"
                                 onMouseDown={handleDragStart}
+                                onTouchStart={handleDragStart}
                                 onClick={handleMinimizedClick}
                             >
                                 <MessageCircle className="h-6 w-6 text-white/80" />
