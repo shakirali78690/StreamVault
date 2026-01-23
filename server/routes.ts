@@ -12,6 +12,7 @@ import { fileURLToPath } from "url";
 import { setupSitemaps } from "./sitemap";
 import { sendContentRequestEmail, sendIssueReportEmail } from "./email-service";
 import { searchSubtitles, downloadSubtitle, getCachedSubtitle } from "./subtitle-service";
+import { checkAndAwardAchievements } from "./achievements";
 import { getActiveRooms } from "./watch-together";
 import webpush from "web-push";
 import { hashPassword, verifyPassword, generateToken, verifyToken, setAuthCookie, clearAuthCookie, type AuthRequest } from "./auth";
@@ -203,6 +204,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         emailVerified: false,
         socialLinks: null,
         favorites: null,
+        xp: 0,
+        level: 1,
+        badges: "[]"
       });
 
       // Generate token and set cookie
@@ -342,8 +346,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           username: user.username,
           avatarUrl: user.avatarUrl,
           bio: user.bio,
+          bio: user.bio,
           socialLinks,
           favorites,
+          xp: user.xp,
+          level: user.level,
+          badges: user.badges,
         },
       });
     } catch (error) {
@@ -613,6 +621,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.addFriend(request.fromUserId, request.toUserId);
 
       // Notify the requester
+      // Notify the requester
       const currentUser = await storage.getUserById(payload.userId);
       await storage.createNotification({
         userId: request.fromUserId,
@@ -622,6 +631,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         data: { friendId: payload.userId },
         read: false,
       });
+
+      // Check achievements for both users
+      await checkAndAwardAchievements(payload.userId); // The acceptor
+      await checkAndAwardAchievements(request.fromUserId); // The requester
 
       res.json({ success: true, fromUserId: request.fromUserId });
     } catch (error) {
@@ -810,6 +823,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         username: user.username,
         avatarUrl: user.avatarUrl,
         bio: user.bio || null,
+        xp: user.xp,
+        level: user.level,
+        badges: user.badges ? JSON.parse(user.badges as string) : [],
         socialLinks,
         favorites: enrichedFavorites,
         createdAt: user.createdAt,
@@ -817,6 +833,228 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Get user profile error:", error);
       res.status(500).json({ error: "Failed to get user profile" });
+    }
+  });
+
+  // ============================================
+  // GAMIFICATION ROUTES
+  // ============================================
+
+  // Award XP
+  app.post("/api/user/xp", async (req, res) => {
+    try {
+      const token = req.cookies.authToken;
+      if (!token) return res.status(401).json({ error: "Not authenticated" });
+      const payload = verifyToken(token);
+      if (!payload) return res.status(401).json({ error: "Invalid token" });
+
+      const { amount } = req.body;
+      if (!amount || typeof amount !== 'number') {
+        return res.status(400).json({ error: "Invalid amount" });
+      }
+
+      // Limit XP gain per request to prevent abuse
+      const safeAmount = Math.min(amount, 100);
+      const result = await storage.updateUserXP(payload.userId, safeAmount);
+
+      // Check for achievements
+      const newBadges = await checkAndAwardAchievements(payload.userId);
+
+      res.json({ ...result, newBadges });
+    } catch (error) {
+      console.error("Update XP error:", error);
+      res.status(500).json({ error: "Failed to update XP" });
+    }
+  });
+
+  // Get Leaderboard
+  app.get("/api/leaderboard", async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 10;
+      const leaderboard = await storage.getLeaderboard(limit);
+
+      // Map to public user interface
+      const publicLeaderboard = leaderboard.map(u => ({
+        id: u.id,
+        username: u.username,
+        avatarUrl: u.avatarUrl,
+        xp: u.xp,
+        level: u.level,
+        badges: u.badges ? JSON.parse(u.badges as string) : []
+      }));
+
+      res.json(publicLeaderboard);
+    } catch (error) {
+      console.error("Get leaderboard error:", error);
+      res.status(500).json({ error: "Failed to get leaderboard" });
+    }
+  });
+
+  // Get All Achievements (Simplified)
+  app.get("/api/achievements", (_req, res) => {
+    // Import ACHIEVEMENTS dynamically to avoid circular dependencies if any
+    import("./achievements").then(({ ACHIEVEMENTS }) => {
+      const simplified = ACHIEVEMENTS.map(a => ({
+        id: a.id,
+        name: a.name,
+        description: a.description,
+        icon: a.icon
+      }));
+      res.json(simplified);
+    });
+  });
+
+  // Debug Achievements
+  app.get("/api/debug/achievements", async (req, res) => {
+    try {
+      const token = req.cookies.authToken;
+      if (!token) return res.status(401).json({ error: "Not authenticated" });
+      const payload = verifyToken(token);
+      if (!payload) return res.status(401).json({ error: "Invalid token" });
+
+      const userId = payload.userId;
+      const friends = await storage.getFriends(userId);
+      const user = await storage.getUserById(userId);
+
+      // Import check logic manually to test it
+      const { ACHIEVEMENTS, checkAndAwardAchievements } = await import("./achievements");
+      const social1 = ACHIEVEMENTS.find(a => a.id === "social-1");
+
+      let conditionResult = false;
+      if (social1 && user) {
+        conditionResult = await social1.condition(user);
+      }
+
+      // AUTO-FIX: Force check all achievements
+      const unlockedNow = await checkAndAwardAchievements(userId);
+
+      res.json({
+        userId,
+        friendsCount: friends.length,
+        friends: friends,
+        userBadges: user?.badges,
+        social1Check: conditionResult,
+        autoFix: {
+          triggered: true,
+          newlyUnlocked: unlockedNow
+        }
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ============================================
+  // SCHEDULING ROUTES (Reminders)
+  // ============================================
+
+  // Create Reminder
+  app.post("/api/reminders", async (req, res) => {
+    try {
+      const token = req.cookies.authToken;
+      if (!token) return res.status(401).json({ error: "Not authenticated" });
+      const payload = verifyToken(token);
+      if (!payload) return res.status(401).json({ error: "Invalid token" });
+
+      const { contentId, contentType, title, remindAt } = req.body;
+
+      if (!contentId || !contentType || !title || !remindAt) {
+        return res.status(400).json({ error: "Missing required fields" });
+      }
+
+      const reminder = await storage.createReminder({
+        userId: payload.userId,
+        contentId,
+        contentType,
+        title,
+        remindAt: new Date(remindAt),
+      });
+
+      res.status(201).json(reminder);
+    } catch (error) {
+      console.error("Create reminder error:", error);
+      res.status(500).json({ error: "Failed to create reminder" });
+    }
+  });
+
+  // Get Reminders
+  app.get("/api/reminders", async (req, res) => {
+    try {
+      const token = req.cookies.authToken;
+      if (!token) return res.status(401).json({ error: "Not authenticated" });
+      const payload = verifyToken(token);
+      if (!payload) return res.status(401).json({ error: "Invalid token" });
+
+      const reminders = await storage.getReminders(payload.userId);
+      res.json(reminders);
+    } catch (error) {
+      console.error("Get reminders error:", error);
+      res.status(500).json({ error: "Failed to get reminders" });
+    }
+  });
+
+  // Delete Reminder
+  app.delete("/api/reminders/:id", async (req, res) => {
+    try {
+      const token = req.cookies.authToken;
+      if (!token) return res.status(401).json({ error: "Not authenticated" });
+      const payload = verifyToken(token);
+      if (!payload) return res.status(401).json({ error: "Invalid token" });
+
+      await storage.deleteReminder(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Delete reminder error:", error);
+      res.status(500).json({ error: "Failed to delete reminder" });
+    }
+  });
+
+  // Get Calendar Events (Mocked + Reminders)
+  app.get("/api/calendar", async (req, res) => {
+    try {
+      const token = req.cookies.authToken;
+      if (!token) return res.status(401).json({ error: "Not authenticated" });
+      const payload = verifyToken(token);
+      if (!payload) return res.status(401).json({ error: "Invalid token" });
+
+      // Get user reminders
+      const userReminders = await storage.getReminders(payload.userId);
+
+      // Get some upcoming content (mocked for now)
+      const upcomingReleases = [
+        {
+          id: "upcoming-1",
+          title: "Stranger Things Season 5",
+          start: new Date(Date.now() + 86400000 * 5).toISOString(), // 5 days from now
+          type: "release",
+          contentType: "show"
+        },
+        {
+          id: "upcoming-2",
+          title: "New Anime Movie",
+          start: new Date(Date.now() + 86400000 * 10).toISOString(),
+          type: "release",
+          contentType: "anime"
+        }
+      ];
+
+      const events = [
+        ...userReminders.map(r => ({
+          id: r.id,
+          title: `Reminder: ${r.title}`,
+          start: r.remindAt,
+          type: "reminder",
+          contentId: r.contentId,
+          contentType: r.contentType
+        })),
+        ...upcomingReleases
+      ];
+
+      res.json(events);
+
+    } catch (error) {
+      console.error("Get calendar error:", error);
+      res.status(500).json({ error: "Failed to get calendar" });
     }
   });
 
@@ -1107,6 +1345,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Get messages error:", error);
       res.status(500).json({ error: "Failed to get messages" });
+    }
+  });
+
+  // Get User Profile (Public)
+  app.get("/api/users/:userId/profile", async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const user = await storage.getUserById(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Parse JSON fields
+      let socialLinks = null;
+      let favorites = null;
+      try {
+        socialLinks = user.socialLinks ? JSON.parse(user.socialLinks as string) : null;
+      } catch (e) { }
+      try {
+        favorites = user.favorites ? JSON.parse(user.favorites as string) : null;
+      } catch (e) { }
+
+      res.json({
+        id: user.id,
+        username: user.username,
+        avatarUrl: user.avatarUrl,
+        bio: user.bio,
+        socialLinks,
+        favorites,
+        xp: user.xp,
+        level: user.level,
+        badges: user.badges // Return badges so frontend can display them
+      });
+    } catch (error) {
+      console.error("Get user profile error:", error);
+      res.status(500).json({ error: "Failed to get user profile" });
     }
   });
 

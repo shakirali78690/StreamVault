@@ -13,6 +13,8 @@ import { Helmet } from "react-helmet-async";
 import type { Anime, AnimeEpisode } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { trackWatch } from "@/components/analytics-tracker";
+import { useAuth } from "@/contexts/auth-context";
+import { useToast } from "@/hooks/use-toast";
 
 export default function WatchAnime() {
     const [, params] = useRoute("/watch-anime/:slug");
@@ -201,10 +203,39 @@ export default function WatchAnime() {
                 duration: Math.floor(duration),
                 lastWatched: new Date().toISOString(),
             });
+
+            // Award XP if > 90% watched
+            if (currentTime / duration > 0.9) {
+                awardXPMutation.mutate();
+            }
         }
     };
 
     const queryClient = useQueryClient();
+    const { toast } = useToast();
+    const { user, refetchUser } = useAuth();
+    const xpAwardedRef = useRef(false);
+
+    // Mutation to award XP
+    const awardXPMutation = useMutation({
+        mutationFn: async () => {
+            if (xpAwardedRef.current) return; // Prevent double awarding
+            xpAwardedRef.current = true;
+            // 25 XP per anime episode (standard for ~20min content)
+            await apiRequest("POST", "/api/user/xp", { amount: 25 });
+        },
+        onSuccess: async () => {
+            toast({
+                title: "XP Earned! 🌟",
+                description: "You earned 25 XP for watching this episode",
+                className: "bg-yellow-500/10 border-yellow-500/20 text-yellow-500",
+            });
+            await refetchUser();
+        },
+        onError: () => {
+            xpAwardedRef.current = false;
+        }
+    });
 
     const updateProgressMutation = useMutation({
         mutationFn: (progress: any) =>

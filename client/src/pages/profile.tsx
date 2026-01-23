@@ -7,10 +7,11 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Loader2, Camera, User, Save, LogOut, FileVideo, Eye, Twitter, Instagram, Youtube, Heart } from 'lucide-react';
+import { Loader2, Camera, User, Save, LogOut, FileVideo, Eye, Twitter, Instagram, Youtube, Heart, Trophy, Medal, Star, icons } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { SiTiktok, SiDiscord } from 'react-icons/si';
 import { FavoritesPicker } from '@/components/favorites-picker';
+import { Progress } from '@/components/ui/progress';
 
 export default function ProfilePage() {
     const [, navigate] = useLocation();
@@ -228,6 +229,65 @@ export default function ProfilePage() {
                             </p>
                         </div>
 
+                        {/* Level & XP Stats */}
+                        <div className="space-y-2">
+                            <div className="flex justify-between items-end">
+                                <div>
+                                    <h4 className="text-sm font-medium">Level {user?.level || 1}</h4>
+                                    <p className="text-xs text-muted-foreground">Master Viewer</p>
+                                </div>
+                                <span className="text-xs text-muted-foreground">
+                                    {(user?.xp || 0) % 1000} / 1000 XP
+                                </span>
+                            </div>
+                            <Progress value={((user?.xp || 0) % 1000) / 10} className="h-2" />
+                        </div>
+
+                        {/* Recent Badges */}
+                        {user?.badges && (typeof user.badges === 'string' ? JSON.parse(user.badges) : user.badges).length > 0 && (
+                            <div className="space-y-3">
+                                <Label>Recent Badges</Label>
+                                <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                                    {(typeof user.badges === 'string' ? JSON.parse(user.badges) : user.badges).slice(0, 5).map((badge: any) => {
+                                        // Dynamic icon logic
+                                        const iconName = badge.icon || 'Star';
+                                        const PascalName = iconName.split('-').map((s: string) => s.charAt(0).toUpperCase() + s.slice(1)).join('');
+                                        const IconComponent = (icons as any)[PascalName] || (icons as any)[iconName] || Star;
+
+                                        return (
+                                            <div key={badge.id} className="flex flex-col items-center p-2 bg-muted/30 rounded-lg min-w-[80px]" title={badge.description}>
+                                                <div className="w-10 h-10 rounded-full bg-yellow-500/10 flex items-center justify-center text-yellow-500 mb-1">
+                                                    <IconComponent className="w-5 h-5" />
+                                                </div>
+                                                {/* Fix truncate logic or styling if needed */}
+                                                <span className="text-[10px] text-center font-medium truncate w-full">{badge.name}</span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Gamification Navigation */}
+                        <div className="grid grid-cols-2 gap-4">
+                            <Button
+                                variant="outline"
+                                className="h-24 flex flex-col items-center justify-center gap-2 border-purple-500/20 hover:border-purple-500 hover:bg-purple-500/10 transition-all"
+                                onClick={() => navigate('/achievements')}
+                            >
+                                <Trophy className="h-8 w-8 text-purple-400" />
+                                <span className="font-semibold">Achievements</span>
+                            </Button>
+                            <Button
+                                variant="outline"
+                                className="h-24 flex flex-col items-center justify-center gap-2 border-yellow-500/20 hover:border-yellow-500 hover:bg-yellow-500/10 transition-all"
+                                onClick={() => navigate('/leaderboard')}
+                            >
+                                <Medal className="h-8 w-8 text-yellow-400" />
+                                <span className="font-semibold">Leaderboard</span>
+                            </Button>
+                        </div>
+
                         {/* Social Links */}
                         <div className="space-y-4">
                             <Label>Social Links</Label>
@@ -338,19 +398,21 @@ export default function ProfilePage() {
             </div>
 
             {/* Full Avatar Preview - Click anywhere to close */}
-            {showFullAvatar && user?.avatarUrl && (
-                <div
-                    className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center cursor-pointer"
-                    onClick={() => setShowFullAvatar(false)}
-                >
-                    <img
-                        src={user.avatarUrl}
-                        alt={user.username}
-                        className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg"
-                        onClick={(e) => e.stopPropagation()}
-                    />
-                </div>
-            )}
-        </div>
+            {
+                showFullAvatar && user?.avatarUrl && (
+                    <div
+                        className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center cursor-pointer"
+                        onClick={() => setShowFullAvatar(false)}
+                    >
+                        <img
+                            src={user.avatarUrl}
+                            alt={user.username}
+                            className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg"
+                            onClick={(e) => e.stopPropagation()}
+                        />
+                    </div>
+                )
+            }
+        </div >
     );
 }

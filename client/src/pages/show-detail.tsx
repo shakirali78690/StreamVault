@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRoute, Link, useLocation } from "wouter";
 import { Helmet } from "react-helmet-async";
-import { Play, Plus, Check, Star, Share2, ChevronLeft, Globe, ExternalLink, Building2, Users } from "lucide-react";
+import { Play, Plus, Check, Star, Share2, ChevronLeft, Globe, ExternalLink, Building2, Users, Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -114,6 +114,38 @@ export default function ShowDetail() {
       queryClient.invalidateQueries({ queryKey: ["/api/watchlist"] });
     },
   });
+
+
+  const createReminderMutation = useMutation({
+    mutationFn: (remindAt: string) => apiRequest("POST", "/api/reminders", {
+      contentId: show!.id,
+      contentType: "show",
+      title: show!.title,
+      remindAt
+    }),
+    onSuccess: () => {
+      toast({
+        title: "Reminder Set!",
+        description: "We'll notify you when it's time to watch.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/reminders"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to set reminder",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  });
+
+  const handleReminder = () => {
+    // Default to 1 day from now if no specific next episode logic yet
+    // In a real app, we'd find the next air date.
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    createReminderMutation.mutate(tomorrow.toISOString());
+  };
 
   const toggleWatchlist = () => {
     if (!show) return;
@@ -232,7 +264,7 @@ export default function ShowDetail() {
   };
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen" >
       <Helmet>
         <title>{`${show.title} - Watch Online Free | StreamVault`}</title>
         <meta name="description" content={show.description} />
@@ -258,11 +290,14 @@ export default function ShowDetail() {
       </Helmet>
 
       {/* Hero Section - Poster on mobile, Backdrop on desktop */}
-      <div className="relative w-full h-96 md:h-[500px] overflow-hidden">
+      <div className="relative w-full h-96 md:h-[500px] overflow-hidden" >
         {/* Poster for mobile */}
-        <div
+        < div
           className="absolute inset-0 bg-cover bg-center md:hidden"
-          style={{ backgroundImage: `url(${show.posterUrl})` }}
+          style={{
+            backgroundImage: `url(${show.posterUrl
+              })`
+          }}
         >
           <div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-background/40" />
         </div>
@@ -336,7 +371,7 @@ export default function ShowDetail() {
 
               {/* CTAs */}
               <div className="flex flex-wrap gap-2 md:gap-3 pt-1 md:pt-2">
-                <Link href={`/watch/${show.slug}`}>
+                <Link href={`/ watch / ${show.slug} `}>
                   <Button size="default" className="gap-1.5 md:gap-2 text-sm md:text-base h-9 md:h-11" data-testid="button-play-episode-1">
                     <Play className="w-4 h-4 md:w-5 md:h-5 fill-current" />
                     Play Episode 1
@@ -372,6 +407,17 @@ export default function ShowDetail() {
                 >
                   <Share2 className="w-4 h-4 md:w-5 md:h-5" />
                   Share
+                </Button>
+                <Button
+                  size="default"
+                  variant="outline"
+                  className="gap-1.5 md:gap-2 text-sm md:text-base h-9 md:h-11"
+                  onClick={handleReminder}
+                  data-testid="button-notify-me"
+                >
+                  <Bell className="w-4 h-4 md:w-5 md:h-5" />
+                  <span className="hidden sm:inline">Notify Me</span>
+                  <span className="sm:hidden">Notify</span>
                 </Button>
                 <Link href={`/create-room?type=show&id=${show?.id}`}>
                   <Button
@@ -416,7 +462,7 @@ export default function ShowDetail() {
                     key={season}
                     variant={selectedSeason === season ? "default" : "outline"}
                     onClick={() => setSelectedSeason(season)}
-                    data-testid={`button-season-${season}`}
+                    data-testid={`button - season - ${season} `}
                     className="text-xs md:text-sm h-8 md:h-10"
                   >
                     Season {season}
@@ -445,7 +491,7 @@ export default function ShowDetail() {
                   <div
                     key={episode.id}
                     onClick={() => {
-                      const url = `/watch/${show.slug}?season=${episode.season}&episode=${episode.episodeNumber}`;
+                      const url = `/ watch / ${show.slug}?season = ${episode.season}& episode=${episode.episodeNumber} `;
                       console.log("Clicking episode - navigating to:", url);
                       window.location.replace(url);
                     }}
@@ -468,7 +514,7 @@ export default function ShowDetail() {
                         <div className="flex-1 py-3 md:py-4 pr-3 md:pr-4">
                           <h3
                             className="text-base md:text-xl font-semibold mb-1 md:mb-2 line-clamp-1"
-                            data-testid={`text-episode-title-${episode.id}`}
+                            data-testid={`text - episode - title - ${episode.id} `}
                           >
                             {episode.title}
                           </h3>

@@ -1,10 +1,10 @@
 {
   "friends": [
     {
-      "id": "4317a97e-00cc-4058-961f-7f9c62aba00f",
+      "id": "ee8ee4ac-37df-4f8c-9d19-8400b6dbe8f4",
       "userId": "c480dcef-3488-4083-b326-00920fdbc1e1",
       "friendId": "b59fe60c-35c8-4689-b83a-feda335caa19",
-      "createdAt": "2026-01-21T12:42:22.393Z"
+      "createdAt": "2026-01-23T14:49:25.854Z"
     }
   ],
   "friendRequests": [
@@ -23,6 +23,14 @@
       "status": "accepted",
       "createdAt": "2026-01-21T12:41:42.654Z",
       "respondedAt": "2026-01-21T12:42:22.391Z"
+    },
+    {
+      "id": "dd6a4878-787f-4099-8ce4-9e30ec2962e7",
+      "fromUserId": "c480dcef-3488-4083-b326-00920fdbc1e1",
+      "toUserId": "b59fe60c-35c8-4689-b83a-feda335caa19",
+      "status": "accepted",
+      "createdAt": "2026-01-23T14:49:00.895Z",
+      "respondedAt": "2026-01-23T14:49:25.851Z"
     }
   ],
   "notifications": [
@@ -255,6 +263,31 @@
       "read": true,
       "id": "fb07ed51-e2bb-4c65-bbb3-552bded09356",
       "createdAt": "2026-01-22T19:03:23.825Z"
+    },
+    {
+      "userId": "b59fe60c-35c8-4689-b83a-feda335caa19",
+      "type": "friend_request",
+      "title": "Friend Request",
+      "message": "admin sent you a friend request",
+      "data": {
+        "requestId": "dd6a4878-787f-4099-8ce4-9e30ec2962e7",
+        "fromUserId": "c480dcef-3488-4083-b326-00920fdbc1e1"
+      },
+      "read": true,
+      "id": "5aa44ff5-2857-4150-bb9b-77c6181c55aa",
+      "createdAt": "2026-01-23T14:49:00.897Z"
+    },
+    {
+      "userId": "c480dcef-3488-4083-b326-00920fdbc1e1",
+      "type": "friend_accepted",
+      "title": "Friend Request Accepted",
+      "message": "elton galeech accepted your friend request",
+      "data": {
+        "friendId": "b59fe60c-35c8-4689-b83a-feda335caa19"
+      },
+      "read": true,
+      "id": "bf983db6-b937-44e2-827f-f735422d959b",
+      "createdAt": "2026-01-23T14:49:25.855Z"
     }
   ],
   "directMessages": [

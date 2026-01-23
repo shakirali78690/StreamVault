@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Crown, Users, Twitter, Instagram, Youtube, ExternalLink } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { Crown, Users, Twitter, Instagram, Youtube, ExternalLink, Trophy, Star, icons, Eye } from 'lucide-react';
 import { SiTiktok, SiDiscord } from 'react-icons/si';
 import { Link } from 'wouter';
 import {
@@ -8,6 +9,9 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { Badge } from '@shared/schema';
+import { Progress } from '@/components/ui/progress';
+import { cn } from '@/lib/utils';
 
 interface SocialLinks {
     twitter?: string;
@@ -41,6 +45,9 @@ interface UserProfileModalProps {
         bio?: string;
         socialLinks?: SocialLinks | null;
         favorites?: Favorites | null;
+        xp?: number;
+        level?: number;
+        badges?: Badge[];
     };
     isFriend?: boolean;
 }
@@ -163,6 +170,15 @@ export function UserProfileModal({ isOpen, onClose, user, isFriend }: UserProfil
                             )}
                         </div>
 
+                        {/* Level & XP */}
+                        <div className="w-full px-8">
+                            <div className="flex justify-between items-center text-sm mb-1">
+                                <span className="font-bold text-primary">Level {user.level || 1}</span>
+                                <span className="text-muted-foreground text-xs">{(user.xp || 0) % 1000} / 1000 XP</span>
+                            </div>
+                            <Progress value={((user.xp || 0) % 1000) / 10} className="h-2" />
+                        </div>
+
                         {/* Bio */}
                         {user.bio ? (
                             <div className="w-full px-4">
@@ -274,6 +290,39 @@ export function UserProfileModal({ isOpen, onClose, user, isFriend }: UserProfil
                                     </div>
                                 )}
                             </div>
+
+                        )}
+
+                        {/* Badges */}
+                        {user.badges && user.badges.length > 0 && (
+                            <div className="w-full px-4 space-y-3">
+                                <h4 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                                    <Trophy className="w-3 h-3 text-yellow-500" />
+                                    Badges
+                                </h4>
+                                <div className="grid grid-cols-4 gap-2">
+                                    {user.badges.map((badge) => {
+                                        // Dynamic icon logic
+                                        const iconName = badge.icon || 'Star';
+                                        const PascalName = iconName.split('-').map((s: string) => s.charAt(0).toUpperCase() + s.slice(1)).join('');
+                                        const IconComponent = (icons as any)[PascalName] || (icons as any)[iconName] || Star;
+
+                                        return (
+                                            <div key={badge.id} className="flex flex-col items-center p-2 bg-muted/30 rounded-lg group relative cursor-help">
+                                                <div className="w-8 h-8 rounded-full bg-yellow-500/10 flex items-center justify-center text-yellow-500 mb-1">
+                                                    <IconComponent className="w-4 h-4" />
+                                                </div>
+                                                <span className="text-[10px] text-center font-medium truncate w-full">{badge.name}</span>
+
+                                                {/* Tooltip */}
+                                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-black text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10 pointer-events-none">
+                                                    {badge.description}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
                         )}
 
                         {/* No content message */}
@@ -282,30 +331,32 @@ export function UserProfileModal({ isOpen, onClose, user, isFriend }: UserProfil
                         )}
                     </div>
                 </DialogContent>
-            </Dialog>
+            </Dialog >
 
             {/* Full Avatar Preview - Click anywhere to close */}
-            {showFullAvatar && (
-                <div
-                    className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center cursor-pointer"
-                    onClick={() => setShowFullAvatar(false)}
-                >
-                    {user.avatarUrl && (
-                        <img
-                            src={user.avatarUrl}
-                            alt={user.username}
-                            className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg"
-                            onClick={(e) => e.stopPropagation()}
-                        />
-                    )}
-                </div>
-            )}
+            {
+                showFullAvatar && (
+                    <div
+                        className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center cursor-pointer"
+                        onClick={() => setShowFullAvatar(false)}
+                    >
+                        {user.avatarUrl && (
+                            <img
+                                src={user.avatarUrl}
+                                alt={user.username}
+                                className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg"
+                                onClick={(e) => e.stopPropagation()}
+                            />
+                        )}
+                    </div>
+                )
+            }
         </>
     );
 }
 
 // Standalone Avatar Preview component for use in profile page
-export function AvatarPreview({ avatarUrl, username }: { avatarUrl?: string | null; username: string }) {
+export function AvatarPreview({ avatarUrl, username, className }: { avatarUrl?: string | null; username: string; className?: string }) {
     const [showFullAvatar, setShowFullAvatar] = useState(false);
 
     return (
@@ -315,7 +366,10 @@ export function AvatarPreview({ avatarUrl, username }: { avatarUrl?: string | nu
                 className="relative group cursor-pointer"
                 disabled={!avatarUrl}
             >
-                <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden ring-4 ring-primary/20 transition-all group-hover:ring-primary/40">
+                <div className={cn(
+                    "w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden ring-4 ring-primary/20 transition-all group-hover:ring-primary/40",
+                    className
+                )}>
                     {avatarUrl ? (
                         <img
                             src={avatarUrl}
@@ -329,14 +383,14 @@ export function AvatarPreview({ avatarUrl, username }: { avatarUrl?: string | nu
                     )}
                 </div>
                 {avatarUrl && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
-                        <span className="text-white text-xs font-medium">View</span>
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Eye className="w-5 h-5 text-white" />
                     </div>
                 )}
             </button>
 
-            {/* Full Avatar Preview - Click anywhere to close */}
-            {showFullAvatar && (
+            {/* Full Avatar Preview - Click anywhere to close (rendered via Portal) */}
+            {showFullAvatar && createPortal(
                 <div
                     className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center cursor-pointer"
                     onClick={() => setShowFullAvatar(false)}
@@ -349,7 +403,8 @@ export function AvatarPreview({ avatarUrl, username }: { avatarUrl?: string | nu
                             onClick={(e) => e.stopPropagation()}
                         />
                     )}
-                </div>
+                </div>,
+                document.body
             )}
         </>
     );

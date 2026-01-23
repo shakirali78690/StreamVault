@@ -69,7 +69,11 @@ export default function Friends() {
             shows?: Array<{ id: string; title: string; posterUrl: string | null }>;
             movies?: Array<{ id: string; title: string; posterUrl: string | null }>;
             anime?: Array<{ id: string; title: string; posterUrl: string | null }>;
+            anime?: Array<{ id: string; title: string; posterUrl: string | null }>;
         } | null;
+        xp?: number;
+        level?: number;
+        badges?: any[];
     } | null>(null);
 
     // Handle ?dm=friendId URL parameter
@@ -103,6 +107,9 @@ export default function Friends() {
         let bio: string | undefined;
         let socialLinks: any = null;
         let favorites: any = null;
+        let xp: number | undefined;
+        let level: number | undefined;
+        let badges: any[] | undefined;
 
         try {
             const response = await fetch(`/api/users/${friendId}/profile`);
@@ -111,6 +118,9 @@ export default function Friends() {
                 bio = profile.bio;
                 socialLinks = profile.socialLinks;
                 favorites = profile.favorites;
+                xp = profile.xp;
+                level = profile.level;
+                badges = profile.badges ? (typeof profile.badges === 'string' ? JSON.parse(profile.badges) : profile.badges) : [];
             }
         } catch (error) {
             console.error('Failed to fetch user profile:', error);
@@ -123,6 +133,9 @@ export default function Friends() {
             bio,
             socialLinks,
             favorites,
+            xp,
+            level,
+            badges
         });
     };
 

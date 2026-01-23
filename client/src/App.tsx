@@ -58,14 +58,21 @@ import Profile from "@/pages/profile";
 import Settings from "@/pages/settings";
 import Friends from "@/pages/friends";
 import NotificationsPage from "@/pages/notifications";
+import Leaderboard from "@/pages/leaderboard";
+import Calendar from "@/pages/calendar";
+import AchievementsPage from "@/pages/achievements";
 import { AuthProvider } from "@/contexts/auth-context";
 import { NotificationsProvider } from "@/contexts/notifications-context";
 import { FriendsProvider } from "@/contexts/friends-context";
+
+import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 
 function Router() {
   // Hide header/footer on watch-together routes
   const [location] = useLocation();
   const isWatchTogether = location.startsWith('/watch-together');
+
+  useKeyboardShortcuts();
 
   return (
     <>
@@ -117,6 +124,9 @@ function Router() {
           <Route path="/settings" component={Settings} />
           <Route path="/friends" component={Friends} />
           <Route path="/notifications" component={NotificationsPage} />
+          <Route path="/leaderboard" component={Leaderboard} />
+          <Route path="/achievements" component={AchievementsPage} />
+          <Route path="/calendar" component={Calendar} />
           <Route component={NotFound} />
         </Switch>
       </main>

@@ -1,4 +1,4 @@
-import type { Show, Episode, Movie, Anime, AnimeEpisode, Comment, InsertShow, InsertEpisode, InsertMovie, InsertAnime, InsertAnimeEpisode, InsertComment, WatchlistItem, ViewingProgress, Category, BlogPost, InsertBlogPost, User } from "@shared/schema";
+import type { Show, Episode, Movie, Anime, AnimeEpisode, Comment, InsertShow, InsertEpisode, InsertMovie, InsertAnime, InsertAnimeEpisode, InsertComment, WatchlistItem, ViewingProgress, Category, BlogPost, InsertBlogPost, User, Badge, Reminder, InsertReminder } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
 import { join } from "path";
@@ -233,6 +233,16 @@ export interface IStorage {
   createApiKey(userId: string, name: string): Promise<ApiKey>;
   deleteApiKey(id: string, userId: string): Promise<void>;
   updateApiKeyUsage(id: string): Promise<{ allowed: boolean; reason?: string }>;
+
+  // Gamification
+  updateUserXP(userId: string, amount: number): Promise<{ user: User; levelUp: boolean }>;
+  addBadge(userId: string, badge: Badge): Promise<User>;
+  getLeaderboard(limit: number): Promise<User[]>;
+
+  // Reminders
+  createReminder(reminder: InsertReminder): Promise<Reminder>;
+  getReminders(userId: string): Promise<Reminder[]>;
+  deleteReminder(id: string): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
@@ -254,6 +264,7 @@ export class MemStorage implements IStorage {
   private notifications: Map<string, Notification>;
   private directMessages: Map<string, DirectMessage>;
   private apiKeys: Map<string, ApiKey>;
+  private reminders: Map<string, Reminder>;
   private dataFile: string;
   private usersFile: string;
   private friendsFile!: string;
@@ -279,6 +290,7 @@ export class MemStorage implements IStorage {
     this.notifications = new Map();
     this.directMessages = new Map();
     this.apiKeys = new Map();
+    this.reminders = new Map();
     this.categories = [
       { id: "action", name: "Action & Thriller", slug: "action" },
       { id: "drama", name: "Drama & Romance", slug: "drama" },
@@ -379,6 +391,12 @@ export class MemStorage implements IStorage {
           });
           console.log(`✅ Loaded viewing progress for ${this.viewingProgress.size} users`);
         }
+
+        // Restore reminders
+        if (data.reminders) {
+          data.reminders.forEach((r: Reminder) => this.reminders.set(r.id, r));
+          console.log(`✅ Loaded ${data.reminders.length} reminders`);
+        }
       } else {
         console.log("📦 No data file found, seeding initial data...");
         this.seedData();
@@ -414,6 +432,7 @@ export class MemStorage implements IStorage {
         issueReports: Array.from(this.issueReports.values()),
         blogPosts: Array.from(this.blogPosts.values()),
         viewingProgress: progressObj,
+        reminders: Array.from(this.reminders.values()),
         lastUpdated: new Date().toISOString(),
       };
 
@@ -1313,6 +1332,9 @@ export class MemStorage implements IStorage {
     const now = new Date();
     const user: User = {
       ...userData,
+      xp: 0,
+      level: 1,
+      badges: "[]",
       id,
       createdAt: now,
       updatedAt: now,
@@ -1625,6 +1647,74 @@ export class MemStorage implements IStorage {
     } catch (error) {
       console.error("Error loading friends data:", error);
     }
+  }
+
+  // Gamification Implementation
+  async updateUserXP(userId: string, amount: number): Promise<{ user: User; levelUp: boolean }> {
+    const user = this.users.get(userId);
+    if (!user) throw new Error("User not found");
+
+    user.xp = (user.xp || 0) + amount;
+
+    // Level calculation: 1000 XP per level
+    const newLevel = Math.floor(user.xp / 1000) + 1;
+    const levelUp = newLevel > (user.level || 1);
+    user.level = newLevel;
+
+    this.users.set(userId, user);
+    this.saveUsers();
+
+    return { user, levelUp };
+  }
+
+  async addBadge(userId: string, badge: Badge): Promise<User> {
+    const user = this.users.get(userId);
+    if (!user) throw new Error("User not found");
+
+    const badges: Badge[] = JSON.parse(user.badges || "[]");
+    if (!badges.find(b => b.id === badge.id)) {
+      badges.push(badge);
+      user.badges = JSON.stringify(badges);
+      this.users.set(userId, user);
+      this.saveUsers();
+    }
+
+    return user;
+  }
+
+  async getLeaderboard(limit: number): Promise<User[]> {
+    // Ensure users loaded
+    if (this.users.size === 0) this.loadUsers();
+
+    return Array.from(this.users.values())
+      .sort((a, b) => (b.xp || 0) - (a.xp || 0))
+      .slice(0, limit)
+      .map(u => ({ ...u, passwordHash: "" })); // Safety
+  }
+
+  // Reminders Implementation
+  async createReminder(insertReminder: InsertReminder): Promise<Reminder> {
+    const id = randomUUID();
+    const reminder: Reminder = {
+      ...insertReminder,
+      id,
+      notified: false,
+      createdAt: new Date(),
+    };
+    this.reminders.set(id, reminder);
+    this.saveData();
+    return reminder;
+  }
+
+  async getReminders(userId: string): Promise<Reminder[]> {
+    return Array.from(this.reminders.values())
+      .filter(r => r.userId === userId)
+      .sort((a, b) => new Date(a.remindAt).getTime() - new Date(b.remindAt).getTime());
+  }
+
+  async deleteReminder(id: string): Promise<void> {
+    this.reminders.delete(id);
+    this.saveData();
   }
 
   private loadApiKeys(): void {

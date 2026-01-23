@@ -12,6 +12,8 @@ import { Helmet } from "react-helmet-async";
 import type { Movie } from "@shared/schema";
 import { trackWatch } from "@/components/analytics-tracker";
 import { apiRequest } from "@/lib/queryClient";
+import { useAuth } from "@/contexts/auth-context";
+import { useToast } from "@/hooks/use-toast";
 
 export default function WatchMovie() {
   const [, params] = useRoute("/watch-movie/:slug");
@@ -129,6 +131,33 @@ export default function WatchMovie() {
     },
   });
 
+  const { toast } = useToast();
+  const { user, refetchUser } = useAuth();
+  const xpAwardedRef = useRef(false);
+
+  // Mutation to award XP
+  const awardXPMutation = useMutation({
+    mutationFn: async () => {
+      if (xpAwardedRef.current) return; // Prevent double awarding locally
+      xpAwardedRef.current = true;
+      await apiRequest("POST", "/api/user/xp", { amount: 50 }); // 50 XP for a movie
+    },
+    onSuccess: async () => {
+      toast({
+        title: "XP Earned! 🌟",
+        description: "You earned 50 XP for watching this movie",
+        className: "bg-yellow-500/10 border-yellow-500/20 text-yellow-500",
+      });
+      await refetchUser(); // Update level/XP in UI
+      // Check for new achievements logic handled by backend hook/trigger usually, 
+      // but we can also trigger a re-check if we want to be safe:
+      // apiRequest("GET", "/api/debug/achievements"); 
+    },
+    onError: () => {
+      xpAwardedRef.current = false; // Reset on failure to try again
+    }
+  });
+
   // Fetch saved progress for movies
   const { data: savedProgress } = useQuery<any[]>({
     queryKey: ["/api/progress"],
@@ -154,6 +183,11 @@ export default function WatchMovie() {
         duration: Math.floor(duration),
         lastWatched: new Date().toISOString(),
       });
+
+      // Award XP if > 90% watched
+      if (currentTime / duration > 0.9) {
+        awardXPMutation.mutate();
+      }
     }
   };
 

@@ -10,7 +10,10 @@
       "id": "b59fe60c-35c8-4689-b83a-feda335caa19",
       "createdAt": "2026-01-20T13:03:43.162Z",
       "updatedAt": "2026-01-22T08:04:23.103Z",
-      "favorites": "{\"shows\":[\"3a8ff251-ed95-41a9-9cac-8246ab2e59d5\"],\"movies\":[],\"anime\":[]}"
+      "favorites": "{\"shows\":[\"3a8ff251-ed95-41a9-9cac-8246ab2e59d5\"],\"movies\":[],\"anime\":[]}",
+      "badges": "[{\"id\":\"social-1\",\"name\":\"Friendly Face\",\"description\":\"Have 1 Friend\",\"icon\":\"user-plus\",\"earnedAt\":\"2026-01-23T14:31:25.526Z\"}]",
+      "xp": 50,
+      "level": 1
     },
     {
       "email": "legend12@email.com",
@@ -23,7 +26,8 @@
       "createdAt": "2026-01-20T13:34:41.090Z",
       "updatedAt": "2026-01-22T18:29:20.088Z",
       "socialLinks": "{\"twitter\":\"streamvault\",\"instagram\":\"streamvault\",\"youtube\":\"streamvault\",\"tiktok\":\"streamvault\",\"discord\":\"streamvault\"}",
-      "favorites": "{\"shows\":[\"3a8ff251-ed95-41a9-9cac-8246ab2e59d5\",\"3e3b9c62-956b-48bf-b455-4b43471436a1\",\"f5248645-e522-42ca-99df-abb6df5ccb54\",\"show-1764226509318\",\"1fada4d3-8801-4aed-8307-176a3f3a0968\"],\"movies\":[\"d26795bd-7566-492c-819b-e5745febde20\",\"08125c43-9c18-404a-a45d-b9335605ebff\",\"099c1fd3-1920-4e05-a78f-5508a6003e74\",\"6b6bc212-26db-4f99-9bdd-5c3e0e7ccee3\",\"4f576c24-8329-4de8-9ee0-36491837c115\"],\"anime\":[\"efa71b5c-d3c2-4742-a290-4b4da2df533d\",\"6cd26445-f733-4d62-abe7-249e2ea9aa60\",\"a1b49de2-2222-4de4-a01f-74e52e9d330b\",\"667ef925-43f2-4f94-a33f-267f5dd8c7c3\",\"47d6dc62-d7b4-4ea5-9cde-bfba04bc4255\"]}"
+      "favorites": "{\"shows\":[\"3a8ff251-ed95-41a9-9cac-8246ab2e59d5\",\"3e3b9c62-956b-48bf-b455-4b43471436a1\",\"f5248645-e522-42ca-99df-abb6df5ccb54\",\"show-1764226509318\",\"1fada4d3-8801-4aed-8307-176a3f3a0968\"],\"movies\":[\"d26795bd-7566-492c-819b-e5745febde20\",\"08125c43-9c18-404a-a45d-b9335605ebff\",\"099c1fd3-1920-4e05-a78f-5508a6003e74\",\"6b6bc212-26db-4f99-9bdd-5c3e0e7ccee3\",\"4f576c24-8329-4de8-9ee0-36491837c115\"],\"anime\":[\"efa71b5c-d3c2-4742-a290-4b4da2df533d\",\"6cd26445-f733-4d62-abe7-249e2ea9aa60\",\"a1b49de2-2222-4de4-a01f-74e52e9d330b\",\"667ef925-43f2-4f94-a33f-267f5dd8c7c3\",\"47d6dc62-d7b4-4ea5-9cde-bfba04bc4255\"]}",
+      "badges": "[{\"id\":\"social-1\",\"name\":\"Friendly Face\",\"description\":\"Have 1 Friend\",\"icon\":\"user-plus\",\"earnedAt\":\"2026-01-23T14:49:25.858Z\"}]"
     },
     {
       "email": "hayden73@jabmag.com",
@@ -39,5 +43,5 @@
       "updatedAt": "2026-01-22T19:29:32.130Z"
     }
   ],
-  "lastUpdated": "2026-01-22T19:29:32.130Z"
+  "lastUpdated": "2026-01-23T15:23:12.520Z"
 }

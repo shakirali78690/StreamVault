@@ -13,9 +13,24 @@ export const users = pgTable("users", {
   bio: text("bio"),
   socialLinks: text("social_links"), // JSON string: { twitter, instagram, youtube, tiktok, discord }
   favorites: text("favorites"), // JSON string: { shows: [], movies: [], anime: [] }
+  xp: integer("xp").default(0).notNull(),
+  level: integer("level").default(1).notNull(),
+  badges: text("badges").default("[]").notNull(), // JSON string: Array of Badge objects
   emailVerified: boolean("email_verified").default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Reminders table for scheduling
+export const reminders = pgTable("reminders", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  contentId: varchar("content_id").notNull(), // showId, movieId, or animeId
+  contentType: text("content_type").notNull(), // "show", "movie", "anime"
+  title: text("title").notNull(),
+  remindAt: timestamp("remind_at").notNull(),
+  notified: boolean("notified").default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, updatedAt: true, passwordHash: true }).extend({
@@ -253,6 +268,21 @@ export const blogPosts = pgTable("blog_posts", {
 export const insertBlogPostSchema = createInsertSchema(blogPosts).omit({ id: true, createdAt: true, updatedAt: true });
 export type BlogPost = typeof blogPosts.$inferSelect;
 export type InsertBlogPost = z.infer<typeof insertBlogPostSchema>;
+
+// Insert Reminder schema
+export const insertReminderSchema = createInsertSchema(reminders).omit({ id: true, createdAt: true, notified: true });
+
+// Types
+export interface Badge {
+  id: string;
+  name: string;
+  description: string;
+  icon: string; // Icon name e.g., "trophy", "star"
+  earnedAt: string;
+}
+
+export type Reminder = typeof reminders.$inferSelect;
+export type InsertReminder = z.infer<typeof insertReminderSchema>;
 
 // Category type
 export type Category = {

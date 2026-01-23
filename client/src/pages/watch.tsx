@@ -7,6 +7,8 @@ import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CommentsSection } from "@/components/comments-section";
 import { VideoPlayer, VideoPlayerRef } from "@/components/video-player";
+import { useToast } from "@/hooks/use-toast";
+import { Trophy } from "lucide-react";
 import { Helmet } from "react-helmet-async";
 import type { Show, Episode } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
@@ -65,6 +67,31 @@ export default function Watch() {
 
   // Video player ref
   const videoPlayerRef = useRef<VideoPlayerRef>(null);
+  const { toast } = useToast();
+  const hasAwardedXP = useRef(false);
+
+  const xpMutation = useMutation({
+    mutationFn: (amount: number) => apiRequest("POST", "/api/user/xp", { amount }),
+    onSuccess: (data: any) => {
+      if (data.levelUp) {
+        toast({
+          title: "Level Up! 🎉",
+          description: `You are now Level ${data.user.level}!`,
+          className: "bg-yellow-500 text-black border-none"
+        });
+      }
+      if (data.newBadges && data.newBadges.length > 0) {
+        data.newBadges.forEach((badgeName: string) => {
+          toast({
+            title: "Achievement Unlocked! 🏆",
+            description: `You earned the "${badgeName}" badge!`,
+            className: "bg-purple-500 text-white border-none",
+            duration: 5000,
+          });
+        });
+      }
+    }
+  });
 
   // State for Next Episode button (only for direct video/JWPlayer)
   const [showNextEpisode, setShowNextEpisode] = useState(false);
@@ -201,6 +228,17 @@ export default function Watch() {
         lastWatched: new Date().toISOString(),
       });
     }
+
+    // Award XP if watched > 90%
+    if (!hasAwardedXP.current && duration > 0 && (currentTime / duration) > 0.9) {
+      hasAwardedXP.current = true;
+      xpMutation.mutate(50); // Award 50 XP per episode
+      toast({
+        title: "XP Earned! 🏆",
+        description: "+50 XP for watching",
+        duration: 3000,
+      });
+    }
   };
 
   const queryClient = useQueryClient();
@@ -247,9 +285,10 @@ export default function Watch() {
     }
   }, [currentSavedProgress, currentEpisodeData?.id]);
 
-  // Reset resume flag when episode changes
+  // Reset resume flag and XP flag when episode changes
   useEffect(() => {
     hasResumedRef.current = false;
+    hasAwardedXP.current = false;
     lastSaveTimeRef.current = 0;
   }, [currentEpisodeData?.id]);
 
