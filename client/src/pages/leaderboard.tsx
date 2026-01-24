@@ -1,9 +1,11 @@
 
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AvatarPreview } from "@/components/user-profile-modal";
 import { Badge } from "@shared/schema";
-import { Crown, Trophy, Medal, Star, icons } from "lucide-react";
+import { Crown, Trophy, Medal, Star, icons, Flame, UserPlus } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -18,9 +20,27 @@ interface LeaderboardUser {
 }
 
 export default function Leaderboard() {
+    const [timeFilter, setTimeFilter] = useState<'daily' | 'weekly' | 'monthly'>('weekly');
+
     const { data: users, isLoading } = useQuery<LeaderboardUser[]>({
-        queryKey: ["/api/leaderboard"],
+        queryKey: ["/api/leaderboard", timeFilter],
+        queryFn: async () => {
+            const res = await fetch(`/api/leaderboard?period=${timeFilter}`);
+            if (!res.ok) throw new Error("Failed to fetch leaderboard");
+            return res.json();
+        }
     });
+
+    // Referral leaderboard
+    const { data: referralLeaders } = useQuery<{ userId: string; username: string; referralCount: number }[]>({
+        queryKey: ["/api/referral-leaderboard"],
+    });
+
+    // Get users with streaks (from main leaderboard, sorted by streak)
+    const streakLeaders = users
+        ?.filter((u: any) => u.currentStreak && u.currentStreak > 0)
+        ?.sort((a: any, b: any) => (b.currentStreak || 0) - (a.currentStreak || 0))
+        ?.slice(0, 10) || [];
 
     const getBadgeIcon = (badge: Badge) => {
         const iconName = badge.icon || 'Star';
@@ -61,6 +81,17 @@ export default function Leaderboard() {
                 </h1>
                 <p className="text-muted-foreground">The top viewers on StreamVault</p>
             </motion.div>
+
+            {/* Time Filter Tabs */}
+            <div className="flex justify-center mb-8">
+                <Tabs value={timeFilter} onValueChange={(v) => setTimeFilter(v as any)}>
+                    <TabsList className="grid grid-cols-3 w-80">
+                        <TabsTrigger value="daily">Daily</TabsTrigger>
+                        <TabsTrigger value="weekly">Weekly</TabsTrigger>
+                        <TabsTrigger value="monthly">Monthly</TabsTrigger>
+                    </TabsList>
+                </Tabs>
+            </div>
 
             {/* Podium Section */}
             <div className="flex justify-center items-end gap-4 md:gap-12 mb-16 min-h-[350px]">
@@ -210,6 +241,107 @@ export default function Leaderboard() {
                         </motion.div>
                     ))}
                 </div>
+            </div>
+
+            {/* Additional Leaderboards Section */}
+            <div className="grid md:grid-cols-2 gap-6 mt-12">
+                {/* Referral Leaderboard */}
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.8 }}
+                    className="bg-gradient-to-br from-purple-500/10 to-pink-500/10 rounded-2xl p-6 border border-purple-500/20"
+                >
+                    <div className="flex items-center gap-3 mb-6">
+                        <div className="w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center">
+                            <UserPlus className="w-5 h-5 text-purple-400" />
+                        </div>
+                        <div>
+                            <h2 className="text-xl font-bold">Top Referrers</h2>
+                            <p className="text-xs text-muted-foreground">Most successful inviters</p>
+                        </div>
+                    </div>
+
+                    {referralLeaders && referralLeaders.length > 0 ? (
+                        <div className="space-y-3">
+                            {referralLeaders.slice(0, 10).map((leader, index) => (
+                                <div
+                                    key={leader.userId}
+                                    className="flex items-center gap-3 p-3 rounded-xl bg-card/40 border border-white/5"
+                                >
+                                    <span className={cn(
+                                        "w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold",
+                                        index === 0 ? "bg-yellow-500 text-black" :
+                                            index === 1 ? "bg-slate-400 text-black" :
+                                                index === 2 ? "bg-orange-500 text-black" :
+                                                    "bg-muted text-muted-foreground"
+                                    )}>
+                                        {index + 1}
+                                    </span>
+                                    <span className="flex-1 font-medium truncate">{leader.username}</span>
+                                    <div className="flex items-center gap-1 text-purple-400">
+                                        <UserPlus className="w-4 h-4" />
+                                        <span className="font-bold">{leader.referralCount}</span>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <p className="text-center text-muted-foreground py-8">No referrals yet. Be the first!</p>
+                    )}
+                </motion.div>
+
+                {/* Streak Leaderboard */}
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.9 }}
+                    className="bg-gradient-to-br from-orange-500/10 to-red-500/10 rounded-2xl p-6 border border-orange-500/20"
+                >
+                    <div className="flex items-center gap-3 mb-6">
+                        <div className="w-10 h-10 rounded-full bg-orange-500/20 flex items-center justify-center">
+                            <Flame className="w-5 h-5 text-orange-400" />
+                        </div>
+                        <div>
+                            <h2 className="text-xl font-bold">Streak Champions</h2>
+                            <p className="text-xs text-muted-foreground">Longest watch streaks</p>
+                        </div>
+                    </div>
+
+                    {streakLeaders.length > 0 ? (
+                        <div className="space-y-3">
+                            {streakLeaders.map((user: any, index: number) => (
+                                <div
+                                    key={user.id}
+                                    className="flex items-center gap-3 p-3 rounded-xl bg-card/40 border border-white/5"
+                                >
+                                    <span className={cn(
+                                        "w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold",
+                                        index === 0 ? "bg-yellow-500 text-black" :
+                                            index === 1 ? "bg-slate-400 text-black" :
+                                                index === 2 ? "bg-orange-500 text-black" :
+                                                    "bg-muted text-muted-foreground"
+                                    )}>
+                                        {index + 1}
+                                    </span>
+                                    <AvatarPreview
+                                        avatarUrl={user.avatarUrl}
+                                        username={user.username}
+                                        className="w-8 h-8"
+                                    />
+                                    <span className="flex-1 font-medium truncate">{user.username}</span>
+                                    <div className="flex items-center gap-1 text-orange-400">
+                                        <Flame className="w-4 h-4" />
+                                        <span className="font-bold">{user.currentStreak}</span>
+                                        <span className="text-xs text-muted-foreground">days</span>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <p className="text-center text-muted-foreground py-8">Start watching to build your streak!</p>
+                    )}
+                </motion.div>
             </div>
         </div>
     );

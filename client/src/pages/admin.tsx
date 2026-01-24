@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Trash2, Edit, Plus, Save, X, Upload, FileJson, LogOut, Mail, Send, Bell, Megaphone, User as UserIcon } from "lucide-react";
+import { Trash2, Edit, Plus, Save, X, Upload, FileJson, LogOut, Mail, Send, Bell, Megaphone, User as UserIcon, Vote, Target } from "lucide-react";
 import type { Show, Episode, Movie, BlogPost, Anime, AnimeEpisode } from "@shared/schema";
 import { getAuthHeaders, logout as authLogout } from "@/lib/auth";
 
@@ -132,6 +132,14 @@ export default function AdminPage() {
             <TabsTrigger value="add-show">Add Show</TabsTrigger>
             <TabsTrigger value="add-episode">Add Episode</TabsTrigger>
             <TabsTrigger value="import">Import</TabsTrigger>
+            <TabsTrigger value="polls" className="gap-2">
+              <Vote className="w-4 h-4" />
+              Polls
+            </TabsTrigger>
+            <TabsTrigger value="challenges" className="gap-2">
+              <Target className="w-4 h-4" />
+              Challenges
+            </TabsTrigger>
           </TabsList>
 
 
@@ -203,6 +211,16 @@ export default function AdminPage() {
           {/* Import Episodes Tab */}
           <TabsContent value="import">
             <ImportEpisodesForm />
+          </TabsContent>
+
+          {/* Polls Management Tab */}
+          <TabsContent value="polls">
+            <PollsManager />
+          </TabsContent>
+
+          {/* Challenges Management Tab */}
+          <TabsContent value="challenges">
+            <ChallengesManager />
           </TabsContent>
         </Tabs>
       </div>
@@ -3573,6 +3591,388 @@ function BroadcastNotificationManager({ shows, movies, anime }: { shows: Show[];
             <Bell className="w-4 h-4 mr-2" />
             {isSending ? 'Broadcasting...' : 'Broadcast to All Users'}
           </Button>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// Polls Manager Component
+function PollsManager() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [question, setQuestion] = useState('');
+  const [options, setOptions] = useState(['', '']);
+  const [featured, setFeatured] = useState(false);
+  const [endDate, setEndDate] = useState('');
+
+  const { data: polls, isLoading } = useQuery<any[]>({
+    queryKey: ["/api/polls"],
+  });
+
+  const createPollMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const res = await fetch("/api/admin/polls", {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error("Failed to create poll");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/polls"] });
+      toast({ title: "Success!", description: "Poll created successfully" });
+      setQuestion('');
+      setOptions(['', '']);
+      setFeatured(false);
+      setEndDate('');
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to create poll", variant: "destructive" });
+    },
+  });
+
+  const addOption = () => {
+    if (options.length < 6) {
+      setOptions([...options, '']);
+    }
+  };
+
+  const removeOption = (index: number) => {
+    if (options.length > 2) {
+      setOptions(options.filter((_, i) => i !== index));
+    }
+  };
+
+  const updateOption = (index: number, value: string) => {
+    const newOptions = [...options];
+    newOptions[index] = value;
+    setOptions(newOptions);
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const validOptions = options.filter(o => o.trim());
+    if (validOptions.length < 2) {
+      toast({ title: "Error", description: "At least 2 options required", variant: "destructive" });
+      return;
+    }
+    createPollMutation.mutate({
+      question,
+      options: validOptions,
+      featured,
+      endDate: endDate || undefined,
+    });
+  };
+
+  return (
+    <div className="grid gap-6 lg:grid-cols-2">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Vote className="w-5 h-5" />
+            Create New Poll
+          </CardTitle>
+          <CardDescription>Create a community poll for users to vote on</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="poll-question">Question</Label>
+              <Textarea
+                id="poll-question"
+                value={question}
+                onChange={(e) => setQuestion(e.target.value)}
+                placeholder="What genre should we add more of?"
+                required
+              />
+            </div>
+
+            <div className="space-y-3">
+              <Label>Options (2-6)</Label>
+              {options.map((option, index) => (
+                <div key={index} className="flex gap-2">
+                  <Input
+                    value={option}
+                    onChange={(e) => updateOption(index, e.target.value)}
+                    placeholder={`Option ${index + 1}`}
+                    required
+                  />
+                  {options.length > 2 && (
+                    <Button type="button" variant="outline" size="icon" onClick={() => removeOption(index)}>
+                      <X className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
+              ))}
+              {options.length < 6 && (
+                <Button type="button" variant="outline" size="sm" onClick={addOption}>
+                  <Plus className="w-4 h-4 mr-2" /> Add Option
+                </Button>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="poll-end">End Date (Optional)</Label>
+              <Input
+                id="poll-end"
+                type="datetime-local"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+              />
+            </div>
+
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={featured}
+                onChange={(e) => setFeatured(e.target.checked)}
+                className="w-4 h-4"
+              />
+              <span className="text-sm">Featured Poll (highlighted on page)</span>
+            </label>
+
+            <Button type="submit" disabled={createPollMutation.isPending} className="w-full">
+              {createPollMutation.isPending ? "Creating..." : "Create Poll"}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Existing Polls ({polls?.length || 0})</CardTitle>
+          <CardDescription>View and manage community polls</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <p className="text-muted-foreground">Loading polls...</p>
+          ) : polls && polls.length > 0 ? (
+            <div className="space-y-3 max-h-96 overflow-y-auto">
+              {polls.map((poll: any) => (
+                <div key={poll.id} className="p-3 border rounded-lg">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="font-medium">{poll.question}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {poll.options?.length || 0} options • {poll.featured ? '⭐ Featured' : 'Regular'}
+                      </p>
+                    </div>
+                    <Badge variant={poll.active ? "default" : "secondary"}>
+                      {poll.active ? "Active" : "Ended"}
+                    </Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-muted-foreground text-center py-8">No polls created yet</p>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// Challenges Manager Component
+function ChallengesManager() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [challengeType, setChallengeType] = useState<'daily' | 'weekly'>('daily');
+  const [targetType, setTargetType] = useState('watch_count');
+  const [targetValue, setTargetValue] = useState(5);
+  const [xpReward, setXpReward] = useState(100);
+  const [badgeReward, setBadgeReward] = useState('');
+  const [endDate, setEndDate] = useState('');
+
+  const { data: challenges, isLoading } = useQuery<any[]>({
+    queryKey: ["/api/challenges"],
+  });
+
+  const createChallengeMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const res = await fetch("/api/admin/challenges", {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error("Failed to create challenge");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/challenges"] });
+      toast({ title: "Success!", description: "Challenge created successfully" });
+      setTitle('');
+      setDescription('');
+      setTargetValue(5);
+      setXpReward(100);
+      setBadgeReward('');
+      setEndDate('');
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to create challenge", variant: "destructive" });
+    },
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    createChallengeMutation.mutate({
+      title,
+      description,
+      type: challengeType,
+      targetType,
+      targetValue,
+      xpReward,
+      badgeReward: badgeReward || undefined,
+      endDate: endDate || undefined,
+    });
+  };
+
+  return (
+    <div className="grid gap-6 lg:grid-cols-2">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Target className="w-5 h-5" />
+            Create New Challenge
+          </CardTitle>
+          <CardDescription>Create daily or weekly challenges for users</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="challenge-title">Title</Label>
+              <Input
+                id="challenge-title"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Weekend Binge Master"
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="challenge-desc">Description</Label>
+              <Textarea
+                id="challenge-desc"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Watch 5 movies this weekend to complete the challenge!"
+                required
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Challenge Type</Label>
+                <select
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  value={challengeType}
+                  onChange={(e) => setChallengeType(e.target.value as any)}
+                >
+                  <option value="daily">Daily</option>
+                  <option value="weekly">Weekly</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <Label>Target Type</Label>
+                <select
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  value={targetType}
+                  onChange={(e) => setTargetType(e.target.value)}
+                >
+                  <option value="watch_count">Watch Any Content</option>
+                  <option value="watch_movie">Watch Movies</option>
+                  <option value="watch_show">Watch Shows</option>
+                  <option value="watch_anime">Watch Anime</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="target-value">Target Count</Label>
+                <Input
+                  id="target-value"
+                  type="number"
+                  min="1"
+                  value={targetValue}
+                  onChange={(e) => setTargetValue(parseInt(e.target.value))}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="xp-reward">XP Reward</Label>
+                <Input
+                  id="xp-reward"
+                  type="number"
+                  min="10"
+                  value={xpReward}
+                  onChange={(e) => setXpReward(parseInt(e.target.value))}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="badge-reward">Badge Reward (Optional)</Label>
+              <Input
+                id="badge-reward"
+                value={badgeReward}
+                onChange={(e) => setBadgeReward(e.target.value)}
+                placeholder="e.g., binge_master, weekend_warrior"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="challenge-end">End Date</Label>
+              <Input
+                id="challenge-end"
+                type="datetime-local"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+              />
+            </div>
+
+            <Button type="submit" disabled={createChallengeMutation.isPending} className="w-full">
+              {createChallengeMutation.isPending ? "Creating..." : "Create Challenge"}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Active Challenges ({challenges?.length || 0})</CardTitle>
+          <CardDescription>View and manage user challenges</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <p className="text-muted-foreground">Loading challenges...</p>
+          ) : challenges && challenges.length > 0 ? (
+            <div className="space-y-3 max-h-96 overflow-y-auto">
+              {challenges.map((challenge: any) => (
+                <div key={challenge.id} className="p-3 border rounded-lg">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="font-medium">{challenge.title}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {challenge.type} • {challenge.targetValue}x {challenge.targetType} • {challenge.xpReward} XP
+                      </p>
+                    </div>
+                    <Badge variant={challenge.active ? "default" : "secondary"}>
+                      {challenge.active ? "Active" : "Ended"}
+                    </Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-muted-foreground text-center py-8">No challenges created yet</p>
+          )}
         </CardContent>
       </Card>
     </div>

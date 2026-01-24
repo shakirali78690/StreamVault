@@ -1,4 +1,4 @@
-import type { Show, Episode, Movie, Anime, AnimeEpisode, Comment, InsertShow, InsertEpisode, InsertMovie, InsertAnime, InsertAnimeEpisode, InsertComment, WatchlistItem, ViewingProgress, Category, BlogPost, InsertBlogPost, User, Badge, Reminder, InsertReminder } from "@shared/schema";
+import type { Show, Episode, Movie, Anime, AnimeEpisode, Comment, InsertShow, InsertEpisode, InsertMovie, InsertAnime, InsertAnimeEpisode, InsertComment, WatchlistItem, ViewingProgress, Category, BlogPost, InsertBlogPost, User, Badge, Reminder, InsertReminder, Review, ReviewHelpfulVote, Challenge, UserChallenge, Poll, PollVote, XpHistoryEntry } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
 import { join } from "path";
@@ -243,6 +243,42 @@ export interface IStorage {
   createReminder(reminder: InsertReminder): Promise<Reminder>;
   getReminders(userId: string): Promise<Reminder[]>;
   deleteReminder(id: string): Promise<void>;
+
+  // Streak tracking
+  updateUserStreak(userId: string): Promise<{ user: User; streakIncreased: boolean; milestone?: number }>;
+  getUserStreak(userId: string): Promise<{ currentStreak: number; longestStreak: number; lastWatchDate: string | null }>;
+
+  // Reviews
+  createReview(review: Omit<Review, 'id' | 'createdAt' | 'updatedAt' | 'helpfulCount'>): Promise<Review>;
+  getReviews(contentType: string, contentId: string): Promise<(Review & { username: string; avatarUrl: string | null })[]>;
+  getUserReview(userId: string, contentType: string, contentId: string): Promise<Review | undefined>;
+  deleteReview(id: string, userId: string): Promise<void>;
+  markReviewHelpful(reviewId: string, userId: string): Promise<void>;
+  getAverageRating(contentType: string, contentId: string): Promise<{ average: number; count: number }>;
+
+  // Challenges
+  getChallenges(type?: 'daily' | 'weekly'): Promise<Challenge[]>;
+  getUserChallenges(userId: string): Promise<(UserChallenge & { challenge: Challenge })[]>;
+  updateChallengeProgress(userId: string, challengeId: string, increment: number): Promise<UserChallenge>;
+  claimChallengeReward(userId: string, challengeId: string): Promise<{ xpAwarded: number; badgeAwarded?: string }>;
+  createChallenge(challenge: Omit<Challenge, 'id' | 'createdAt'>): Promise<Challenge>;
+
+  // Referrals
+  generateReferralCode(userId: string): Promise<string>;
+  applyReferralCode(newUserId: string, code: string): Promise<void>;
+  getReferralLeaderboard(limit: number): Promise<{ userId: string; username: string; referralCount: number }[]>;
+
+  // Polls
+  createPoll(poll: Omit<Poll, 'id' | 'createdAt'>): Promise<Poll>;
+  getPolls(activeOnly?: boolean): Promise<Poll[]>;
+  getPollById(id: string): Promise<Poll | undefined>;
+  votePoll(pollId: string, userId: string, optionIndex: number): Promise<void>;
+  getPollResults(pollId: string): Promise<{ optionIndex: number; count: number }[]>;
+  getUserVote(pollId: string, userId: string): Promise<PollVote | undefined>;
+
+  // XP History for time-based leaderboards
+  addXpHistory(userId: string, amount: number, source: string): Promise<XpHistoryEntry>;
+  getLeaderboardByPeriod(period: 'daily' | 'weekly' | 'monthly', limit: number): Promise<{ userId: string; username: string; avatarUrl: string | null; xpGained: number; level: number }[]>;
 }
 
 export class MemStorage implements IStorage {
@@ -265,6 +301,13 @@ export class MemStorage implements IStorage {
   private directMessages: Map<string, DirectMessage>;
   private apiKeys: Map<string, ApiKey>;
   private reminders: Map<string, Reminder>;
+  private reviews: Map<string, Review>;
+  private reviewHelpful: Map<string, ReviewHelpfulVote>;
+  private challenges: Map<string, Challenge>;
+  private userChallenges: Map<string, UserChallenge>;
+  private polls: Map<string, Poll>;
+  private pollVotes: Map<string, PollVote>;
+  private xpHistory: Map<string, XpHistoryEntry>;
   private dataFile: string;
   private usersFile: string;
   private friendsFile!: string;
@@ -291,6 +334,13 @@ export class MemStorage implements IStorage {
     this.directMessages = new Map();
     this.apiKeys = new Map();
     this.reminders = new Map();
+    this.reviews = new Map();
+    this.reviewHelpful = new Map();
+    this.challenges = new Map();
+    this.userChallenges = new Map();
+    this.polls = new Map();
+    this.pollVotes = new Map();
+    this.xpHistory = new Map();
     this.categories = [
       { id: "action", name: "Action & Thriller", slug: "action" },
       { id: "drama", name: "Drama & Romance", slug: "drama" },
@@ -1821,6 +1871,489 @@ export class MemStorage implements IStorage {
     this.saveApiKeys();
 
     return { allowed: true };
+  }
+
+  // ============================================
+  // STREAK TRACKING IMPLEMENTATION
+  // ============================================
+
+  async updateUserStreak(userId: string): Promise<{ user: User; streakIncreased: boolean; milestone?: number }> {
+    const user = this.users.get(userId);
+    if (!user) throw new Error("User not found");
+
+    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+    const lastWatch = user.lastWatchDate;
+
+    let streakIncreased = false;
+    let milestone: number | undefined;
+
+    if (!lastWatch) {
+      // First time watching
+      user.currentStreak = 1;
+      user.longestStreak = Math.max(user.longestStreak || 0, 1);
+      streakIncreased = true;
+    } else if (lastWatch === today) {
+      // Already watched today, no change
+    } else {
+      const lastDate = new Date(lastWatch);
+      const todayDate = new Date(today);
+      const diffDays = Math.floor((todayDate.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
+
+      if (diffDays === 1) {
+        // Consecutive day - increment streak
+        user.currentStreak = (user.currentStreak || 0) + 1;
+        user.longestStreak = Math.max(user.longestStreak || 0, user.currentStreak);
+        streakIncreased = true;
+
+        // Check for milestones (7, 30, 100, 365 days)
+        const milestones = [7, 30, 100, 365];
+        for (const m of milestones) {
+          if (user.currentStreak === m) {
+            milestone = m;
+            break;
+          }
+        }
+      } else if (diffDays > 1) {
+        // Streak broken - reset to 1
+        user.currentStreak = 1;
+        streakIncreased = true;
+      }
+    }
+
+    user.lastWatchDate = today;
+    user.updatedAt = new Date();
+    this.users.set(userId, user);
+    this.saveUsers();
+
+    return { user, streakIncreased, milestone };
+  }
+
+  async getUserStreak(userId: string): Promise<{ currentStreak: number; longestStreak: number; lastWatchDate: string | null }> {
+    const user = this.users.get(userId);
+    if (!user) throw new Error("User not found");
+
+    return {
+      currentStreak: user.currentStreak || 0,
+      longestStreak: user.longestStreak || 0,
+      lastWatchDate: user.lastWatchDate || null,
+    };
+  }
+
+  // ============================================
+  // REVIEWS IMPLEMENTATION
+  // ============================================
+
+  async createReview(reviewData: Omit<Review, 'id' | 'createdAt' | 'updatedAt' | 'helpfulCount'>): Promise<Review> {
+    // Check if user already has a review for this content
+    const existing = await this.getUserReview(reviewData.userId, reviewData.contentType, reviewData.contentId);
+
+    const now = new Date();
+    if (existing) {
+      // Update existing review
+      const updated: Review = {
+        ...existing,
+        ...reviewData,
+        updatedAt: now,
+      };
+      this.reviews.set(existing.id, updated);
+      this.saveData();
+      return updated;
+    }
+
+    // Create new review
+    const id = randomUUID();
+    const review: Review = {
+      ...reviewData,
+      id,
+      helpfulCount: 0,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.reviews.set(id, review);
+    this.saveData();
+    return review;
+  }
+
+  async getReviews(contentType: string, contentId: string): Promise<(Review & { username: string; avatarUrl: string | null })[]> {
+    const reviews = Array.from(this.reviews.values())
+      .filter(r => r.contentType === contentType && r.contentId === contentId)
+      .sort((a, b) => (b.helpfulCount || 0) - (a.helpfulCount || 0));
+
+    return reviews.map(review => {
+      const user = this.users.get(review.userId);
+      return {
+        ...review,
+        username: user?.username || 'Unknown',
+        avatarUrl: user?.avatarUrl || null,
+      };
+    });
+  }
+
+  async getUserReview(userId: string, contentType: string, contentId: string): Promise<Review | undefined> {
+    return Array.from(this.reviews.values()).find(
+      r => r.userId === userId && r.contentType === contentType && r.contentId === contentId
+    );
+  }
+
+  async deleteReview(id: string, userId: string): Promise<void> {
+    const review = this.reviews.get(id);
+    if (review && review.userId === userId) {
+      this.reviews.delete(id);
+      this.saveData();
+    }
+  }
+
+  async markReviewHelpful(reviewId: string, userId: string): Promise<void> {
+    // Check if user already marked this review
+    const existing = Array.from(this.reviewHelpful.values()).find(
+      h => h.reviewId === reviewId && h.userId === userId
+    );
+    if (existing) return;
+
+    // Add helpful vote
+    const id = randomUUID();
+    const vote: ReviewHelpfulVote = {
+      id,
+      reviewId,
+      userId,
+      createdAt: new Date(),
+    };
+    this.reviewHelpful.set(id, vote);
+
+    // Update review's helpful count
+    const review = this.reviews.get(reviewId);
+    if (review) {
+      review.helpfulCount = (review.helpfulCount || 0) + 1;
+      this.reviews.set(reviewId, review);
+    }
+    this.saveData();
+  }
+
+  async getAverageRating(contentType: string, contentId: string): Promise<{ average: number; count: number }> {
+    const reviews = Array.from(this.reviews.values())
+      .filter(r => r.contentType === contentType && r.contentId === contentId);
+
+    if (reviews.length === 0) {
+      return { average: 0, count: 0 };
+    }
+
+    const sum = reviews.reduce((acc, r) => acc + r.rating, 0);
+    return {
+      average: Math.round((sum / reviews.length) * 10) / 10,
+      count: reviews.length,
+    };
+  }
+
+  // ============================================
+  // CHALLENGES IMPLEMENTATION
+  // ============================================
+
+  async getChallenges(type?: 'daily' | 'weekly'): Promise<Challenge[]> {
+    const now = new Date();
+    return Array.from(this.challenges.values())
+      .filter(c => {
+        if (!c.active) return false;
+        if (type && c.type !== type) return false;
+        if (new Date(c.endDate) < now) return false;
+        return true;
+      })
+      .sort((a, b) => new Date(a.endDate).getTime() - new Date(b.endDate).getTime());
+  }
+
+  async getUserChallenges(userId: string): Promise<(UserChallenge & { challenge: Challenge })[]> {
+    const userChallenges = Array.from(this.userChallenges.values())
+      .filter(uc => uc.userId === userId);
+
+    return userChallenges.map(uc => {
+      const challenge = this.challenges.get(uc.challengeId);
+      return { ...uc, challenge: challenge! };
+    }).filter(uc => uc.challenge);
+  }
+
+  async updateChallengeProgress(userId: string, challengeId: string, increment: number): Promise<UserChallenge> {
+    // Find or create user challenge entry
+    let userChallenge = Array.from(this.userChallenges.values()).find(
+      uc => uc.userId === userId && uc.challengeId === challengeId
+    );
+
+    const challenge = this.challenges.get(challengeId);
+    if (!challenge) throw new Error("Challenge not found");
+
+    if (!userChallenge) {
+      const id = randomUUID();
+      userChallenge = {
+        id,
+        userId,
+        challengeId,
+        progress: 0,
+        completed: false,
+        claimed: false,
+        completedAt: null,
+        createdAt: new Date(),
+      };
+      this.userChallenges.set(id, userChallenge);
+    }
+
+    // Update progress
+    userChallenge.progress = (userChallenge.progress || 0) + increment;
+
+    // Check if completed
+    if (userChallenge.progress >= challenge.targetValue && !userChallenge.completed) {
+      userChallenge.completed = true;
+      userChallenge.completedAt = new Date();
+    }
+
+    this.userChallenges.set(userChallenge.id, userChallenge);
+    this.saveData();
+    return userChallenge;
+  }
+
+  async claimChallengeReward(userId: string, challengeId: string): Promise<{ xpAwarded: number; badgeAwarded?: string }> {
+    const userChallenge = Array.from(this.userChallenges.values()).find(
+      uc => uc.userId === userId && uc.challengeId === challengeId
+    );
+
+    if (!userChallenge || !userChallenge.completed || userChallenge.claimed) {
+      throw new Error("Cannot claim reward");
+    }
+
+    const challenge = this.challenges.get(challengeId);
+    if (!challenge) throw new Error("Challenge not found");
+
+    // Mark as claimed
+    userChallenge.claimed = true;
+    this.userChallenges.set(userChallenge.id, userChallenge);
+
+    // Award XP
+    await this.updateUserXP(userId, challenge.xpReward);
+
+    // Award badge if applicable
+    let badgeAwarded: string | undefined;
+    if (challenge.badgeReward) {
+      badgeAwarded = challenge.badgeReward;
+      await this.addBadge(userId, {
+        id: challenge.badgeReward,
+        name: challenge.title,
+        description: `Completed: ${challenge.description}`,
+        icon: 'target',
+        earnedAt: new Date().toISOString(),
+      });
+    }
+
+    this.saveData();
+    return { xpAwarded: challenge.xpReward, badgeAwarded };
+  }
+
+  async createChallenge(challengeData: Omit<Challenge, 'id' | 'createdAt'>): Promise<Challenge> {
+    const id = randomUUID();
+    const challenge: Challenge = {
+      ...challengeData,
+      id,
+      createdAt: new Date(),
+    };
+    this.challenges.set(id, challenge);
+    this.saveData();
+    return challenge;
+  }
+
+  // ============================================
+  // REFERRALS IMPLEMENTATION
+  // ============================================
+
+  async generateReferralCode(userId: string): Promise<string> {
+    const user = this.users.get(userId);
+    if (!user) throw new Error("User not found");
+
+    if (user.referralCode) {
+      return user.referralCode;
+    }
+
+    // Generate unique 8-character code
+    const code = randomUUID().slice(0, 8).toUpperCase();
+    user.referralCode = code;
+    this.users.set(userId, user);
+    this.saveUsers();
+    return code;
+  }
+
+  async applyReferralCode(newUserId: string, code: string): Promise<void> {
+    const referrer = Array.from(this.users.values()).find(u => u.referralCode === code);
+    if (!referrer) throw new Error("Invalid referral code");
+    if (referrer.id === newUserId) throw new Error("Cannot refer yourself");
+
+    const newUser = this.users.get(newUserId);
+    if (!newUser) throw new Error("User not found");
+    if (newUser.referredBy) throw new Error("Already used a referral code");
+
+    // Update new user
+    newUser.referredBy = referrer.id;
+    newUser.xp = (newUser.xp || 0) + 50; // Welcome bonus
+    this.users.set(newUserId, newUser);
+
+    // Update referrer
+    referrer.referralCount = (referrer.referralCount || 0) + 1;
+    referrer.xp = (referrer.xp || 0) + 100; // Referral bonus
+    this.users.set(referrer.id, referrer);
+
+    this.saveUsers();
+  }
+
+  async getReferralLeaderboard(limit: number): Promise<{ userId: string; username: string; referralCount: number }[]> {
+    return Array.from(this.users.values())
+      .filter(u => (u.referralCount || 0) > 0)
+      .sort((a, b) => (b.referralCount || 0) - (a.referralCount || 0))
+      .slice(0, limit)
+      .map(u => ({
+        userId: u.id,
+        username: u.username,
+        referralCount: u.referralCount || 0,
+      }));
+  }
+
+  // ============================================
+  // POLLS IMPLEMENTATION
+  // ============================================
+
+  async createPoll(pollData: Omit<Poll, 'id' | 'createdAt'>): Promise<Poll> {
+    const id = randomUUID();
+    const poll: Poll = {
+      ...pollData,
+      id,
+      createdAt: new Date(),
+    };
+    this.polls.set(id, poll);
+    this.saveData();
+    return poll;
+  }
+
+  async getPolls(activeOnly: boolean = true): Promise<Poll[]> {
+    const now = new Date();
+    return Array.from(this.polls.values())
+      .filter(p => {
+        if (activeOnly && !p.active) return false;
+        if (activeOnly && p.endDate && new Date(p.endDate) < now) return false;
+        return true;
+      })
+      .sort((a, b) => {
+        // Featured first, then by creation date
+        if (a.featured && !b.featured) return -1;
+        if (!a.featured && b.featured) return 1;
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      });
+  }
+
+  async getPollById(id: string): Promise<Poll | undefined> {
+    return this.polls.get(id);
+  }
+
+  async votePoll(pollId: string, userId: string, optionIndex: number): Promise<void> {
+    const poll = this.polls.get(pollId);
+    if (!poll) throw new Error("Poll not found");
+    if (!poll.active) throw new Error("Poll is closed");
+    if (poll.endDate && new Date(poll.endDate) < new Date()) throw new Error("Poll has ended");
+
+    // Check if user already voted
+    const existingVote = await this.getUserVote(pollId, userId);
+    if (existingVote) throw new Error("Already voted");
+
+    // Validate option index
+    const options = JSON.parse(poll.options);
+    if (optionIndex < 0 || optionIndex >= options.length) throw new Error("Invalid option");
+
+    const id = randomUUID();
+    const vote: PollVote = {
+      id,
+      pollId,
+      userId,
+      optionIndex,
+      createdAt: new Date(),
+    };
+    this.pollVotes.set(id, vote);
+    this.saveData();
+  }
+
+  async getPollResults(pollId: string): Promise<{ optionIndex: number; count: number }[]> {
+    const votes = Array.from(this.pollVotes.values()).filter(v => v.pollId === pollId);
+
+    // Count votes per option
+    const counts = new Map<number, number>();
+    for (const vote of votes) {
+      counts.set(vote.optionIndex, (counts.get(vote.optionIndex) || 0) + 1);
+    }
+
+    return Array.from(counts.entries()).map(([optionIndex, count]) => ({ optionIndex, count }));
+  }
+
+  async getUserVote(pollId: string, userId: string): Promise<PollVote | undefined> {
+    return Array.from(this.pollVotes.values()).find(
+      v => v.pollId === pollId && v.userId === userId
+    );
+  }
+
+  // ============================================
+  // XP HISTORY IMPLEMENTATION
+  // ============================================
+
+  async addXpHistory(userId: string, amount: number, source: string): Promise<XpHistoryEntry> {
+    const id = randomUUID();
+    const entry: XpHistoryEntry = {
+      id,
+      userId,
+      amount,
+      source,
+      createdAt: new Date(),
+    };
+    this.xpHistory.set(id, entry);
+    this.saveData();
+    return entry;
+  }
+
+  async getLeaderboardByPeriod(period: 'daily' | 'weekly' | 'monthly', limit: number): Promise<{ userId: string; username: string; avatarUrl: string | null; xpGained: number; level: number }[]> {
+    const now = new Date();
+    let startDate: Date;
+
+    if (period === 'daily') {
+      startDate = new Date(now.setHours(0, 0, 0, 0));
+    } else if (period === 'weekly') {
+      // Start of week (Sunday)
+      startDate = new Date(now.setDate(now.getDate() - now.getDay()));
+      startDate.setHours(0, 0, 0, 0);
+    } else {
+      // Start of month
+      startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+    }
+
+    // Filter XP history by date
+    const xpEntries = Array.from(this.xpHistory.values()).filter(entry =>
+      new Date(entry.createdAt) >= startDate
+    );
+
+    // Aggregate XP by user
+    const userXpMap = new Map<string, number>();
+    for (const entry of xpEntries) {
+      const current = userXpMap.get(entry.userId) || 0;
+      userXpMap.set(entry.userId, current + entry.amount);
+    }
+
+    // Map to return format
+    const leaderboard = [];
+    for (const [userId, xpGained] of userXpMap.entries()) {
+      const user = this.users.get(userId);
+      if (user) {
+        leaderboard.push({
+          userId: user.id,
+          username: user.username,
+          avatarUrl: user.avatarUrl,
+          xpGained,
+          level: user.level,
+        });
+      }
+    }
+
+    // Sort by XP gained descending
+    return leaderboard
+      .sort((a, b) => b.xpGained - a.xpGained)
+      .slice(0, limit);
   }
 }
 

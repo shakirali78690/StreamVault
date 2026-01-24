@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { SiTiktok, SiDiscord } from 'react-icons/si';
 import { FavoritesPicker } from '@/components/favorites-picker';
 import { Progress } from '@/components/ui/progress';
+import { StreakDisplay } from '@/components/streak-display';
 
 export default function ProfilePage() {
     const [, navigate] = useLocation();
@@ -158,6 +159,9 @@ export default function ProfilePage() {
                         <CardDescription>Manage your account settings</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-6">
+                        {/* Watch Streak */}
+                        <StreakDisplay />
+
                         {/* Avatar Section */}
                         <div className="flex items-center gap-6">
                             <div className="relative group">

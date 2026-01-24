@@ -16,6 +16,14 @@ export const users = pgTable("users", {
   xp: integer("xp").default(0).notNull(),
   level: integer("level").default(1).notNull(),
   badges: text("badges").default("[]").notNull(), // JSON string: Array of Badge objects
+  // Streak tracking
+  currentStreak: integer("current_streak").default(0).notNull(),
+  longestStreak: integer("longest_streak").default(0).notNull(),
+  lastWatchDate: text("last_watch_date"), // ISO date string (YYYY-MM-DD)
+  // Referral system
+  referralCode: varchar("referral_code").unique(),
+  referredBy: varchar("referred_by"),
+  referralCount: integer("referral_count").default(0).notNull(),
   emailVerified: boolean("email_verified").default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -32,6 +40,89 @@ export const reminders = pgTable("reminders", {
   notified: boolean("notified").default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+// Reviews table for user ratings and reviews
+export const reviews = pgTable("reviews", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  contentType: text("content_type").notNull(), // "movie" | "show" | "anime"
+  contentId: varchar("content_id").notNull(),
+  rating: integer("rating").notNull(), // 1-5 stars
+  reviewText: text("review_text"),
+  spoilerWarning: boolean("spoiler_warning").default(false),
+  helpfulCount: integer("helpful_count").default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Review helpful votes
+export const reviewHelpful = pgTable("review_helpful", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  reviewId: varchar("review_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Challenges table for daily/weekly challenges
+export const challenges = pgTable("challenges", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  type: text("type").notNull(), // "daily" | "weekly"
+  targetType: text("target_type").notNull(), // "watch_movie", "watch_show", "watch_anime", "watch_genre", "watch_count"
+  targetValue: integer("target_value").notNull(), // e.g., 3 for "watch 3 movies"
+  targetGenre: text("target_genre"), // Optional genre filter
+  xpReward: integer("xp_reward").notNull(),
+  badgeReward: text("badge_reward"), // Optional badge ID
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date").notNull(),
+  active: boolean("active").default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// User challenge progress
+export const userChallenges = pgTable("user_challenges", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  challengeId: varchar("challenge_id").notNull(),
+  progress: integer("progress").default(0),
+  completed: boolean("completed").default(false),
+  claimed: boolean("claimed").default(false),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Polls table for community voting
+export const polls = pgTable("polls", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  question: text("question").notNull(),
+  options: text("options").notNull(), // JSON array of option strings
+  createdBy: varchar("created_by").notNull(), // admin user ID
+  endDate: timestamp("end_date"),
+  active: boolean("active").default(true),
+  featured: boolean("featured").default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Poll votes
+export const pollVotes = pgTable("poll_votes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  pollId: varchar("poll_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  optionIndex: integer("option_index").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// XP History for time-based leaderboards
+export const xpHistory = pgTable("xp_history", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  amount: integer("amount").notNull(),
+  source: varchar("source", { length: 50 }).notNull(), // watch_movie, watch_show, watch_anime, streak_bonus, referral, etc.
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type XpHistoryEntry = typeof xpHistory.$inferSelect;
 
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, updatedAt: true, passwordHash: true }).extend({
   password: z.string().min(6, "Password must be at least 6 characters"),
@@ -283,6 +374,18 @@ export interface Badge {
 
 export type Reminder = typeof reminders.$inferSelect;
 export type InsertReminder = z.infer<typeof insertReminderSchema>;
+
+// Review types
+export type Review = typeof reviews.$inferSelect;
+export type ReviewHelpfulVote = typeof reviewHelpful.$inferSelect;
+
+// Challenge types
+export type Challenge = typeof challenges.$inferSelect;
+export type UserChallenge = typeof userChallenges.$inferSelect;
+
+// Poll types
+export type Poll = typeof polls.$inferSelect;
+export type PollVote = typeof pollVotes.$inferSelect;
 
 // Category type
 export type Category = {

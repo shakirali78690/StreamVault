@@ -12,6 +12,7 @@ import { useState, useEffect } from "react";
 import { ContentRow } from "@/components/content-row";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { ReviewsSection } from "@/components/reviews-section";
 
 // Extract Google Drive ID from URL and generate thumbnail
 const getEpisodeThumbnail = (episode: Episode, showBackdrop?: string) => {
@@ -723,6 +724,9 @@ export default function ShowDetail() {
                   </div>
                 </div>
               )}
+
+              {/* User Reviews */}
+              <ReviewsSection contentType="show" contentId={show.id} />
             </div>
           </TabsContent>
 

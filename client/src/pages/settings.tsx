@@ -11,6 +11,7 @@ import { Loader2, Settings, Bot, Bell, Volume2, Palette, Shield, Trash2, Key, Co
 import { useToast } from '@/hooks/use-toast';
 import { useTheme } from '@/components/theme-provider';
 import { apiRequest } from '@/lib/queryClient';
+import { ReferralSection } from '@/components/referral-section';
 
 // Settings stored in localStorage
 const SETTINGS_KEY = 'streamvault_settings';
@@ -373,6 +374,9 @@ export default function SettingsPage() {
                         </div>
                     </CardContent>
                 </Card>
+
+                {/* Referral System */}
+                <ReferralSection />
 
                 {/* API Keys */}
                 <Card>

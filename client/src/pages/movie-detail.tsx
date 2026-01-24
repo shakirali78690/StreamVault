@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import type { Movie, BlogPost } from "@shared/schema";
+import { ReviewsSection } from "@/components/reviews-section";
 
 export default function MovieDetail() {
   const [, params] = useRoute("/movie/:slug");
@@ -546,6 +547,11 @@ export default function MovieDetail() {
               </div>
             </div>
           )}
+
+          {/* User Reviews Section */}
+          <div className="mb-8">
+            <ReviewsSection contentType="movie" contentId={movie.id} />
+          </div>
         </div>
       </div>
     </div>

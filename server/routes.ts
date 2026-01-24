@@ -857,6 +857,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const safeAmount = Math.min(amount, 100);
       const result = await storage.updateUserXP(payload.userId, safeAmount);
 
+      // Log to XP History
+      await storage.addXpHistory(payload.userId, safeAmount, 'watch_content');
+
+      // Update user's watch streak
+      const streakResult = await storage.updateUserStreak(payload.userId);
+
+      // Award bonus XP for streak milestones
+      let streakBonusXP = 0;
+      if (streakResult.milestone) {
+        const milestoneBonus: Record<number, number> = { 7: 100, 30: 250, 100: 500, 365: 1000 };
+        streakBonusXP = milestoneBonus[streakResult.milestone] || 0;
+        if (streakBonusXP > 0) {
+          await storage.updateUserXP(payload.userId, streakBonusXP);
+          await storage.addXpHistory(payload.userId, streakBonusXP, 'streak_bonus');
+
+          await storage.createNotification({
+            userId: payload.userId,
+            type: 'achievement',
+            title: `🔥 ${streakResult.milestone}-Day Streak!`,
+            message: `You earned ${streakBonusXP} bonus XP for your ${streakResult.milestone}-day watch streak!`,
+            data: { streakDays: streakResult.milestone, bonusXP: streakBonusXP },
+            read: false,
+          });
+        }
+      }
+
       // Create XP earned notification
       await storage.createNotification({
         userId: payload.userId,
@@ -870,7 +896,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Check for achievements
       const newBadges = await checkAndAwardAchievements(payload.userId);
 
-      res.json({ ...result, newBadges });
+      res.json({ ...result, newBadges, streak: streakResult, streakBonusXP });
     } catch (error) {
       console.error("Update XP error:", error);
       res.status(500).json({ error: "Failed to update XP" });
@@ -881,19 +907,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/leaderboard", async (req, res) => {
     try {
       const limit = parseInt(req.query.limit as string) || 10;
-      const leaderboard = await storage.getLeaderboard(limit);
+      const period = req.query.period as 'daily' | 'weekly' | 'monthly';
 
-      // Map to public user interface
-      const publicLeaderboard = leaderboard.map(u => ({
-        id: u.id,
-        username: u.username,
-        avatarUrl: u.avatarUrl,
-        xp: u.xp,
-        level: u.level,
-        badges: u.badges ? JSON.parse(u.badges as string) : []
-      }));
+      if (period) {
+        // Return time-based leaderboard
+        const leaderboard = await storage.getLeaderboardByPeriod(period, limit);
 
-      res.json(publicLeaderboard);
+        // Map to public user interface (XP is already aggregated as xpGained)
+        const publicLeaderboard = leaderboard.map(u => ({
+          id: u.userId,
+          username: u.username,
+          avatarUrl: u.avatarUrl,
+          xp: u.xpGained, // Show gained XP for the period
+          level: u.level,
+          badges: [], // Badges are global, maybe irrelevant for time-period ranking
+          currentStreak: 0 // Not relevant for this view
+        }));
+
+        return res.json(publicLeaderboard);
+      } else {
+        // Return all-time leaderboard
+        const leaderboard = await storage.getLeaderboard(limit);
+
+        // Map to public user interface
+        const publicLeaderboard = leaderboard.map(u => ({
+          id: u.id,
+          username: u.username,
+          avatarUrl: u.avatarUrl,
+          xp: u.xp,
+          level: u.level,
+          badges: u.badges ? JSON.parse(u.badges as string) : [],
+          currentStreak: u.currentStreak || 0
+        }));
+
+        return res.json(publicLeaderboard);
+      }
     } catch (error) {
       console.error("Get leaderboard error:", error);
       res.status(500).json({ error: "Failed to get leaderboard" });
@@ -951,6 +999,331 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ============================================
+  // STREAK TRACKING ROUTES
+  // ============================================
+
+  // Get user's streak info
+  app.get("/api/user/streak", async (req, res) => {
+    try {
+      const token = req.cookies.authToken;
+      if (!token) return res.status(401).json({ error: "Not authenticated" });
+      const payload = verifyToken(token);
+      if (!payload) return res.status(401).json({ error: "Invalid token" });
+
+      const streak = await storage.getUserStreak(payload.userId);
+      res.json(streak);
+    } catch (error) {
+      console.error("Get streak error:", error);
+      res.status(500).json({ error: "Failed to get streak" });
+    }
+  });
+
+  // ============================================
+  // REVIEWS ROUTES
+  // ============================================
+
+  // Get reviews for content
+  app.get("/api/reviews/:contentType/:contentId", async (req, res) => {
+    try {
+      const { contentType, contentId } = req.params;
+      const reviews = await storage.getReviews(contentType, contentId);
+      const rating = await storage.getAverageRating(contentType, contentId);
+      res.json({ reviews, averageRating: rating.average, totalReviews: rating.count });
+    } catch (error) {
+      console.error("Get reviews error:", error);
+      res.status(500).json({ error: "Failed to get reviews" });
+    }
+  });
+
+  // Create/update review
+  app.post("/api/reviews", async (req, res) => {
+    try {
+      const token = req.cookies.authToken;
+      if (!token) return res.status(401).json({ error: "Not authenticated" });
+      const payload = verifyToken(token);
+      if (!payload) return res.status(401).json({ error: "Invalid token" });
+
+      const { contentType, contentId, rating, reviewText, spoilerWarning } = req.body;
+
+      if (!contentType || !contentId || !rating || rating < 1 || rating > 5) {
+        return res.status(400).json({ error: "Invalid review data" });
+      }
+
+      const review = await storage.createReview({
+        userId: payload.userId,
+        contentType,
+        contentId,
+        rating,
+        reviewText: reviewText || null,
+        spoilerWarning: spoilerWarning || false,
+      });
+
+      res.status(201).json(review);
+    } catch (error) {
+      console.error("Create review error:", error);
+      res.status(500).json({ error: "Failed to create review" });
+    }
+  });
+
+  // Delete review
+  app.delete("/api/reviews/:id", async (req, res) => {
+    try {
+      const token = req.cookies.authToken;
+      if (!token) return res.status(401).json({ error: "Not authenticated" });
+      const payload = verifyToken(token);
+      if (!payload) return res.status(401).json({ error: "Invalid token" });
+
+      await storage.deleteReview(req.params.id, payload.userId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Delete review error:", error);
+      res.status(500).json({ error: "Failed to delete review" });
+    }
+  });
+
+  // Mark review as helpful
+  app.post("/api/reviews/:id/helpful", async (req, res) => {
+    try {
+      const token = req.cookies.authToken;
+      if (!token) return res.status(401).json({ error: "Not authenticated" });
+      const payload = verifyToken(token);
+      if (!payload) return res.status(401).json({ error: "Invalid token" });
+
+      await storage.markReviewHelpful(req.params.id, payload.userId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Mark helpful error:", error);
+      res.status(500).json({ error: "Failed to mark as helpful" });
+    }
+  });
+
+  // ============================================
+  // CHALLENGES ROUTES
+  // ============================================
+
+  // Get active challenges
+  app.get("/api/challenges", async (req, res) => {
+    try {
+      const token = req.cookies.authToken;
+      if (!token) return res.status(401).json({ error: "Not authenticated" });
+      const payload = verifyToken(token);
+      if (!payload) return res.status(401).json({ error: "Invalid token" });
+
+      const type = req.query.type as 'daily' | 'weekly' | undefined;
+      const challenges = await storage.getChallenges(type);
+      const userChallenges = await storage.getUserChallenges(payload.userId);
+
+      // Map challenges with user progress
+      const result = challenges.map(c => {
+        const userChallenge = userChallenges.find(uc => uc.challengeId === c.id);
+        return {
+          ...c,
+          progress: userChallenge?.progress || 0,
+          completed: userChallenge?.completed || false,
+          claimed: userChallenge?.claimed || false,
+        };
+      });
+
+      res.json(result);
+    } catch (error) {
+      console.error("Get challenges error:", error);
+      res.status(500).json({ error: "Failed to get challenges" });
+    }
+  });
+
+  // Claim challenge reward
+  app.post("/api/challenges/:id/claim", async (req, res) => {
+    try {
+      const token = req.cookies.authToken;
+      if (!token) return res.status(401).json({ error: "Not authenticated" });
+      const payload = verifyToken(token);
+      if (!payload) return res.status(401).json({ error: "Invalid token" });
+
+      const result = await storage.claimChallengeReward(payload.userId, req.params.id);
+      res.json(result);
+    } catch (error: any) {
+      console.error("Claim challenge error:", error);
+      res.status(400).json({ error: error.message || "Failed to claim reward" });
+    }
+  });
+
+  // Admin: Create challenge
+  app.post("/api/admin/challenges", async (req, res) => {
+    try {
+      const token = req.cookies.authToken;
+      if (!token) return res.status(401).json({ error: "Not authenticated" });
+      const payload = verifyToken(token);
+      if (!payload) return res.status(401).json({ error: "Invalid token" });
+
+      // TODO: Add admin check here
+      const { title, description, type, targetType, targetValue, targetGenre, xpReward, badgeReward, startDate, endDate } = req.body;
+
+      const challenge = await storage.createChallenge({
+        title,
+        description,
+        type,
+        targetType,
+        targetValue,
+        targetGenre: targetGenre || null,
+        xpReward,
+        badgeReward: badgeReward || null,
+        startDate: new Date(startDate),
+        endDate: new Date(endDate),
+        active: true,
+      });
+
+      res.status(201).json(challenge);
+    } catch (error) {
+      console.error("Create challenge error:", error);
+      res.status(500).json({ error: "Failed to create challenge" });
+    }
+  });
+
+  // ============================================
+  // REFERRAL ROUTES
+  // ============================================
+
+  // Get/generate referral code
+  app.get("/api/user/referral-code", async (req, res) => {
+    try {
+      const token = req.cookies.authToken;
+      if (!token) return res.status(401).json({ error: "Not authenticated" });
+      const payload = verifyToken(token);
+      if (!payload) return res.status(401).json({ error: "Invalid token" });
+
+      const code = await storage.generateReferralCode(payload.userId);
+      res.json({ code });
+    } catch (error) {
+      console.error("Get referral code error:", error);
+      res.status(500).json({ error: "Failed to get referral code" });
+    }
+  });
+
+  // Apply referral code
+  app.post("/api/referral/apply", async (req, res) => {
+    try {
+      const token = req.cookies.authToken;
+      if (!token) return res.status(401).json({ error: "Not authenticated" });
+      const payload = verifyToken(token);
+      if (!payload) return res.status(401).json({ error: "Invalid token" });
+
+      const { code } = req.body;
+      if (!code) return res.status(400).json({ error: "Referral code required" });
+
+      await storage.applyReferralCode(payload.userId, code);
+      res.json({ success: true, message: "Referral code applied! You earned 50 XP!" });
+    } catch (error: any) {
+      console.error("Apply referral error:", error);
+      res.status(400).json({ error: error.message || "Failed to apply referral code" });
+    }
+  });
+
+  // Get referral leaderboard
+  app.get("/api/referral-leaderboard", async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 10;
+      const leaderboard = await storage.getReferralLeaderboard(limit);
+      res.json(leaderboard);
+    } catch (error) {
+      console.error("Get referral leaderboard error:", error);
+      res.status(500).json({ error: "Failed to get leaderboard" });
+    }
+  });
+
+  // ============================================
+  // POLLS ROUTES
+  // ============================================
+
+  // Get active polls
+  app.get("/api/polls", async (req, res) => {
+    try {
+      const polls = await storage.getPolls(true);
+      res.json(polls);
+    } catch (error) {
+      console.error("Get polls error:", error);
+      res.status(500).json({ error: "Failed to get polls" });
+    }
+  });
+
+  // Get poll with results
+  app.get("/api/polls/:id", async (req, res) => {
+    try {
+      const poll = await storage.getPollById(req.params.id);
+      if (!poll) return res.status(404).json({ error: "Poll not found" });
+
+      const results = await storage.getPollResults(poll.id);
+
+      // Check if user has voted
+      let userVote: number | null = null;
+      const token = req.cookies.authToken;
+      if (token) {
+        const payload = verifyToken(token);
+        if (payload) {
+          const vote = await storage.getUserVote(poll.id, payload.userId);
+          if (vote) userVote = vote.optionIndex;
+        }
+      }
+
+      res.json({ ...poll, options: JSON.parse(poll.options), results, userVote });
+    } catch (error) {
+      console.error("Get poll error:", error);
+      res.status(500).json({ error: "Failed to get poll" });
+    }
+  });
+
+  // Vote on poll
+  app.post("/api/polls/:id/vote", async (req, res) => {
+    try {
+      const token = req.cookies.authToken;
+      if (!token) return res.status(401).json({ error: "Not authenticated" });
+      const payload = verifyToken(token);
+      if (!payload) return res.status(401).json({ error: "Invalid token" });
+
+      const { optionIndex } = req.body;
+      if (typeof optionIndex !== 'number') {
+        return res.status(400).json({ error: "Invalid option" });
+      }
+
+      await storage.votePoll(req.params.id, payload.userId, optionIndex);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Vote poll error:", error);
+      res.status(400).json({ error: error.message || "Failed to vote" });
+    }
+  });
+
+  // Admin: Create poll
+  app.post("/api/admin/polls", async (req, res) => {
+    try {
+      const token = req.cookies.authToken;
+      if (!token) return res.status(401).json({ error: "Not authenticated" });
+      const payload = verifyToken(token);
+      if (!payload) return res.status(401).json({ error: "Invalid token" });
+
+      // TODO: Add admin check here
+      const { question, options, endDate, featured } = req.body;
+
+      if (!question || !options || !Array.isArray(options) || options.length < 2) {
+        return res.status(400).json({ error: "Invalid poll data" });
+      }
+
+      const poll = await storage.createPoll({
+        question,
+        options: JSON.stringify(options),
+        createdBy: payload.userId,
+        endDate: endDate ? new Date(endDate) : null,
+        active: true,
+        featured: featured || false,
+      });
+
+      res.status(201).json(poll);
+    } catch (error) {
+      console.error("Create poll error:", error);
+      res.status(500).json({ error: "Failed to create poll" });
     }
   });
 

@@ -61,6 +61,8 @@ import NotificationsPage from "@/pages/notifications";
 import Leaderboard from "@/pages/leaderboard";
 import Calendar from "@/pages/calendar";
 import AchievementsPage from "@/pages/achievements";
+import ChallengesPage from "@/pages/challenges";
+import PollsPage from "@/pages/polls";
 import { AuthProvider } from "@/contexts/auth-context";
 import { NotificationsProvider } from "@/contexts/notifications-context";
 import { FriendsProvider } from "@/contexts/friends-context";
@@ -126,6 +128,8 @@ function Router() {
           <Route path="/notifications" component={NotificationsPage} />
           <Route path="/leaderboard" component={Leaderboard} />
           <Route path="/achievements" component={AchievementsPage} />
+          <Route path="/challenges" component={ChallengesPage} />
+          <Route path="/polls" component={PollsPage} />
           <Route path="/calendar" component={Calendar} />
           <Route component={NotFound} />
         </Switch>
