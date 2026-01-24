@@ -159,6 +159,22 @@ export async function checkAndAwardAchievements(userId: string): Promise<string[
                     icon: achievement.icon,
                     earnedAt: new Date().toISOString()
                 });
+
+                // Create achievement notification
+                await storage.createNotification({
+                    userId: userId,
+                    type: 'achievement',
+                    title: 'Achievement Unlocked! 🏆',
+                    message: `You earned the "${achievement.name}" badge!`,
+                    data: {
+                        achievementId: achievement.id,
+                        name: achievement.name,
+                        description: achievement.description,
+                        icon: achievement.icon
+                    },
+                    read: false,
+                });
+
                 earnedBadges.push(achievement.name);
             }
         } catch (err) {

@@ -857,6 +857,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const safeAmount = Math.min(amount, 100);
       const result = await storage.updateUserXP(payload.userId, safeAmount);
 
+      // Create XP earned notification
+      await storage.createNotification({
+        userId: payload.userId,
+        type: 'xp_earned',
+        title: 'XP Earned! 🌟',
+        message: `You earned ${safeAmount} XP`,
+        data: { amount: safeAmount, newXp: result.user.xp, newLevel: result.user.level, levelUp: result.levelUp },
+        read: false,
+      });
+
       // Check for achievements
       const newBadges = await checkAndAwardAchievements(payload.userId);
 

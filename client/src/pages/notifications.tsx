@@ -2,7 +2,7 @@ import { useNotifications } from "@/contexts/notifications-context";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Bell, Check, Trash2, Mail, UserPlus, Users, MessageSquare } from "lucide-react";
+import { Bell, Check, Trash2, Mail, UserPlus, Users, MessageSquare, Star, Trophy } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 
@@ -21,6 +21,10 @@ export default function NotificationsPage() {
                 return <Mail className="h-4 w-4 text-yellow-500" />;
             case 'announcement':
                 return <Bell className="h-4 w-4 text-red-500" />;
+            case 'xp_earned':
+                return <Star className="h-4 w-4 text-yellow-400" />;
+            case 'achievement':
+                return <Trophy className="h-4 w-4 text-amber-500" />;
             default:
                 return <Bell className="h-4 w-4" />;
         }

@@ -4,7 +4,7 @@ import { useAuth } from './auth-context';
 interface Notification {
     id: string;
     userId: string;
-    type: 'friend_request' | 'friend_accepted' | 'room_invite' | 'dm' | 'system';
+    type: 'friend_request' | 'friend_accepted' | 'room_invite' | 'dm' | 'system' | 'xp_earned' | 'achievement';
     title: string;
     message: string;
     data?: Record<string, unknown>;

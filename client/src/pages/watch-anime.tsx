@@ -15,6 +15,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { trackWatch } from "@/components/analytics-tracker";
 import { useAuth } from "@/contexts/auth-context";
 import { useToast } from "@/hooks/use-toast";
+import { useNotifications } from "@/contexts/notifications-context";
 
 export default function WatchAnime() {
     const [, params] = useRoute("/watch-anime/:slug");
@@ -204,8 +205,8 @@ export default function WatchAnime() {
                 lastWatched: new Date().toISOString(),
             });
 
-            // Award XP if > 90% watched
-            if (currentTime / duration > 0.9) {
+            // Award XP if > 90% watched (only once per episode)
+            if (currentTime / duration > 0.9 && !xpAwardedRef.current) {
                 awardXPMutation.mutate();
             }
         }
@@ -214,6 +215,7 @@ export default function WatchAnime() {
     const queryClient = useQueryClient();
     const { toast } = useToast();
     const { user, refetchUser } = useAuth();
+    const { fetchNotifications } = useNotifications();
     const xpAwardedRef = useRef(false);
 
     // Mutation to award XP
@@ -225,12 +227,10 @@ export default function WatchAnime() {
             await apiRequest("POST", "/api/user/xp", { amount: 25 });
         },
         onSuccess: async () => {
-            toast({
-                title: "XP Earned! 🌟",
-                description: "You earned 25 XP for watching this episode",
-                className: "bg-yellow-500/10 border-yellow-500/20 text-yellow-500",
-            });
+            // Refetch user to update XP/level in UI
             await refetchUser();
+            // Refetch notifications to show XP earned notification in notification center
+            await fetchNotifications();
         },
         onError: () => {
             xpAwardedRef.current = false;

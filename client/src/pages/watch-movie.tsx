@@ -14,6 +14,7 @@ import { trackWatch } from "@/components/analytics-tracker";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/contexts/auth-context";
 import { useToast } from "@/hooks/use-toast";
+import { useNotifications } from "@/contexts/notifications-context";
 
 export default function WatchMovie() {
   const [, params] = useRoute("/watch-movie/:slug");
@@ -133,6 +134,7 @@ export default function WatchMovie() {
 
   const { toast } = useToast();
   const { user, refetchUser } = useAuth();
+  const { fetchNotifications } = useNotifications();
   const xpAwardedRef = useRef(false);
 
   // Mutation to award XP
@@ -143,15 +145,10 @@ export default function WatchMovie() {
       await apiRequest("POST", "/api/user/xp", { amount: 50 }); // 50 XP for a movie
     },
     onSuccess: async () => {
-      toast({
-        title: "XP Earned! 🌟",
-        description: "You earned 50 XP for watching this movie",
-        className: "bg-yellow-500/10 border-yellow-500/20 text-yellow-500",
-      });
-      await refetchUser(); // Update level/XP in UI
-      // Check for new achievements logic handled by backend hook/trigger usually, 
-      // but we can also trigger a re-check if we want to be safe:
-      // apiRequest("GET", "/api/debug/achievements"); 
+      // Refetch user to update XP/level in UI
+      await refetchUser();
+      // Refetch notifications to show XP earned notification in notification center
+      await fetchNotifications();
     },
     onError: () => {
       xpAwardedRef.current = false; // Reset on failure to try again
@@ -184,8 +181,8 @@ export default function WatchMovie() {
         lastWatched: new Date().toISOString(),
       });
 
-      // Award XP if > 90% watched
-      if (currentTime / duration > 0.9) {
+      // Award XP if > 90% watched (only once per movie)
+      if (currentTime / duration > 0.9 && !xpAwardedRef.current) {
         awardXPMutation.mutate();
       }
     }
