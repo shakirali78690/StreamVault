@@ -246,6 +246,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           username: user.username,
           avatarUrl: user.avatarUrl,
           bio: user.bio,
+          referredBy: user.referredBy,
+          referralCount: user.referralCount,
         },
       });
     } catch (error) {
@@ -291,6 +293,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           username: user.username,
           avatarUrl: user.avatarUrl,
           bio: user.bio,
+          referredBy: user.referredBy,
+          referralCount: user.referralCount,
         },
       });
     } catch (error) {
@@ -346,7 +350,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           username: user.username,
           avatarUrl: user.avatarUrl,
           bio: user.bio,
-          bio: user.bio,
+          referredBy: user.referredBy,
+          referralCount: user.referralCount,
           socialLinks,
           favorites,
           xp: user.xp,
@@ -416,6 +421,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           username: user.username,
           avatarUrl: user.avatarUrl,
           bio: user.bio,
+          referredBy: user.referredBy,
+          referralCount: user.referralCount,
           socialLinks,
           favorites,
         },

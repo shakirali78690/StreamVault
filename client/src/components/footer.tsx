@@ -4,11 +4,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { useTranslation } from 'react-i18next';
+import { LanguageSelector } from "@/components/language-selector";
 
 export function Footer() {
   const [email, setEmail] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
+  const { t } = useTranslation();
 
   const handleNewsletterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,31 +52,31 @@ export function Footer() {
   };
 
   const quickLinks = [
-    { name: "Browse", path: "/browse" },
-    { name: "Anime", path: "/anime" },
-    { name: "Blog", path: "/blog" },
-    { name: "About Us", path: "/about" },
-    { name: "Contact", path: "/contact" },
-    { name: "Site Map", path: "/sitemap" },
-    { name: "Terms of Service", path: "/terms" },
-    { name: "Privacy Policy", path: "/privacy" },
-    { name: "DMCA", path: "/dmca" },
+    { name: t('footer.browse'), path: "/browse" },
+    { name: t('nav.anime'), path: "/anime" },
+    { name: t('footer.blog'), path: "/blog" },
+    { name: t('footer.about'), path: "/about" },
+    { name: t('footer.contact'), path: "/contact" },
+    { name: t('footer.sitemap'), path: "/sitemap" },
+    { name: t('footer.terms'), path: "/terms" },
+    { name: t('footer.privacy'), path: "/privacy" },
+    { name: t('footer.dmca'), path: "/dmca" },
   ];
 
   const categories = [
-    { name: "Action", path: "/category/action" },
-    { name: "Drama", path: "/category/drama" },
-    { name: "Comedy", path: "/category/comedy" },
-    { name: "Thriller", path: "/category/thriller" },
-    { name: "Romance", path: "/category/romance" },
+    { name: t('categories.action'), path: "/category/action" },
+    { name: t('categories.drama'), path: "/category/drama" },
+    { name: t('categories.comedy'), path: "/category/comedy" },
+    { name: t('categories.thriller'), path: "/category/thriller" },
+    { name: t('categories.romance'), path: "/category/romance" },
   ];
 
   const support = [
-    { name: "Help Center", path: "/help" },
-    { name: "FAQs", path: "/faq" },
-    { name: "Report Issue", path: "/report" },
-    { name: "Request Content", path: "/request" },
-    { name: "API", path: "/settings" },
+    { name: t('support.help'), path: "/help" },
+    { name: t('support.faq'), path: "/faq" },
+    { name: t('support.report'), path: "/report" },
+    { name: t('support.request'), path: "/request" },
+    { name: t('support.api'), path: "/settings" },
   ];
 
   return (
@@ -82,7 +85,7 @@ export function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-8">
           {/* Quick Links */}
           <div>
-            <h3 className="font-semibold mb-4">Quick Links</h3>
+            <h3 className="font-semibold mb-4">{t('footer.quickLinks')}</h3>
             <ul className="space-y-2">
               {quickLinks.map((link) => (
                 <li key={link.path}>
@@ -101,7 +104,7 @@ export function Footer() {
 
           {/* Categories */}
           <div>
-            <h3 className="font-semibold mb-4">Categories</h3>
+            <h3 className="font-semibold mb-4">{t('footer.categories')}</h3>
             <ul className="space-y-2">
               {categories.map((category) => (
                 <li key={category.path}>
@@ -120,7 +123,7 @@ export function Footer() {
 
           {/* Support */}
           <div>
-            <h3 className="font-semibold mb-4">Support</h3>
+            <h3 className="font-semibold mb-4">{t('footer.support')}</h3>
             <ul className="space-y-2">
               {support.map((item) => (
                 <li key={item.path}>
@@ -139,7 +142,7 @@ export function Footer() {
 
           {/* Social & Newsletter */}
           <div>
-            <h3 className="font-semibold mb-4">Stay Connected</h3>
+            <h3 className="font-semibold mb-4">{t('footer.stayConnected')}</h3>
 
             {/* Social Icons */}
             <div className="flex gap-2 mb-4">
@@ -238,12 +241,12 @@ export function Footer() {
             {/* Newsletter */}
             <form onSubmit={handleNewsletterSubmit} className="space-y-2">
               <label className="text-sm text-muted-foreground">
-                Subscribe to our newsletter
+                {t('footer.subscribe')}
               </label>
               <div className="flex gap-2">
                 <Input
                   type="email"
-                  placeholder="Your email"
+                  placeholder="Your email" // Could translate this too if I had a key
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -254,7 +257,7 @@ export function Footer() {
                   data-testid="button-newsletter-submit"
                   disabled={isSubmitting}
                 >
-                  {isSubmitting ? "..." : "Subscribe"}
+                  {isSubmitting ? "..." : t('footer.subscribe')}
                 </Button>
               </div>
             </form>
@@ -264,8 +267,11 @@ export function Footer() {
         {/* Bottom Bar */}
         <div className="border-t border-border pt-6">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-muted-foreground">
-            <p>© 2024 StreamVault. All rights reserved.</p>
-            <p>Your Premium Web Series Destination</p>
+            <p>{t('footer.copyright')}</p>
+            <div className="flex items-center gap-4">
+              <LanguageSelector />
+              <p>{t('footer.tagline')}</p>
+            </div>
           </div>
         </div>
       </div>

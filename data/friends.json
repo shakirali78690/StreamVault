@@ -303,6 +303,18 @@
       "read": true,
       "id": "e594dc51-b4d9-4b3e-b6da-6dd1ab122b40",
       "createdAt": "2026-01-25T11:53:18.427Z"
+    },
+    {
+      "userId": "b59fe60c-35c8-4689-b83a-feda335caa19",
+      "type": "dm",
+      "title": "New Message",
+      "message": "admin: hiiii",
+      "data": {
+        "fromUserId": "c480dcef-3488-4083-b326-00920fdbc1e1"
+      },
+      "read": true,
+      "id": "5058eff1-70ec-4de3-bf03-b91402b91af9",
+      "createdAt": "2026-01-25T12:57:04.729Z"
     }
   ],
   "directMessages": [
@@ -423,8 +435,16 @@
       "fromUserId": "c480dcef-3488-4083-b326-00920fdbc1e1",
       "toUserId": "b59fe60c-35c8-4689-b83a-feda335caa19",
       "message": "Lol",
-      "read": false,
+      "read": true,
       "createdAt": "2026-01-22T19:03:23.824Z"
+    },
+    {
+      "id": "b154b3a8-15e0-4b6e-92bc-bb35b7e3c070",
+      "fromUserId": "c480dcef-3488-4083-b326-00920fdbc1e1",
+      "toUserId": "b59fe60c-35c8-4689-b83a-feda335caa19",
+      "message": "hiiii",
+      "read": true,
+      "createdAt": "2026-01-25T12:57:04.727Z"
     }
   ]
 }

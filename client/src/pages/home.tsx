@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useQuery } from "@tanstack/react-query";
 import { HeroCarousel } from "@/components/hero-carousel";
 import { ContentRow } from "@/components/content-row";
@@ -8,6 +9,7 @@ import { useMemo } from "react";
 import { Link } from "wouter";
 
 export default function Home() {
+  const { t } = useTranslation();
   const { data: shows, isLoading: showsLoading } = useQuery<Show[]>({
     queryKey: ["/api/shows"],
   });
@@ -143,7 +145,7 @@ export default function Home() {
       <div className="container mx-auto py-8 space-y-12">
         {trending.length > 0 && (
           <ContentRow
-            title="Trending Now"
+            title={t('home.trending')}
             shows={trending}
             orientation="landscape"
           />
@@ -152,7 +154,7 @@ export default function Home() {
         {/* Recommendations Row */}
         {recommendations.length > 0 && (
           <ContentRow
-            title="Recommended for You"
+            title={t('home.recommended')}
             shows={recommendations}
             orientation="portrait"
           />
@@ -161,7 +163,7 @@ export default function Home() {
         {continueWatching.length > 0 && (
           <div>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold">Continue Watching</h2>
+              <h2 className="text-xl font-semibold">{t('home.continueWatching')}</h2>
               {totalInProgress > continueWatching.length && (
                 <Link href="/continue-watching">
                   <a className="text-sm text-primary hover:underline">
@@ -194,7 +196,7 @@ export default function Home() {
 
         {allContent.length > 0 && (
           <ContentRow
-            title="Recently Added"
+            title={t('home.newReleases')}
             shows={allContent.slice(0, 12)}
             orientation="landscape"
           />

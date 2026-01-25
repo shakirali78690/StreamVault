@@ -1,4 +1,5 @@
 import { Link, useLocation } from "wouter";
+import { useTranslation } from 'react-i18next';
 import { Search, Moon, Sun, Play, Menu, X, Bookmark, Users, User, LogOut, PartyPopper, UserPlus, Download, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,6 +27,7 @@ export function Header() {
   const [searchQuery, setSearchQuery] = useState("");
   const [showResults, setShowResults] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
+  const { t } = useTranslation();
 
   const { data: shows } = useQuery<Show[]>({
     queryKey: ["/api/shows"],
@@ -40,11 +42,11 @@ export function Header() {
   });
 
   const navigation = [
-    { name: "Home", path: "/" },
-    { name: "Web Series", path: "/series" },
-    { name: "Movies", path: "/movies" },
-    { name: "Anime", path: "/anime" },
-    { name: "Trending", path: "/trending" },
+    { name: t('nav.home'), path: "/" },
+    { name: t('nav.shows'), path: "/series" },
+    { name: t('nav.movies'), path: "/movies" },
+    { name: t('nav.anime'), path: "/anime" },
+    { name: t('home.trending'), path: "/trending" },
   ];
 
   const categories = [
@@ -135,7 +137,7 @@ export function Header() {
                 className="px-3"
                 data-testid="button-categories-dropdown"
               >
-                Categories
+                {t('footer.categories')}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-48">
@@ -191,7 +193,7 @@ export function Header() {
               >
                 <Input
                   type="search"
-                  placeholder="Search shows..."
+                  placeholder={t('nav.search')}
                   value={searchQuery}
                   onChange={(e) => handleSearchChange(e.target.value)}
                   className="w-64"
@@ -266,8 +268,6 @@ export function Header() {
               <Search className="h-5 w-5" />
             </Button>
           )}
-
-          {/* Theme Toggle */}
           <Button
             variant="ghost"
             size="icon"
@@ -302,24 +302,24 @@ export function Header() {
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => navigate('/profile')}>
                   <User className="mr-2 h-4 w-4" />
-                  Profile
+                  {t('nav.profile')}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => navigate('/settings')}>
                   <Settings className="mr-2 h-4 w-4" />
-                  Settings
+                  {t('nav.settings')}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => navigate('/friends')}>
                   <Users className="mr-2 h-4 w-4" />
-                  Friends
+                  {t('profile.friends')}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => navigate('/downloads')}>
                   <Download className="mr-2 h-4 w-4" />
-                  Downloads
+                  {t('actions.download')}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => logout()} className="text-destructive focus:text-destructive">
                   <LogOut className="mr-2 h-4 w-4" />
-                  Log Out
+                  {t('nav.logout')}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -327,7 +327,7 @@ export function Header() {
             <Link href="/login">
               <Button variant="default" size="sm" className="hidden sm:flex gap-2">
                 <UserPlus className="h-4 w-4" />
-                Join
+                {t('nav.signup')}
               </Button>
             </Link>
           )}
@@ -358,7 +358,7 @@ export function Header() {
               <form onSubmit={handleSearch}>
                 <Input
                   type="search"
-                  placeholder="Search shows..."
+                  placeholder={t('nav.search')}
                   value={searchQuery}
                   onChange={(e) => handleSearchChange(e.target.value)}
                   data-testid="input-mobile-search"
@@ -451,13 +451,13 @@ export function Header() {
                 data-testid="link-mobile-watchlist"
               >
                 <Bookmark className="h-4 w-4" />
-                My Watchlist
+                {t('nav.watchlist')}
               </div>
             </Link>
 
             <div className="pt-2 border-t border-border">
               <p className="px-3 py-2 text-xs font-semibold text-muted-foreground">
-                Categories
+                {t('footer.categories')}
               </p>
               {categories.map((category) => (
                 <Link key={category.path} href={category.path}>

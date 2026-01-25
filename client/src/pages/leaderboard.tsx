@@ -283,6 +283,11 @@ export default function Leaderboard() {
                                     )}>
                                         {index + 1}
                                     </span>
+                                    <AvatarPreview
+                                        avatarUrl={leader.avatarUrl}
+                                        username={leader.username}
+                                        className="w-8 h-8"
+                                    />
                                     <span className="flex-1 font-medium truncate">{leader.username}</span>
                                     <div className="flex items-center gap-1 text-purple-400">
                                         <UserPlus className="w-4 h-4" />

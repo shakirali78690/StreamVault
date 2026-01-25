@@ -19,7 +19,11 @@ interface ReferralLeader {
     referralCount: number;
 }
 
-export function ReferralSection() {
+interface ReferralSectionProps {
+    showLeaderboard?: boolean;
+}
+
+export function ReferralSection({ showLeaderboard = true }: ReferralSectionProps) {
     const { user, refetchUser } = useAuth();
     const { toast } = useToast();
     const queryClient = useQueryClient();
@@ -40,10 +44,7 @@ export function ReferralSection() {
     // Apply referral code mutation
     const applyMutation = useMutation({
         mutationFn: async (code: string) => {
-            return apiRequest('/api/referral/apply', {
-                method: 'POST',
-                body: JSON.stringify({ code }),
-            });
+            return apiRequest('POST', '/api/referral/apply', { code });
         },
         onSuccess: () => {
             queryClient.invalidateQueries();
@@ -158,7 +159,7 @@ export function ReferralSection() {
             )}
 
             {/* Mini referral leaderboard */}
-            {leaderboard && leaderboard.length > 0 && (
+            {showLeaderboard && leaderboard && leaderboard.length > 0 && (
                 <Card className="bg-card/50">
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2 text-base">
@@ -178,9 +179,9 @@ export function ReferralSection() {
                                 >
                                     <div className="flex items-center gap-3">
                                         <span className={`w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold ${index === 0 ? 'bg-yellow-500/20 text-yellow-400' :
-                                                index === 1 ? 'bg-gray-400/20 text-gray-300' :
-                                                    index === 2 ? 'bg-orange-500/20 text-orange-400' :
-                                                        'bg-muted text-muted-foreground'
+                                            index === 1 ? 'bg-gray-400/20 text-gray-300' :
+                                                index === 2 ? 'bg-orange-500/20 text-orange-400' :
+                                                    'bg-muted text-muted-foreground'
                                             }`}>
                                             {index + 1}
                                         </span>

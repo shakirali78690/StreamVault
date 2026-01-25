@@ -376,7 +376,7 @@ export default function SettingsPage() {
                 </Card>
 
                 {/* Referral System */}
-                <ReferralSection />
+                <ReferralSection showLeaderboard={false} />
 
                 {/* API Keys */}
                 <Card>

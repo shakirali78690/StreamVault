@@ -24,6 +24,8 @@ interface User {
     bio: string | null;
     socialLinks?: SocialLinks | null;
     favorites?: Favorites | null;
+    referredBy?: string | null;
+    referralCount?: number;
 }
 
 interface AuthContextType {

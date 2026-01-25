@@ -2318,6 +2318,20 @@ export class MemStorage implements IStorage {
     referrer.xp = (referrer.xp || 0) + 100; // Referral bonus
     this.users.set(referrer.id, referrer);
 
+    // Add XP History
+    await this.addXpHistory(newUserId, 50, 'referral_bonus');
+    await this.addXpHistory(referrer.id, 100, 'referral_reward');
+
+    // Notify Referrer
+    await this.createNotification({
+      userId: referrer.id,
+      type: 'system',
+      title: 'Referral Bonus! 🎉',
+      message: `${newUser.username} used your referral code. You earned 100 XP!`,
+      read: false,
+      data: { referralId: newUser.id }
+    });
+
     this.saveUsers();
   }
 
