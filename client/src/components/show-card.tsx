@@ -77,7 +77,7 @@ export function ShowCard({
     const episode = progressData?.episodeNumber || 1;
 
     if (isAnime) {
-      setLocation(`/watch-anime/${show.slug}?s=${season}&e=${episode}`);
+      setLocation(`/watch-anime/${show.slug}?season=${season}&episode=${episode}`);
     } else if (isMovie) {
       setLocation(`/watch-movie/${show.slug}`);
     } else {

@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Loader2, Camera, User, Save, LogOut, FileVideo, Eye, Twitter, Instagram, Youtube, Heart, Trophy, Medal, Star, icons } from 'lucide-react';
+import { Loader2, Camera, User, Save, LogOut, FileVideo, Eye, Twitter, Instagram, Youtube, Heart, Trophy, Medal, Star, BarChart2, Target, icons } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { SiTiktok, SiDiscord } from 'react-icons/si';
 import { FavoritesPicker } from '@/components/favorites-picker';
@@ -289,6 +289,22 @@ export default function ProfilePage() {
                             >
                                 <Medal className="h-8 w-8 text-yellow-400" />
                                 <span className="font-semibold">Leaderboard</span>
+                            </Button>
+                            <Button
+                                variant="outline"
+                                className="h-24 flex flex-col items-center justify-center gap-2 border-blue-500/20 hover:border-blue-500 hover:bg-blue-500/10 transition-all"
+                                onClick={() => navigate('/polls')}
+                            >
+                                <BarChart2 className="h-8 w-8 text-blue-400" />
+                                <span className="font-semibold">Polls</span>
+                            </Button>
+                            <Button
+                                variant="outline"
+                                className="h-24 flex flex-col items-center justify-center gap-2 border-red-500/20 hover:border-red-500 hover:bg-red-500/10 transition-all"
+                                onClick={() => navigate('/challenges')}
+                            >
+                                <Target className="h-8 w-8 text-red-400" />
+                                <span className="font-semibold">Challenges</span>
                             </Button>
                         </div>
 

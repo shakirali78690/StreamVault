@@ -20,19 +20,20 @@ interface LeaderboardUser {
 }
 
 export default function Leaderboard() {
-    const [timeFilter, setTimeFilter] = useState<'daily' | 'weekly' | 'monthly'>('weekly');
+    const [timeFilter, setTimeFilter] = useState<'all' | 'daily' | 'weekly' | 'monthly'>('all');
 
     const { data: users, isLoading } = useQuery<LeaderboardUser[]>({
         queryKey: ["/api/leaderboard", timeFilter],
         queryFn: async () => {
-            const res = await fetch(`/api/leaderboard?period=${timeFilter}`);
+            const queryParam = timeFilter === 'all' ? '' : `?period=${timeFilter}`;
+            const res = await fetch(`/api/leaderboard${queryParam}`);
             if (!res.ok) throw new Error("Failed to fetch leaderboard");
             return res.json();
         }
     });
 
     // Referral leaderboard
-    const { data: referralLeaders } = useQuery<{ userId: string; username: string; referralCount: number }[]>({
+    const { data: referralLeaders } = useQuery<{ userId: string; username: string; avatarUrl: string | null; referralCount: number }[]>({
         queryKey: ["/api/referral-leaderboard"],
     });
 
@@ -85,7 +86,8 @@ export default function Leaderboard() {
             {/* Time Filter Tabs */}
             <div className="flex justify-center mb-8">
                 <Tabs value={timeFilter} onValueChange={(v) => setTimeFilter(v as any)}>
-                    <TabsList className="grid grid-cols-3 w-80">
+                    <TabsList className="grid grid-cols-4 w-[400px]">
+                        <TabsTrigger value="all">All Time</TabsTrigger>
                         <TabsTrigger value="daily">Daily</TabsTrigger>
                         <TabsTrigger value="weekly">Weekly</TabsTrigger>
                         <TabsTrigger value="monthly">Monthly</TabsTrigger>
@@ -244,21 +246,24 @@ export default function Leaderboard() {
             </div>
 
             {/* Additional Leaderboards Section */}
-            <div className="grid md:grid-cols-2 gap-6 mt-12">
+            <div className="grid md:grid-cols-2 gap-8 mt-16">
                 {/* Referral Leaderboard */}
                 <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.8 }}
-                    className="bg-gradient-to-br from-purple-500/10 to-pink-500/10 rounded-2xl p-6 border border-purple-500/20"
+                    className="relative overflow-hidden rounded-3xl border border-purple-500/20 bg-gradient-to-br from-purple-900/10 via-background to-background p-6 shadow-2xl shadow-purple-900/10"
                 >
-                    <div className="flex items-center gap-3 mb-6">
-                        <div className="w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center">
-                            <UserPlus className="w-5 h-5 text-purple-400" />
+                    <div className="absolute inset-0 bg-grid-white/5 opacity-50" />
+                    <div className="relative flex items-center gap-4 mb-8">
+                        <div className="flex items-center justify-center w-12 h-12 rounded-2xl bg-purple-500/20 border border-purple-500/30 text-purple-400 shadow-[0_0_15px_rgba(168,85,247,0.3)]">
+                            <UserPlus className="w-6 h-6" />
                         </div>
                         <div>
-                            <h2 className="text-xl font-bold">Top Referrers</h2>
-                            <p className="text-xs text-muted-foreground">Most successful inviters</p>
+                            <h2 className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-indigo-400 bg-clip-text text-transparent">
+                                Top Referrers
+                            </h2>
+                            <p className="text-sm text-muted-foreground">Community growers</p>
                         </div>
                     </div>
 
@@ -287,7 +292,10 @@ export default function Leaderboard() {
                             ))}
                         </div>
                     ) : (
-                        <p className="text-center text-muted-foreground py-8">No referrals yet. Be the first!</p>
+                        <div className="flex flex-col items-center justify-center py-12 text-center space-y-3 opacity-60">
+                            <UserPlus className="w-12 h-12 text-muted-foreground/50" />
+                            <p className="text-muted-foreground">No referrals yet. Be the first!</p>
+                        </div>
                     )}
                 </motion.div>
 
@@ -296,15 +304,18 @@ export default function Leaderboard() {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.9 }}
-                    className="bg-gradient-to-br from-orange-500/10 to-red-500/10 rounded-2xl p-6 border border-orange-500/20"
+                    className="relative overflow-hidden rounded-3xl border border-orange-500/20 bg-gradient-to-br from-orange-900/10 via-background to-background p-6 shadow-2xl shadow-orange-900/10"
                 >
-                    <div className="flex items-center gap-3 mb-6">
-                        <div className="w-10 h-10 rounded-full bg-orange-500/20 flex items-center justify-center">
-                            <Flame className="w-5 h-5 text-orange-400" />
+                    <div className="absolute inset-0 bg-grid-white/5 opacity-50" />
+                    <div className="relative flex items-center gap-4 mb-8">
+                        <div className="flex items-center justify-center w-12 h-12 rounded-2xl bg-orange-500/20 border border-orange-500/30 text-orange-400 shadow-[0_0_15px_rgba(249,115,22,0.3)]">
+                            <Flame className="w-6 h-6" />
                         </div>
                         <div>
-                            <h2 className="text-xl font-bold">Streak Champions</h2>
-                            <p className="text-xs text-muted-foreground">Longest watch streaks</p>
+                            <h2 className="text-2xl font-bold bg-gradient-to-r from-orange-400 to-red-400 bg-clip-text text-transparent">
+                                Streak Champions
+                            </h2>
+                            <p className="text-sm text-muted-foreground">Most dedicated watchers</p>
                         </div>
                     </div>
 
@@ -339,7 +350,10 @@ export default function Leaderboard() {
                             ))}
                         </div>
                     ) : (
-                        <p className="text-center text-muted-foreground py-8">Start watching to build your streak!</p>
+                        <div className="flex flex-col items-center justify-center py-12 text-center space-y-3 opacity-60">
+                            <Flame className="w-12 h-12 text-muted-foreground/50" />
+                            <p className="text-muted-foreground">No streaks yet. Start watching!</p>
+                        </div>
                     )}
                 </motion.div>
             </div>

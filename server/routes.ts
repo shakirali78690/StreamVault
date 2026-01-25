@@ -1403,35 +1403,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get user reminders
       const userReminders = await storage.getReminders(payload.userId);
 
-      // Get some upcoming content (mocked for now)
-      const upcomingReleases = [
-        {
-          id: "upcoming-1",
-          title: "Stranger Things Season 5",
-          start: new Date(Date.now() + 86400000 * 5).toISOString(), // 5 days from now
-          type: "release",
-          contentType: "show"
-        },
-        {
-          id: "upcoming-2",
-          title: "New Anime Movie",
-          start: new Date(Date.now() + 86400000 * 10).toISOString(),
-          type: "release",
-          contentType: "anime"
-        }
-      ];
-
-      const events = [
-        ...userReminders.map(r => ({
-          id: r.id,
-          title: `Reminder: ${r.title}`,
-          start: r.remindAt,
-          type: "reminder",
-          contentId: r.contentId,
-          contentType: r.contentType
-        })),
-        ...upcomingReleases
-      ];
+      const events = userReminders.map(r => ({
+        id: r.id,
+        title: `Reminder: ${r.title}`,
+        start: r.remindAt,
+        type: "reminder",
+        contentId: r.contentId,
+        contentType: r.contentType
+      }));
 
       res.json(events);
 

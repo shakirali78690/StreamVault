@@ -372,7 +372,7 @@ export default function ShowDetail() {
 
               {/* CTAs */}
               <div className="flex flex-wrap gap-2 md:gap-3 pt-1 md:pt-2">
-                <Link href={`/ watch / ${show.slug} `}>
+                <Link href={`/watch/${show.slug}`}>
                   <Button size="default" className="gap-1.5 md:gap-2 text-sm md:text-base h-9 md:h-11" data-testid="button-play-episode-1">
                     <Play className="w-4 h-4 md:w-5 md:h-5 fill-current" />
                     Play Episode 1
@@ -492,7 +492,7 @@ export default function ShowDetail() {
                   <div
                     key={episode.id}
                     onClick={() => {
-                      const url = `/ watch / ${show.slug}?season = ${episode.season}& episode=${episode.episodeNumber} `;
+                      const url = `/watch/${show.slug}?season=${episode.season}&episode=${episode.episodeNumber}`;
                       console.log("Clicking episode - navigating to:", url);
                       window.location.replace(url);
                     }}

@@ -131,6 +131,7 @@ export interface IStorage {
   updateAnime(id: string, updates: Partial<Anime>): Promise<Anime>;
   deleteAnime(id: string): Promise<void>;
   searchAnime(query: string): Promise<Anime[]>;
+  getUpcomingAnime(): Promise<Anime[]>;
 
   // Anime Episodes
   getAllAnimeEpisodes(): Promise<AnimeEpisode[]>;
@@ -266,7 +267,7 @@ export interface IStorage {
   // Referrals
   generateReferralCode(userId: string): Promise<string>;
   applyReferralCode(newUserId: string, code: string): Promise<void>;
-  getReferralLeaderboard(limit: number): Promise<{ userId: string; username: string; referralCount: number }[]>;
+  getReferralLeaderboard(limit: number): Promise<{ userId: string; username: string; avatarUrl: string | null; referralCount: number }[]>;
 
   // Polls
   createPoll(poll: Omit<Poll, 'id' | 'createdAt'>): Promise<Poll>;
@@ -704,6 +705,12 @@ export class MemStorage implements IStorage {
 
   async getAnimeById(id: string): Promise<Anime | undefined> {
     return this.anime.get(id);
+  }
+
+  async getUpcomingAnime(): Promise<Anime[]> {
+    return Array.from(this.anime.values()).filter(
+      (anime) => anime.status === "Upcoming"
+    );
   }
 
   async getAnimeBySlug(slug: string): Promise<Anime | undefined> {
@@ -2198,7 +2205,7 @@ export class MemStorage implements IStorage {
     this.saveUsers();
   }
 
-  async getReferralLeaderboard(limit: number): Promise<{ userId: string; username: string; referralCount: number }[]> {
+  async getReferralLeaderboard(limit: number): Promise<{ userId: string; username: string; avatarUrl: string | null; referralCount: number }[]> {
     return Array.from(this.users.values())
       .filter(u => (u.referralCount || 0) > 0)
       .sort((a, b) => (b.referralCount || 0) - (a.referralCount || 0))
@@ -2206,6 +2213,7 @@ export class MemStorage implements IStorage {
       .map(u => ({
         userId: u.id,
         username: u.username,
+        avatarUrl: u.avatarUrl,
         referralCount: u.referralCount || 0,
       }));
   }

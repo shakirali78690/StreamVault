@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRoute, useLocation, Link } from "wouter";
 import { useEffect, useState, useRef } from "react";
-import { Download, ChevronLeft, ChevronRight, Share2, MessageSquare } from "lucide-react";
+import { Download, ChevronLeft, ChevronRight, Share2, MessageSquare, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { getGoogleDriveDownloadUrl } from "@/lib/utils";
@@ -164,7 +164,7 @@ export default function WatchAnime() {
     // Navigate to next episode
     const goToNextEpisode = () => {
         if (nextEpisode && slug) {
-            const url = `/watch-anime/${slug}?s=${nextEpisode.season}&e=${nextEpisode.episodeNumber}`;
+            const url = `/watch-anime/${slug}?season=${nextEpisode.season}&episode=${nextEpisode.episodeNumber}`;
             window.location.replace(url);
         }
     };
@@ -477,7 +477,7 @@ export default function WatchAnime() {
                                         key={episode.id}
                                         className="overflow-hidden cursor-pointer group hover-elevate active-elevate-2 transition-all"
                                         onClick={() => {
-                                            const url = `/watch-anime/${slug}?s=${episode.season}&e=${episode.episodeNumber}`;
+                                            const url = `/watch-anime/${slug}?season=${episode.season}&episode=${episode.episodeNumber}`;
                                             console.log("Up Next - navigating to:", url);
                                             window.location.replace(url);
                                         }}
