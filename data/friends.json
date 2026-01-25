@@ -343,6 +343,20 @@
       "read": true,
       "id": "c0066821-e565-4c15-892f-a247450b4750",
       "createdAt": "2026-01-25T15:12:52.927Z"
+    },
+    {
+      "userId": "b59fe60c-35c8-4689-b83a-feda335caa19",
+      "type": "achievement",
+      "title": "New Badge Earned! 🏅",
+      "message": "You have been awarded the \"Sweetie\" badge!",
+      "data": {
+        "badgeId": "50a0cf03-0991-4320-8172-60aaf4c4e59e",
+        "name": "Sweetie",
+        "icon": "award"
+      },
+      "read": true,
+      "id": "0012fd98-aec3-43c1-aaa9-1d669daa6f38",
+      "createdAt": "2026-01-25T17:51:27.644Z"
     }
   ],
   "directMessages": [

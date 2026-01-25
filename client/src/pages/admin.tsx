@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -4132,6 +4132,7 @@ function BadgesManager() {
         </CardHeader>
         <CardContent>
           <AwardBadgeForm badges={badges || []} />
+          <ManageUserBadges />
         </CardContent>
       </Card>
 
@@ -4235,23 +4236,54 @@ function AwardBadgeForm({ badges }: { badges: any[] }) {
   const { toast } = useToast();
   const [username, setUsername] = useState('');
   const [badgeId, setBadgeId] = useState('');
+  const [selectedUsers, setSelectedUsers] = useState<any[]>([]);
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [showResults, setShowResults] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  const searchRef = useRef<HTMLDivElement>(null);
+
+  // Debounced search effect
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      if (username.trim()) {
+        setIsSearching(true);
+        try {
+          const res = await fetch(`/api/admin/users/search?query=${encodeURIComponent(username)}`, { headers: getAuthHeaders() });
+          if (res.ok) {
+            const users = await res.json();
+            // Filter out already selected users
+            const filtered = users.filter((u: any) => !selectedUsers.find(sel => sel.id === u.id));
+            setSearchResults(filtered);
+            setShowResults(true);
+          }
+        } catch (error) {
+          console.error("Search failed", error);
+        } finally {
+          setIsSearching(false);
+        }
+      } else {
+        setSearchResults([]);
+        setShowResults(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [username, selectedUsers]);
+
+  // Handle click outside to close dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+        setShowResults(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const awardMutation = useMutation({
     mutationFn: async () => {
-      // First find user by username
-      const userRes = await fetch(`/api/admin/users/search?query=${encodeURIComponent(username)}`, { headers: getAuthHeaders() });
-      if (!userRes.ok) {
-        throw new Error(`User search failed: ${userRes.status}`);
-      }
-      const users = await userRes.json();
-
-      if (!Array.isArray(users)) {
-        console.error("Search users response:", users);
-        throw new Error("Invalid response from user search");
-      }
-
-      const user = users.find((u: any) => u.username === username);
-      if (!user) throw new Error("User not found");
+      if (selectedUsers.length === 0) throw new Error("Please select at least one user");
 
       const awardRes = await fetch("/api/admin/badges/award", {
         method: "POST",
@@ -4260,7 +4292,7 @@ function AwardBadgeForm({ badges }: { badges: any[] }) {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          userId: user.id,
+          userIds: selectedUsers.map(u => u.id),
           badgeId,
         }),
       });
@@ -4270,10 +4302,12 @@ function AwardBadgeForm({ badges }: { badges: any[] }) {
       }
       return awardRes.json();
     },
-    onSuccess: () => {
-      toast({ title: "Success", description: "Badge awarded successfully" });
+    onSuccess: (data) => {
+      toast({ title: "Success", description: `Badge awarded to ${data.awardedCount} users` });
       setUsername('');
       setBadgeId('');
+      setSelectedUsers([]);
+      setSearchResults([]);
     },
     onError: (error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -4282,42 +4316,283 @@ function AwardBadgeForm({ badges }: { badges: any[] }) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!username || !badgeId) {
-      toast({ title: "Error", description: "Please fill all fields", variant: "destructive" });
+    if (selectedUsers.length === 0 || !badgeId) {
+      toast({ title: "Error", description: "Please select users and a badge", variant: "destructive" });
       return;
     }
     awardMutation.mutate();
   };
 
+  const handleSelectUser = (user: any) => {
+    if (!selectedUsers.find(u => u.id === user.id)) {
+      setSelectedUsers([...selectedUsers, user]);
+    }
+    setUsername(""); // Clear search to allow adding more
+    setShowResults(false);
+  };
+
+  const removeUser = (userId: string) => {
+    setSelectedUsers(selectedUsers.filter(u => u.id !== userId));
+  };
+
   return (
-    <form onSubmit={handleSubmit} className="flex gap-4 items-end">
-      <div className="space-y-2 flex-1">
-        <Label htmlFor="award-username">Username</Label>
-        <Input
-          id="award-username"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          placeholder="Enter username"
-        />
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="flex gap-4 items-end">
+        <div className="space-y-2 flex-1 relative" ref={searchRef}>
+          <Label htmlFor="award-username">Search Users</Label>
+          <div className="relative">
+            <Input
+              id="award-username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="Type to search users..."
+              autoComplete="off"
+            />
+            {isSearching && (
+              <div className="absolute right-3 top-2.5">
+                <div className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full"></div>
+              </div>
+            )}
+          </div>
+
+          {/* Live Search Results Dropdown */}
+          {showResults && searchResults.length > 0 && (
+            <div className="absolute top-full mt-1 w-full bg-popover border border-border rounded-md shadow-md z-50 max-h-60 overflow-y-auto">
+              {searchResults.map((user) => (
+                <div
+                  key={user.id}
+                  className="flex items-center gap-3 p-2 hover:bg-accent cursor-pointer transition-colors"
+                  onClick={() => handleSelectUser(user)}
+                >
+                  <div className="h-8 w-8 rounded-full overflow-hidden bg-secondary flex-shrink-0">
+                    {user.avatarUrl ? (
+                      <img src={user.avatarUrl} alt={user.username} className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="h-full w-full flex items-center justify-center">
+                        <UserIcon className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm truncate">{user.username}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-2 flex-1">
+          <Label htmlFor="award-badge">Select Badge</Label>
+          <Select value={badgeId} onValueChange={setBadgeId}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select Badge" />
+            </SelectTrigger>
+            <SelectContent>
+              {badges.map((badge) => (
+                <SelectItem key={badge.id} value={badge.id}>
+                  {badge.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <Button type="submit" disabled={awardMutation.isPending || selectedUsers.length === 0}>
+          {awardMutation.isPending ? "Awarding..." : "Award Badge"}
+        </Button>
       </div>
-      <div className="space-y-2 flex-1">
-        <Label htmlFor="award-badge">Select Badge</Label>
-        <Select value={badgeId} onValueChange={setBadgeId}>
-          <SelectTrigger>
-            <SelectValue placeholder="Select Badge" />
-          </SelectTrigger>
-          <SelectContent>
-            {badges.map((badge) => (
-              <SelectItem key={badge.id} value={badge.id}>
-                {badge.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-      <Button type="submit" disabled={awardMutation.isPending}>
-        {awardMutation.isPending ? "Awarding..." : "Award Badge"}
-      </Button>
+
+      {selectedUsers.length > 0 && (
+        <div className="flex flex-wrap gap-2 p-3 bg-muted/50 rounded-md border min-h-[60px]">
+          {selectedUsers.map(user => (
+            <div key={user.id} className="flex items-center gap-2 bg-background border px-2 py-1 rounded-full text-sm animate-in fade-in zoom-in-95 duration-200">
+              <div className="h-5 w-5 rounded-full overflow-hidden bg-secondary">
+                {user.avatarUrl ? (
+                  <img src={user.avatarUrl} alt={user.username} className="h-full w-full object-cover" />
+                ) : (
+                  <UserIcon className="h-3 w-3 text-muted-foreground m-1" />
+                )}
+              </div>
+              <span className="font-medium">{user.username}</span>
+              <button
+                type="button"
+                onClick={() => removeUser(user.id)}
+                className="ml-1 text-muted-foreground hover:text-destructive transition-colors"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </form>
+  );
+}
+
+function ManageUserBadges() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [username, setUsername] = useState("");
+  const [searchedUser, setSearchedUser] = useState<any>(null);
+  const [userBadges, setUserBadges] = useState<any[]>([]);
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [showResults, setShowResults] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  const searchRef = useRef<HTMLDivElement>(null);
+
+  // Debounced search effect
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      if (username.trim()) {
+        if (searchedUser && username === searchedUser.username) return; // Don't search if verified and unchanged
+
+        setIsSearching(true);
+        try {
+          const res = await fetch(`/api/admin/users/search?query=${encodeURIComponent(username)}`, { headers: getAuthHeaders() });
+          if (res.ok) {
+            const users = await res.json();
+            setSearchResults(users);
+            setShowResults(true);
+          }
+        } catch (error) {
+          console.error("Search failed", error);
+        } finally {
+          setIsSearching(false);
+        }
+      } else {
+        setSearchResults([]);
+        setShowResults(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [username, searchedUser]);
+
+  // Handle click outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+        setShowResults(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const revokeMutation = useMutation({
+    mutationFn: async (badgeId: string) => {
+      const res = await fetch("/api/admin/badges/revoke", {
+        method: "POST",
+        headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: searchedUser.id, badgeId }),
+      });
+      if (!res.ok) throw new Error("Failed to revoke badge");
+    },
+    onSuccess: (_, badgeId) => {
+      toast({ title: "Badge revoked successfully" });
+      setUserBadges(prev => prev.filter(b => b.badgeId !== badgeId));
+    },
+    onError: () => {
+      toast({ title: "Error revoking badge", variant: "destructive" });
+    }
+  });
+
+  const handleSelectUser = (user: any) => {
+    setSearchedUser(user);
+    setUsername(user.username);
+    setShowResults(false);
+    // Fetch badges immediately
+    fetch(`/api/users/${user.id}/badges`).then(r => r.json()).then(setUserBadges);
+  };
+
+  return (
+    <Card className="mt-6">
+      <CardHeader>
+        <CardTitle>Manage User Badges</CardTitle>
+        <CardDescription>Search for a user to view and revoke their badges</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="flex gap-4 mb-6 relative" ref={searchRef}>
+          <div className="relative flex-1">
+            <Input
+              placeholder="Search user to manage badges..."
+              value={username}
+              onChange={(e) => {
+                setUsername(e.target.value);
+                if (searchedUser && e.target.value !== searchedUser.username) {
+                  setSearchedUser(null);
+                  setUserBadges([]);
+                }
+              }}
+            />
+            {isSearching && (
+              <div className="absolute right-3 top-2.5">
+                <div className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full"></div>
+              </div>
+            )}
+          </div>
+
+          {/* Live Search Results Dropdown */}
+          {showResults && searchResults.length > 0 && (
+            <div className="absolute top-full mt-1 w-full bg-popover border border-border rounded-md shadow-md z-50 max-h-60 overflow-y-auto">
+              {searchResults.map((user) => (
+                <div
+                  key={user.id}
+                  className="flex items-center gap-3 p-2 hover:bg-accent cursor-pointer transition-colors"
+                  onClick={() => handleSelectUser(user)}
+                >
+                  <div className="h-8 w-8 rounded-full overflow-hidden bg-secondary flex-shrink-0">
+                    {user.avatarUrl ? (
+                      <img src={user.avatarUrl} alt={user.username} className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="h-full w-full flex items-center justify-center">
+                        <UserIcon className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm truncate">{user.username}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {searchedUser && (
+          <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
+            <div className="flex items-center gap-2 p-2 bg-muted/50 rounded border">
+              <UserIcon className="w-4 h-4" />
+              <span className="font-semibold">{searchedUser.username}</span>
+              <span className="text-muted-foreground text-sm">({userBadges.length} badges)</span>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {userBadges.length > 0 ? userBadges.map((ub: any) => (
+                <div key={ub.id} className="p-3 border rounded flex flex-col items-center text-center relative group hover:border-destructive/50 transition-colors">
+                  <Button
+                    variant="destructive"
+                    size="icon"
+                    className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                    onClick={() => {
+                      if (confirm(`Revoke badge "${ub.badge.name}" from ${searchedUser.username}?`)) {
+                        revokeMutation.mutate(ub.badgeId);
+                      }
+                    }}
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                  <img src={ub.badge.imageUrl} className="w-12 h-12 object-contain mb-2" />
+                  <div className="text-sm font-medium">{ub.badge.name}</div>
+                  <div className="text-xs text-muted-foreground mt-1">Earned: {new Date(ub.earnedAt).toLocaleDateString()}</div>
+                </div>
+              )) : (
+                <p className="col-span-4 text-center text-muted-foreground py-4">No badges found for this user.</p>
+              )}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }

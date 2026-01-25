@@ -282,6 +282,7 @@ export interface IStorage {
   deleteBadge(id: string): Promise<void>;
   getUserBadges(userId: string): Promise<(UserBadge & { badge: Badge })[]>;
   awardBadge(userId: string, badgeId: string): Promise<UserBadge>;
+  revokeBadge(userId: string, badgeId: string): Promise<void>;
 
   getPollResults(pollId: string): Promise<{ optionIndex: number; count: number }[]>;
   getUserVote(pollId: string, userId: string): Promise<PollVote | undefined>;
@@ -523,6 +524,14 @@ export class MemStorage implements IStorage {
         blogPosts: Array.from(this.blogPosts.values()),
         viewingProgress: progressObj,
         reminders: Array.from(this.reminders.values()),
+        reviews: Array.from(this.reviews.values()),
+        challenges: Array.from(this.challenges.values()),
+        userChallenges: Array.from(this.userChallenges.values()),
+        polls: Array.from(this.polls.values()),
+        pollVotes: Array.from(this.pollVotes.values()),
+        xpHistory: Array.from(this.xpHistory.values()),
+        badges: Array.from(this.badges.values()),
+        userBadges: Array.from(this.userBadges.values()),
         lastUpdated: new Date().toISOString(),
       };
 
@@ -1866,6 +1875,34 @@ export class MemStorage implements IStorage {
 
     this.saveData();
     return userBadge;
+  }
+
+  async revokeBadge(userId: string, badgeId: string): Promise<void> {
+    const userBadgesToRemove = Array.from(this.userBadges.values())
+      .filter(ub => ub.userId === userId && ub.badgeId === badgeId);
+
+    if (userBadgesToRemove.length > 0) {
+      // Remove all instances (handles potential duplicates)
+      userBadgesToRemove.forEach(ub => this.userBadges.delete(ub.id));
+
+      // Update legacy JSON field
+      const user = this.users.get(userId);
+      if (user) {
+        let currentBadges: any[] = [];
+        try {
+          currentBadges = JSON.parse(user.badges || "[]");
+        } catch (e) { currentBadges = []; }
+
+        // Remove the badge
+        const updatedBadges = currentBadges.filter(b => b.id !== badgeId);
+        user.badges = JSON.stringify(updatedBadges);
+        this.users.set(userId, user);
+        this.saveUsers(); // Persist user changes
+      }
+
+      this.saveData();
+      console.log(`✅ Revoked ${userBadgesToRemove.length} instances of badge ${badgeId} for user ${userId}`);
+    }
   }
 
   async getLeaderboard(limit: number): Promise<User[]> {

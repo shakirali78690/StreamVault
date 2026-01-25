@@ -5176,26 +5176,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Award badge to user (Admin only)
   app.post("/api/admin/badges/award", requireAdmin, async (req, res) => {
     try {
-      const { userId, badgeId } = req.body;
-      const user = await storage.getUserById(userId);
-      if (!user) return res.status(404).json({ error: "User not found" });
+      const { userId, userIds, badgeId } = req.body;
+
+      const targets = userIds || (userId ? [userId] : []);
+      if (targets.length === 0) return res.status(400).json({ error: "No users specified" });
 
       const badge = await storage.getBadge(badgeId);
       if (!badge) return res.status(404).json({ error: "Badge not found" });
 
-      await storage.awardBadge(userId, badgeId);
+      const results = [];
+      for (const uid of targets) {
+        const user = await storage.getUserById(uid);
+        if (!user) continue;
 
-      // Notify User
-      await storage.createNotification({
-        userId: userId,
-        type: 'achievement',
-        title: 'New Badge Earned! 🏅',
-        message: `You have been awarded the "${badge.name}" badge!`,
-        data: { badgeId: badge.id, name: badge.name, icon: 'award' },
-        read: false
-      });
+        await storage.awardBadge(uid, badgeId);
 
-      res.json({ success: true });
+        // Notify User
+        await storage.createNotification({
+          userId: uid,
+          type: 'achievement',
+          title: 'New Badge Earned! 🏅',
+          message: `You have been awarded the "${badge.name}" badge!`,
+          data: { badgeId: badge.id, name: badge.name, icon: 'award' },
+          read: false
+        });
+        results.push(uid);
+      }
+
+      res.json({ success: true, awardedCount: results.length });
     } catch (error: any) {
       res.status(400).json({ error: error.message });
     }

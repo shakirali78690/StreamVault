@@ -29,8 +29,8 @@ export function StreakDisplay({ compact = false }: { compact?: boolean }) {
                     <TooltipTrigger asChild>
                         <motion.div
                             className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-sm font-semibold ${hasActiveStreak
-                                    ? 'bg-gradient-to-r from-orange-500/20 to-red-500/20 text-orange-400'
-                                    : 'bg-muted text-muted-foreground'
+                                ? 'bg-gradient-to-r from-orange-500/20 to-red-500/20 text-orange-400'
+                                : 'bg-muted text-muted-foreground'
                                 }`}
                             initial={{ scale: 0.9 }}
                             animate={{ scale: 1 }}
@@ -55,8 +55,8 @@ export function StreakDisplay({ compact = false }: { compact?: boolean }) {
             <div className="flex items-center gap-4">
                 <motion.div
                     className={`p-3 rounded-full ${hasActiveStreak
-                            ? 'bg-gradient-to-br from-orange-500 to-red-500'
-                            : 'bg-muted'
+                        ? 'bg-gradient-to-br from-orange-500 to-red-500'
+                        : 'bg-muted'
                         }`}
                     animate={hasActiveStreak ? { scale: [1, 1.1, 1] } : {}}
                     transition={{ repeat: Infinity, duration: 2 }}
@@ -89,8 +89,8 @@ export function StreakDisplay({ compact = false }: { compact?: boolean }) {
                     <div
                         key={milestone}
                         className={`flex-1 text-center py-2 rounded-lg text-xs ${streak.currentStreak >= milestone
-                                ? 'bg-orange-500/30 text-orange-300'
-                                : 'bg-muted/50 text-muted-foreground'
+                            ? 'bg-orange-500/30 text-orange-300'
+                            : 'bg-muted/50 text-muted-foreground'
                             }`}
                     >
                         {milestone}d {streak.currentStreak >= milestone ? '✓' : ''}
