@@ -303,16 +303,24 @@ export function UserProfileModal({ isOpen, onClose, user, isFriend }: UserProfil
                                 <div className="grid grid-cols-4 gap-2">
                                     {user.badges.map((badge) => {
                                         // Dynamic icon logic
-                                        const iconName = badge.icon || 'Star';
+                                        const iconName = (badge as any).icon || 'Star';
                                         const PascalName = iconName.split('-').map((s: string) => s.charAt(0).toUpperCase() + s.slice(1)).join('');
                                         const IconComponent = (icons as any)[PascalName] || (icons as any)[iconName] || Star;
 
                                         return (
                                             <div key={badge.id} className="flex flex-col items-center p-2 bg-muted/30 rounded-lg group relative cursor-help">
-                                                <div className="w-8 h-8 rounded-full bg-yellow-500/10 flex items-center justify-center text-yellow-500 mb-1">
-                                                    <IconComponent className="w-4 h-4" />
-                                                </div>
-                                                <span className="text-[10px] text-center font-medium truncate w-full">{badge.name}</span>
+                                                {badge.imageUrl ? (
+                                                    <img
+                                                        src={badge.imageUrl}
+                                                        alt={badge.name}
+                                                        className="w-8 h-8 object-contain mb-1"
+                                                    />
+                                                ) : (
+                                                    <div className="w-8 h-8 rounded-full bg-yellow-500/10 flex items-center justify-center text-yellow-500 mb-1">
+                                                        <IconComponent className="w-4 h-4" />
+                                                    </div>
+                                                )}
+                                                <span className="text-[10px] text-center font-medium w-full leading-tight">{badge.name}</span>
 
                                                 {/* Tooltip */}
                                                 <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-black text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10 pointer-events-none">

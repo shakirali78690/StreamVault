@@ -43,8 +43,12 @@ export default function Leaderboard() {
         ?.sort((a: any, b: any) => (b.currentStreak || 0) - (a.currentStreak || 0))
         ?.slice(0, 10) || [];
 
-    const getBadgeIcon = (badge: Badge) => {
-        const iconName = badge.icon || 'Star';
+    const renderBadge = (badge: Badge) => {
+        if (badge.imageUrl) {
+            return <img src={badge.imageUrl} alt={badge.name} className="w-5 h-5 object-contain" />;
+        }
+
+        const iconName = (badge as any).icon || 'Star';
         const PascalName = iconName.split('-').map((s: string) => s.charAt(0).toUpperCase() + s.slice(1)).join('');
         const IconComponent = (icons as any)[PascalName] || (icons as any)[iconName] || Star;
         return <IconComponent className="w-3 h-3" />;
@@ -167,8 +171,17 @@ export default function Leaderboard() {
                                     "text-xs font-medium uppercase tracking-wider",
                                     rank === 1 ? "text-yellow-500/70" : "text-muted-foreground/70"
                                 )}>
-                                    Lvl {user.level}
+                                    Lvl {user.level || 1}
                                 </div>
+                                {user.badges && user.badges.length > 0 && (
+                                    <div className="flex items-center justify-center gap-1 mt-1">
+                                        {user.badges.slice(0, 3).map(badge => (
+                                            <div key={badge.id} title={badge.name}>
+                                                {renderBadge(badge)}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         </motion.div>
                     );
@@ -221,7 +234,7 @@ export default function Leaderboard() {
                                         <div className="hidden sm:flex items-center gap-1 opacity-70 group-hover:opacity-100 transition-opacity">
                                             {user.badges.slice(0, 3).map(badge => (
                                                 <div key={badge.id} className="text-muted-foreground" title={badge.name}>
-                                                    {getBadgeIcon(badge)}
+                                                    {renderBadge(badge)}
                                                 </div>
                                             ))}
                                         </div>
@@ -231,7 +244,7 @@ export default function Leaderboard() {
                                 {/* Level (Desktop) */}
                                 <div className="hidden md:block w-32">
                                     <span className="px-2 py-0.5 rounded-md bg-primary/10 text-primary text-[10px] font-bold border border-primary/20">
-                                        LVL {user.level}
+                                        LVL {user.level || 1}
                                     </span>
                                 </div>
 

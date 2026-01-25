@@ -279,6 +279,7 @@ export interface IStorage {
   getBadge(id: string): Promise<Badge | undefined>;
   createBadge(badge: InsertBadge): Promise<Badge>;
   updateBadge(id: string, updates: Partial<InsertBadge>): Promise<Badge | undefined>;
+  deleteBadge(id: string): Promise<void>;
   getUserBadges(userId: string): Promise<(UserBadge & { badge: Badge })[]>;
   awardBadge(userId: string, badgeId: string): Promise<UserBadge>;
 
@@ -1459,11 +1460,16 @@ export class MemStorage implements IStorage {
   }
 
   async searchUsers(query: string): Promise<User[]> {
+    if (this.users.size === 0) {
+      this.loadUsers();
+    }
     const lowerQuery = query.toLowerCase();
-    return Array.from(this.users.values()).filter(
-      user => user.username.toLowerCase().includes(lowerQuery)
-    );
+    return Array.from(this.users.values())
+      .filter(u => u.username.toLowerCase().includes(lowerQuery))
+      .slice(0, 10);
   }
+
+
 
   // Friends methods
   async getFriends(userId: string): Promise<Friend[]> {
@@ -1793,6 +1799,11 @@ export class MemStorage implements IStorage {
     this.badges.set(id, updated);
     this.saveData();
     return updated;
+  }
+
+  async deleteBadge(id: string): Promise<void> {
+    this.badges.delete(id);
+    this.saveData();
   }
 
   async getUserBadges(userId: string): Promise<(UserBadge & { badge: Badge })[]> {

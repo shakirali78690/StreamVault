@@ -86,7 +86,9 @@ export default function AchievementsPage() {
                             >
                                 <CardContent className="p-6 flex flex-col items-center text-center h-full justify-center gap-3">
                                     <div className={`p-3 rounded-full ${isUnlocked ? "bg-purple-500/20 text-purple-400" : "bg-white/5 text-muted-foreground"}`}>
-                                        {isUnlocked ? (
+                                        {isUnlocked && achievement.imageUrl ? (
+                                            <img src={achievement.imageUrl} alt={achievement.name} className="w-12 h-12 object-contain" />
+                                        ) : isUnlocked ? (
                                             <LucideIcon name={achievement.icon} className="w-8 h-8" />
                                         ) : (
                                             <Lock className="w-6 h-6" />

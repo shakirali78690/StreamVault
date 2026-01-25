@@ -4,11 +4,13 @@ import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { EditBadgeDialog } from "@/components/edit-badge-dialog";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -4125,6 +4127,16 @@ function BadgesManager() {
 
       <Card>
         <CardHeader>
+          <CardTitle>Award Badge</CardTitle>
+          <CardDescription>Manually award a badge to a user</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <AwardBadgeForm badges={badges || []} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle>Active Badges ({badges?.length || 0})</CardTitle>
           <CardDescription>Manage existing badges</CardDescription>
         </CardHeader>
@@ -4134,14 +4146,7 @@ function BadgesManager() {
           ) : badges && badges.length > 0 ? (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {badges.map((badge: any) => (
-                <div key={badge.id} className="p-4 border rounded-lg flex flex-col items-center text-center space-y-2 hover:bg-muted/50 transition opacity-0 animate-in fade-in zoom-in duration-300">
-                  <img src={badge.imageUrl} alt={badge.name} className="w-16 h-16 object-contain" />
-                  <div>
-                    <p className="font-medium">{badge.name}</p>
-                    <p className="text-xs text-muted-foreground max-w-[200px] truncate">{badge.description}</p>
-                  </div>
-                  <Badge variant="outline">{badge.category}</Badge>
-                </div>
+                <BadgeItem key={badge.id} badge={badge} />
               ))}
             </div>
           ) : (
@@ -4150,5 +4155,169 @@ function BadgesManager() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+function BadgeItem({ badge }: { badge: any }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [isEditing, setIsEditing] = useState(false);
+
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/admin/badges/${badge.id}`, {
+        method: "DELETE",
+        headers: getAuthHeaders()
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Failed to delete badge");
+      }
+    },
+    onSuccess: () => {
+      toast({ title: "Success", description: "Badge deleted successfully" });
+      queryClient.invalidateQueries({ queryKey: ["/api/badges"] });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    }
+  });
+
+  return (
+    <>
+      <div className="p-4 border rounded-lg flex flex-col items-center text-center space-y-2 hover:bg-muted/50 transition relative group">
+        <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setIsEditing(true)}>
+            <Edit className="h-3 w-3" />
+          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive">
+                <Trash2 className="h-3 w-3" />
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete Badge?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Are you sure you want to delete "{badge.name}"? This cannot be undone and may affect users who have earned this badge.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={() => deleteMutation.mutate()} className="bg-destructive hover:bg-destructive/90">
+                  Delete
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
+
+        <img src={badge.imageUrl} alt={badge.name} className="w-16 h-16 object-contain" />
+        <div>
+          <p className="font-medium">{badge.name}</p>
+          <p className="text-xs text-muted-foreground max-w-[200px] truncate">{badge.description}</p>
+        </div>
+        <Badge variant="outline">{badge.category}</Badge>
+      </div>
+
+      <EditBadgeDialog
+        badge={badge}
+        open={isEditing}
+        onOpenChange={setIsEditing}
+      />
+    </>
+  );
+}
+
+
+function AwardBadgeForm({ badges }: { badges: any[] }) {
+  const { toast } = useToast();
+  const [username, setUsername] = useState('');
+  const [badgeId, setBadgeId] = useState('');
+
+  const awardMutation = useMutation({
+    mutationFn: async () => {
+      // First find user by username
+      const userRes = await fetch(`/api/admin/users/search?query=${encodeURIComponent(username)}`, { headers: getAuthHeaders() });
+      if (!userRes.ok) {
+        throw new Error(`User search failed: ${userRes.status}`);
+      }
+      const users = await userRes.json();
+
+      if (!Array.isArray(users)) {
+        console.error("Search users response:", users);
+        throw new Error("Invalid response from user search");
+      }
+
+      const user = users.find((u: any) => u.username === username);
+      if (!user) throw new Error("User not found");
+
+      const awardRes = await fetch("/api/admin/badges/award", {
+        method: "POST",
+        headers: {
+          ...getAuthHeaders(),
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          userId: user.id,
+          badgeId,
+        }),
+      });
+      if (!awardRes.ok) {
+        const err = await awardRes.json();
+        throw new Error(err.error || "Failed to award badge");
+      }
+      return awardRes.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Success", description: "Badge awarded successfully" });
+      setUsername('');
+      setBadgeId('');
+    },
+    onError: (error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!username || !badgeId) {
+      toast({ title: "Error", description: "Please fill all fields", variant: "destructive" });
+      return;
+    }
+    awardMutation.mutate();
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="flex gap-4 items-end">
+      <div className="space-y-2 flex-1">
+        <Label htmlFor="award-username">Username</Label>
+        <Input
+          id="award-username"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          placeholder="Enter username"
+        />
+      </div>
+      <div className="space-y-2 flex-1">
+        <Label htmlFor="award-badge">Select Badge</Label>
+        <Select value={badgeId} onValueChange={setBadgeId}>
+          <SelectTrigger>
+            <SelectValue placeholder="Select Badge" />
+          </SelectTrigger>
+          <SelectContent>
+            {badges.map((badge) => (
+              <SelectItem key={badge.id} value={badge.id}>
+                {badge.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <Button type="submit" disabled={awardMutation.isPending}>
+        {awardMutation.isPending ? "Awarding..." : "Award Badge"}
+      </Button>
+    </form>
   );
 }

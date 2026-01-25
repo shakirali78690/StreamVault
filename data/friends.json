@@ -315,6 +315,34 @@
       "read": true,
       "id": "5058eff1-70ec-4de3-bf03-b91402b91af9",
       "createdAt": "2026-01-25T12:57:04.729Z"
+    },
+    {
+      "userId": "b59fe60c-35c8-4689-b83a-feda335caa19",
+      "type": "achievement",
+      "title": "New Badge Earned! 🏅",
+      "message": "You have been awarded the \"StreamVault Founder\" badge!",
+      "data": {
+        "badgeId": "b68546c5-eaee-40a0-98b4-4d9aa44997df",
+        "name": "StreamVault Founder",
+        "icon": "award"
+      },
+      "read": true,
+      "id": "94eefa4a-ae2f-4957-8d0e-ac8c7013eb63",
+      "createdAt": "2026-01-25T15:01:29.335Z"
+    },
+    {
+      "userId": "b59fe60c-35c8-4689-b83a-feda335caa19",
+      "type": "achievement",
+      "title": "New Badge Earned! 🏅",
+      "message": "You have been awarded the \"StreamVault Founder\" badge!",
+      "data": {
+        "badgeId": "a9333e1c-9bf2-473e-bd60-0be1b9e27725",
+        "name": "StreamVault Founder",
+        "icon": "award"
+      },
+      "read": true,
+      "id": "c0066821-e565-4c15-892f-a247450b4750",
+      "createdAt": "2026-01-25T15:12:52.927Z"
     }
   ],
   "directMessages": [

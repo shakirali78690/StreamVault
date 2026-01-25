@@ -486,7 +486,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const users = await storage.searchUsers(query);
       // Filter out current user and return only public info
       const filtered = users
-        .filter(u => u.id !== payload.userId)
         .map(u => ({
           id: u.id,
           username: u.username,
@@ -1997,6 +1996,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(shows);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch shows" });
+    }
+  });
+
+  // Admin Search users
+  app.get("/api/admin/users/search", requireAdmin, async (req, res) => {
+    try {
+      const query = req.query.query as string || req.query.q as string;
+      if (!query) {
+        return res.status(400).json({ error: "Search query required" });
+      }
+      const users = await storage.searchUsers(query);
+      res.json(users);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to search users" });
     }
   });
 
@@ -5113,6 +5126,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching user stats:", error);
       res.status(500).json({ error: "Failed to fetch user stats" });
+    }
+  });
+
+  // ============================================
+  // BADGE MANAGEMENT ROUTES
+  // ============================================
+
+  // Get all badges
+  app.get("/api/badges", async (_req, res) => {
+    const badges = await storage.getBadges();
+    res.json(badges);
+  });
+
+  // Create badge (Admin only)
+  app.post("/api/admin/badges", requireAdmin, async (req, res) => {
+    try {
+      const badge = await storage.createBadge(req.body);
+      res.json(badge);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Update badge (Admin only)
+  app.patch("/api/admin/badges/:id", requireAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const badge = await storage.updateBadge(id, req.body);
+      if (!badge) return res.status(404).json({ error: "Badge not found" });
+      res.json(badge);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Delete badge (Admin only)
+  app.delete("/api/admin/badges/:id", requireAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      // Note: Ideally check for user badges constraints, but strict deletion allowed for now
+      await storage.deleteBadge(id);
+      res.sendStatus(204);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Award badge to user (Admin only)
+  app.post("/api/admin/badges/award", requireAdmin, async (req, res) => {
+    try {
+      const { userId, badgeId } = req.body;
+      const user = await storage.getUserById(userId);
+      if (!user) return res.status(404).json({ error: "User not found" });
+
+      const badge = await storage.getBadge(badgeId);
+      if (!badge) return res.status(404).json({ error: "Badge not found" });
+
+      await storage.awardBadge(userId, badgeId);
+
+      // Notify User
+      await storage.createNotification({
+        userId: userId,
+        type: 'achievement',
+        title: 'New Badge Earned! 🏅',
+        message: `You have been awarded the "${badge.name}" badge!`,
+        data: { badgeId: badge.id, name: badge.name, icon: 'award' },
+        read: false
+      });
+
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
     }
   });
 

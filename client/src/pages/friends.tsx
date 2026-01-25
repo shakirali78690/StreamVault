@@ -462,38 +462,51 @@ export default function Friends() {
 
                     {searchResults.length > 0 && (
                         <div className="grid gap-4">
-                            {searchResults.map((user) => (
+                            {searchResults.map((resultUser) => (
                                 <div
-                                    key={user.id}
+                                    key={resultUser.id}
                                     className="flex items-center gap-4 p-4 bg-card rounded-lg border"
                                 >
                                     {/* Avatar */}
-                                    <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden">
-                                        {user.avatarUrl ? (
-                                            <img src={user.avatarUrl} alt={user.username} className="w-full h-full object-cover" />
-                                        ) : (
-                                            <span className="text-lg font-medium">{user.username.slice(0, 2).toUpperCase()}</span>
-                                        )}
-                                    </div>
+                                    {/* Avatar - Clickable to view profile */}
+                                    <button
+                                        className="relative cursor-pointer"
+                                        onClick={() => handleViewProfile(resultUser.id, resultUser.username, resultUser.avatarUrl)}
+                                    >
+                                        <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden hover:ring-2 hover:ring-primary/50 transition-all">
+                                            {resultUser.avatarUrl ? (
+                                                <img src={resultUser.avatarUrl} alt={resultUser.username} className="w-full h-full object-cover" />
+                                            ) : (
+                                                <span className="text-lg font-medium">{resultUser.username.slice(0, 2).toUpperCase()}</span>
+                                            )}
+                                        </div>
+                                    </button>
 
                                     {/* Info */}
                                     <div className="flex-1">
-                                        <h3 className="font-semibold">{user.username}</h3>
+                                        <h3 className="font-semibold">{resultUser.username}</h3>
                                     </div>
 
                                     {/* Action */}
-                                    <Button
-                                        size="sm"
-                                        onClick={() => handleSendRequest(user.id)}
-                                        disabled={pendingRequests.has(user.id)}
-                                    >
-                                        {pendingRequests.has(user.id) ? (
-                                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                        ) : (
-                                            <UserPlus className="h-4 w-4 mr-2" />
-                                        )}
-                                        Add Friend
-                                    </Button>
+                                    {user?.id === resultUser.id ? (
+                                        <Button size="sm" variant="outline" disabled>
+                                            You
+                                        </Button>
+                                    ) : (
+                                        <Button
+                                            size="sm"
+                                            onClick={() => handleSendRequest(resultUser.id)}
+                                            disabled={pendingRequests.has(resultUser.id)}
+                                        >
+                                            {pendingRequests.has(resultUser.id) ? (
+                                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                            ) : (
+                                                <UserPlus className="h-4 w-4 mr-2" />
+                                            )}
+                                            Add Friend
+
+                                        </Button>
+                                    )}
                                 </div>
                             ))}
                         </div>

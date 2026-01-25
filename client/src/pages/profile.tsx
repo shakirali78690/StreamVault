@@ -264,7 +264,7 @@ export default function ProfilePage() {
                                                     <img
                                                         src={badge.imageUrl}
                                                         alt={badge.name}
-                                                        className="w-10 h-10 rounded-full object-cover mb-1 bg-background border border-border"
+                                                        className="w-10 h-10 object-contain mb-1"
                                                     />
                                                 ) : (
                                                     <div className="w-10 h-10 rounded-full bg-yellow-500/10 flex items-center justify-center text-yellow-500 mb-1">
