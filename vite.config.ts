@@ -15,6 +15,9 @@ export default defineConfig({
       filename: 'sw.js',
       registerType: 'autoUpdate',
       injectRegister: 'auto',
+      injectManifest: {
+        maximumFileSizeToCacheInBytes: 5000000
+      },
       manifest: {
         name: 'StreamVault',
         short_name: 'StreamVault',
