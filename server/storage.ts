@@ -1,4 +1,4 @@
-import type { Show, Episode, Movie, Anime, AnimeEpisode, Comment, InsertShow, InsertEpisode, InsertMovie, InsertAnime, InsertAnimeEpisode, InsertComment, WatchlistItem, ViewingProgress, Category, BlogPost, InsertBlogPost, User, Badge, Reminder, InsertReminder, Review, ReviewHelpfulVote, Challenge, UserChallenge, Poll, PollVote, XpHistoryEntry } from "@shared/schema";
+import type { Show, Episode, Movie, Anime, AnimeEpisode, Comment, InsertShow, InsertEpisode, InsertMovie, InsertAnime, InsertAnimeEpisode, InsertComment, WatchlistItem, ViewingProgress, Category, BlogPost, InsertBlogPost, User, Badge, InsertBadge, UserBadge, Reminder, InsertReminder, Review, ReviewHelpfulVote, Challenge, UserChallenge, Poll, PollVote, XpHistoryEntry } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
 import { join } from "path";
@@ -237,7 +237,6 @@ export interface IStorage {
 
   // Gamification
   updateUserXP(userId: string, amount: number): Promise<{ user: User; levelUp: boolean }>;
-  addBadge(userId: string, badge: Badge): Promise<User>;
   getLeaderboard(limit: number): Promise<User[]>;
 
   // Reminders
@@ -273,13 +272,23 @@ export interface IStorage {
   createPoll(poll: Omit<Poll, 'id' | 'createdAt'>): Promise<Poll>;
   getPolls(activeOnly?: boolean): Promise<Poll[]>;
   getPollById(id: string): Promise<Poll | undefined>;
-  votePoll(pollId: string, userId: string, optionIndex: number): Promise<void>;
+  votePoll(pollId: string, userId: string, optionIndex: number): Promise<PollVote>;
+
+  // Badges
+  getBadges(): Promise<Badge[]>;
+  getBadge(id: string): Promise<Badge | undefined>;
+  createBadge(badge: InsertBadge): Promise<Badge>;
+  updateBadge(id: string, updates: Partial<InsertBadge>): Promise<Badge | undefined>;
+  getUserBadges(userId: string): Promise<(UserBadge & { badge: Badge })[]>;
+  awardBadge(userId: string, badgeId: string): Promise<UserBadge>;
+
   getPollResults(pollId: string): Promise<{ optionIndex: number; count: number }[]>;
   getUserVote(pollId: string, userId: string): Promise<PollVote | undefined>;
 
   // XP History for time-based leaderboards
   addXpHistory(userId: string, amount: number, source: string): Promise<XpHistoryEntry>;
   getLeaderboardByPeriod(period: 'daily' | 'weekly' | 'monthly', limit: number): Promise<{ userId: string; username: string; avatarUrl: string | null; xpGained: number; level: number }[]>;
+  getBadgeStats(): Promise<{ totalBadges: number; totalAwarded: number; popularBadges: { name: string; count: number }[] }>;
 }
 
 export class MemStorage implements IStorage {
@@ -309,6 +318,8 @@ export class MemStorage implements IStorage {
   private polls: Map<string, Poll>;
   private pollVotes: Map<string, PollVote>;
   private xpHistory: Map<string, XpHistoryEntry>;
+  private badges: Map<string, Badge>;
+  private userBadges: Map<string, UserBadge>;
   private dataFile: string;
   private usersFile: string;
   private friendsFile!: string;
@@ -342,6 +353,8 @@ export class MemStorage implements IStorage {
     this.polls = new Map();
     this.pollVotes = new Map();
     this.xpHistory = new Map();
+    this.badges = new Map();
+    this.userBadges = new Map();
     this.categories = [
       { id: "action", name: "Action & Thriller", slug: "action" },
       { id: "drama", name: "Drama & Romance", slug: "drama" },
@@ -448,6 +461,31 @@ export class MemStorage implements IStorage {
           data.reminders.forEach((r: Reminder) => this.reminders.set(r.id, r));
           console.log(`✅ Loaded ${data.reminders.length} reminders`);
         }
+
+        // Restore reviews
+        if (data.reviews) {
+          data.reviews.forEach((review: Review) => this.reviews.set(review.id, review));
+          console.log(`✅ Loaded ${data.reviews.length} reviews`);
+        }
+
+        // Restore badges
+        if (data.badges) {
+          data.badges.forEach((badge: Badge) => this.badges.set(badge.id, badge));
+          console.log(`✅ Loaded ${data.badges.length} badges`);
+        }
+
+        // Restore user badges
+        if (data.userBadges) {
+          data.userBadges.forEach((ub: UserBadge) => this.userBadges.set(ub.id, ub));
+          console.log(`✅ Loaded ${data.userBadges.length} user badges`);
+        }
+
+        // Restore polls
+        if (data.polls) {
+          data.polls.forEach((poll: Poll) => this.polls.set(poll.id, poll));
+          console.log(`✅ Loaded ${data.polls.length} polls`);
+        }
+
       } else {
         console.log("📦 No data file found, seeding initial data...");
         this.seedData();
@@ -1724,19 +1762,99 @@ export class MemStorage implements IStorage {
     return { user, levelUp };
   }
 
-  async addBadge(userId: string, badge: Badge): Promise<User> {
-    const user = this.users.get(userId);
-    if (!user) throw new Error("User not found");
+  // Badge Methods
+  async getBadges(): Promise<Badge[]> {
+    return Array.from(this.badges.values());
+  }
 
-    const badges: Badge[] = JSON.parse(user.badges || "[]");
-    if (!badges.find(b => b.id === badge.id)) {
-      badges.push(badge);
-      user.badges = JSON.stringify(badges);
+  async getBadge(id: string): Promise<Badge | undefined> {
+    return this.badges.get(id);
+  }
+
+  async createBadge(badgeInit: InsertBadge): Promise<Badge> {
+    const id = randomUUID();
+    const badge: Badge = {
+      ...badgeInit,
+      id,
+      category: badgeInit.category || "general",
+      active: badgeInit.active ?? true,
+      imageUrl: badgeInit.imageUrl || "",
+      createdAt: new Date(),
+    };
+    this.badges.set(id, badge);
+    this.saveData();
+    return badge;
+  }
+
+  async updateBadge(id: string, updates: Partial<InsertBadge>): Promise<Badge | undefined> {
+    const badge = this.badges.get(id);
+    if (!badge) return undefined;
+    const updated = { ...badge, ...updates };
+    this.badges.set(id, updated);
+    this.saveData();
+    return updated;
+  }
+
+  async getUserBadges(userId: string): Promise<(UserBadge & { badge: Badge })[]> {
+    const userBadges = Array.from(this.userBadges.values())
+      .filter(ub => ub.userId === userId);
+
+    // Join with Badge details
+    return userBadges.map(ub => {
+      const badge = this.badges.get(ub.badgeId);
+      if (!badge) throw new Error(`Badge not found for id ${ub.badgeId}`);
+      return { ...ub, badge };
+    });
+  }
+
+  async awardBadge(userId: string, badgeId: string): Promise<UserBadge> {
+    // Check if valid badge
+    const badge = this.badges.get(badgeId);
+    if (!badge) throw new Error("Badge not found");
+
+    // Check availability (already has it?)
+    const existing = Array.from(this.userBadges.values())
+      .find(ub => ub.userId === userId && ub.badgeId === badgeId);
+
+    if (existing) return existing;
+
+    const id = randomUUID();
+    const userBadge: UserBadge = {
+      id,
+      userId,
+      badgeId,
+      earnedAt: new Date(),
+    };
+    this.userBadges.set(id, userBadge);
+
+    // Also update User profile JSON for backward compatibility? 
+    // Or assume frontend reads from new API.
+    // The user schema has `badges` string field. I should update that too to keep sync?
+    // "badges": text("badges").default("[]").notNull()
+    const user = this.users.get(userId);
+    if (user) {
+      // Parse existing badges
+      let currentBadges: any[] = [];
+      try {
+        currentBadges = JSON.parse(user.badges || "[]");
+      } catch (e) { currentBadges = []; }
+
+      // Add new badge minimal info
+      currentBadges.push({
+        id: badge.id,
+        name: badge.name,
+        description: badge.description,
+        icon: 'award', // Fallback for old UI
+        imageUrl: badge.imageUrl,
+        earnedAt: userBadge.earnedAt.toISOString()
+      });
+
+      user.badges = JSON.stringify(currentBadges);
       this.users.set(userId, user);
-      this.saveUsers();
     }
 
-    return user;
+    this.saveData();
+    return userBadge;
   }
 
   async getLeaderboard(limit: number): Promise<User[]> {
@@ -2137,14 +2255,12 @@ export class MemStorage implements IStorage {
     // Award badge if applicable
     let badgeAwarded: string | undefined;
     if (challenge.badgeReward) {
-      badgeAwarded = challenge.badgeReward;
-      await this.addBadge(userId, {
-        id: challenge.badgeReward,
-        name: challenge.title,
-        description: `Completed: ${challenge.description}`,
-        icon: 'target',
-        earnedAt: new Date().toISOString(),
-      });
+      // Check if badge exists in badges table
+      const badge = await this.getBadge(challenge.badgeReward);
+      if (badge) {
+        badgeAwarded = badge.id;
+        await this.awardBadge(userId, badge.id);
+      }
     }
 
     this.saveData();
@@ -2362,6 +2478,26 @@ export class MemStorage implements IStorage {
     return leaderboard
       .sort((a, b) => b.xpGained - a.xpGained)
       .slice(0, limit);
+  }
+
+  async getBadgeStats(): Promise<{ totalBadges: number; totalAwarded: number; popularBadges: { name: string; count: number }[] }> {
+    const totalBadges = this.badges.size;
+    const totalAwarded = this.userBadges.size;
+
+    const badgeCounts = new Map<string, number>();
+    for (const ub of this.userBadges.values()) {
+      badgeCounts.set(ub.badgeId, (badgeCounts.get(ub.badgeId) || 0) + 1);
+    }
+
+    const popularBadges = Array.from(badgeCounts.entries())
+      .map(([id, count]) => {
+        const badge = this.badges.get(id);
+        return { name: badge?.name || 'Unknown', count };
+      })
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+
+    return { totalBadges, totalAwarded, popularBadges };
   }
 }
 

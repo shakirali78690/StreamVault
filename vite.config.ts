@@ -1,5 +1,6 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import { VitePWA } from 'vite-plugin-pwa';
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -8,6 +9,56 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export default defineConfig({
   plugins: [
     react(),
+    VitePWA({
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.js',
+      registerType: 'autoUpdate',
+      injectRegister: 'auto',
+      manifest: {
+        name: 'StreamVault',
+        short_name: 'StreamVault',
+        description: 'Premium Netflix-inspired streaming platform',
+        start_url: '/',
+        display: 'standalone',
+        background_color: '#0a0a0a',
+        theme_color: '#e50914',
+        orientation: 'any',
+        icons: [
+          {
+            src: '/icons/icon.svg',
+            sizes: 'any',
+            type: 'image/svg+xml',
+            purpose: 'any'
+          },
+          {
+            src: '/favicon.svg',
+            sizes: 'any',
+            type: 'image/svg+xml',
+            purpose: 'maskable'
+          }
+        ],
+        categories: ["entertainment", "video"],
+        shortcuts: [
+          {
+            name: "Browse Movies",
+            short_name: "Movies",
+            description: "Browse all movies",
+            url: "/movies"
+          },
+          {
+            name: "Browse Shows",
+            short_name: "Shows",
+            description: "Browse all TV shows",
+            url: "/browse/shows"
+          }
+        ]
+      },
+      devOptions: {
+        enabled: true,
+        type: 'module',
+      },
+    }),
   ],
   resolve: {
     alias: {

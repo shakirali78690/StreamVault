@@ -1328,6 +1328,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ============================================
+  // BADGES ROUTES
+  // ============================================
+
+  // Get all badges
+  app.get("/api/badges", async (req, res) => {
+    try {
+      const badges = await storage.getBadges();
+      res.json(badges);
+    } catch (error) {
+      console.error("Get badges error:", error);
+      res.status(500).json({ error: "Failed to get badges" });
+    }
+  });
+
+  // Get user badges
+  app.get("/api/users/:userId/badges", async (req, res) => {
+    try {
+      const userId = req.params.userId;
+      const userBadges = await storage.getUserBadges(userId);
+      res.json(userBadges);
+    } catch (error) {
+      console.error("Get user badges error:", error);
+      res.status(500).json({ error: "Failed to get user badges" });
+    }
+  });
+
+  // Admin: Create badge
+  app.post("/api/admin/badges", async (req, res) => {
+    try {
+      const token = req.cookies.authToken;
+      if (!token) return res.status(401).json({ error: "Not authenticated" });
+      const payload = verifyToken(token);
+      if (!payload) return res.status(401).json({ error: "Invalid token" });
+
+      const badge = await storage.createBadge(req.body);
+      res.status(201).json(badge);
+    } catch (error) {
+      console.error("Create badge error:", error);
+      res.status(500).json({ error: "Failed to create badge" });
+    }
+  });
+
+  // Admin: Update badge
+  app.put("/api/admin/badges/:id", async (req, res) => {
+    try {
+      const token = req.cookies.authToken;
+      if (!token) return res.status(401).json({ error: "Not authenticated" });
+      const payload = verifyToken(token);
+      if (!payload) return res.status(401).json({ error: "Invalid token" });
+
+      const updated = await storage.updateBadge(req.params.id, req.body);
+      if (!updated) return res.status(404).json({ error: "Badge not found" });
+      res.json(updated);
+    } catch (error) {
+      console.error("Update badge error:", error);
+      res.status(500).json({ error: "Failed to update badge" });
+    }
+  });
+
+  // ============================================
   // SCHEDULING ROUTES (Reminders)
   // ============================================
 
@@ -4992,6 +5052,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           referrer: p.referrer.substring(0, 50)
         }));
 
+      // Badge stats
+      const badgeStats = await storage.getBadgeStats();
+
       res.json({
         overview: {
           pageViews: { today: todayViews, week: weekViews, month: monthViews, total: totalViews },
@@ -5007,7 +5070,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         browsers: browserCounts,
         topShows,
         topMovies,
-        recentPageViews
+        recentPageViews,
+        badgeStats
       });
     } catch (error) {
       res.status(500).json({ error: "Failed to get analytics" });

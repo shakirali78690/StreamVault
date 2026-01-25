@@ -113,6 +113,25 @@ export const pollVotes = pgTable("poll_votes", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Badges table for custom image badges
+export const badges = pgTable("badges", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description").notNull(),
+  imageUrl: text("image_url").notNull(),
+  category: text("category").default("general"), // "challenge", "achievement", "general"
+  active: boolean("active").default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// User Badges mapping (Many-to-Many)
+export const userBadges = pgTable("user_badges", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  badgeId: varchar("badge_id").notNull(),
+  earnedAt: timestamp("earned_at").defaultNow().notNull(),
+});
+
 // XP History for time-based leaderboards
 export const xpHistory = pgTable("xp_history", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -311,6 +330,7 @@ export const insertMovieSchema = createInsertSchema(movies).omit({ id: true });
 export const insertAnimeSchema = createInsertSchema(anime).omit({ id: true });
 export const insertAnimeEpisodeSchema = createInsertSchema(animeEpisodes).omit({ id: true });
 export const insertCommentSchema = createInsertSchema(comments).omit({ id: true, createdAt: true });
+export const insertBadgeSchema = createInsertSchema(badges).omit({ id: true, createdAt: true });
 
 // Select types
 export type Show = typeof shows.$inferSelect;
@@ -364,13 +384,9 @@ export type InsertBlogPost = z.infer<typeof insertBlogPostSchema>;
 export const insertReminderSchema = createInsertSchema(reminders).omit({ id: true, createdAt: true, notified: true });
 
 // Types
-export interface Badge {
-  id: string;
-  name: string;
-  description: string;
-  icon: string; // Icon name e.g., "trophy", "star"
-  earnedAt: string;
-}
+export type Badge = typeof badges.$inferSelect;
+export type InsertBadge = z.infer<typeof insertBadgeSchema>;
+export type UserBadge = typeof userBadges.$inferSelect;
 
 export type Reminder = typeof reminders.$inferSelect;
 export type InsertReminder = z.infer<typeof insertReminderSchema>;

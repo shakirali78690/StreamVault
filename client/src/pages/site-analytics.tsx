@@ -15,9 +15,11 @@ import {
     TrendingUp,
     Play,
     Film,
-    Tv
+    Tv,
+    Award
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 
 interface SiteAnalytics {
     overview: {
@@ -35,6 +37,11 @@ interface SiteAnalytics {
     topShows: { id: string; title: string; watches: number; duration: number }[];
     topMovies: { id: string; title: string; watches: number; duration: number }[];
     recentPageViews: { timestamp: string; path: string; referrer: string }[];
+    badgeStats?: {
+        totalBadges: number;
+        totalAwarded: number;
+        popularBadges: { name: string; count: number }[];
+    };
 }
 
 export default function SiteAnalytics() {
@@ -188,6 +195,19 @@ export default function SiteAnalytics() {
                                         Total streaming hours
                                     </p>
                                 </div>
+
+                                {analytics.badgeStats && (
+                                    <div className="bg-card p-6 rounded-xl border">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <span className="text-muted-foreground text-sm">Badges Awarded</span>
+                                            <Award className="w-5 h-5 text-yellow-500" />
+                                        </div>
+                                        <p className="text-3xl font-bold">{analytics.badgeStats.totalAwarded.toLocaleString()}</p>
+                                        <p className="text-xs text-muted-foreground mt-1">
+                                            Across {analytics.badgeStats.totalBadges} badge types
+                                        </p>
+                                    </div>
+                                )}
                             </div>
 
                             {/* Charts Row */}
@@ -198,43 +218,27 @@ export default function SiteAnalytics() {
                                         <BarChart3 className="w-5 h-5 text-blue-500" />
                                         <h2 className="font-semibold">Daily Traffic (Last 7 Days)</h2>
                                     </div>
-                                    <div className="flex items-end gap-2 h-40">
-                                        {analytics.dailyViews.map((day, i) => (
-                                            <div key={i} className="flex-1 flex flex-col items-center gap-1">
-                                                <div className="w-full flex flex-col gap-0.5">
-                                                    <div
-                                                        className="w-full bg-blue-500/30 rounded-t"
-                                                        style={{
-                                                            height: `${(day.visitors / maxDailyViews) * 100}%`,
-                                                            minHeight: day.visitors > 0 ? '2px' : '0'
-                                                        }}
-                                                        title={`${day.visitors} visitors`}
-                                                    />
-                                                    <div
-                                                        className="w-full bg-blue-500 rounded-t"
-                                                        style={{
-                                                            height: `${((day.views - day.visitors) / maxDailyViews) * 100}%`,
-                                                            minHeight: day.views > day.visitors ? '2px' : '0'
-                                                        }}
-                                                        title={`${day.views} views`}
-                                                    />
-                                                </div>
-                                                <span className="text-xs text-muted-foreground">
-                                                    {new Date(day.date).toLocaleDateString('en', { weekday: 'short' })}
-                                                </span>
-                                                <span className="text-xs font-medium">{day.views}</span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                    <div className="flex justify-center gap-4 mt-3 text-xs">
-                                        <div className="flex items-center gap-1">
-                                            <div className="w-3 h-3 bg-blue-500 rounded" />
-                                            <span>Views</span>
-                                        </div>
-                                        <div className="flex items-center gap-1">
-                                            <div className="w-3 h-3 bg-blue-500/30 rounded" />
-                                            <span>Visitors</span>
-                                        </div>
+                                    <div className="h-[200px] w-full">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <BarChart data={analytics.dailyViews}>
+                                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#333" />
+                                                <XAxis
+                                                    dataKey="date"
+                                                    tickFormatter={(date) => new Date(date).toLocaleDateString('en', { weekday: 'short' })}
+                                                    stroke="#666"
+                                                    fontSize={12}
+                                                    tickLine={false}
+                                                    axisLine={false}
+                                                />
+                                                <YAxis stroke="#666" fontSize={12} tickLine={false} axisLine={false} />
+                                                <Tooltip
+                                                    contentStyle={{ backgroundColor: '#1f2937', borderColor: '#374151', color: '#fff' }}
+                                                    cursor={{ fill: 'rgba(255, 255, 255, 0.05)' }}
+                                                />
+                                                <Bar dataKey="views" fill="#3b82f6" radius={[4, 4, 0, 0]} name="Page Views" />
+                                                <Bar dataKey="visitors" fill="#10b981" radius={[4, 4, 0, 0]} name="Unique Visitors" />
+                                            </BarChart>
+                                        </ResponsiveContainer>
                                     </div>
                                 </div>
 
@@ -244,25 +248,31 @@ export default function SiteAnalytics() {
                                         <Clock className="w-5 h-5 text-purple-500" />
                                         <h2 className="font-semibold">Hourly Activity (24h)</h2>
                                     </div>
-                                    <div className="flex items-end gap-0.5 h-32">
-                                        {analytics.hourlyActivity.map((hour, i) => (
-                                            <div
-                                                key={i}
-                                                className="flex-1 bg-purple-500 rounded-t transition-all hover:bg-purple-400"
-                                                style={{
-                                                    height: `${(hour.views / maxHourlyViews) * 100}%`,
-                                                    minHeight: hour.views > 0 ? '2px' : '0'
-                                                }}
-                                                title={`${hour.hour}:00 - ${hour.views} views`}
-                                            />
-                                        ))}
-                                    </div>
-                                    <div className="flex justify-between text-xs text-muted-foreground mt-2">
-                                        <span>12 AM</span>
-                                        <span>6 AM</span>
-                                        <span>12 PM</span>
-                                        <span>6 PM</span>
-                                        <span>12 AM</span>
+                                    <div className="h-[200px] w-full">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <AreaChart data={analytics.hourlyActivity}>
+                                                <defs>
+                                                    <linearGradient id="colorViews" x1="0" y1="0" x2="0" y2="1">
+                                                        <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.8} />
+                                                        <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
+                                                    </linearGradient>
+                                                </defs>
+                                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#333" />
+                                                <XAxis
+                                                    dataKey="hour"
+                                                    tickFormatter={(h) => `${h}:00`}
+                                                    stroke="#666"
+                                                    fontSize={12}
+                                                    tickLine={false}
+                                                    axisLine={false}
+                                                />
+                                                <YAxis stroke="#666" fontSize={12} tickLine={false} axisLine={false} />
+                                                <Tooltip
+                                                    contentStyle={{ backgroundColor: '#1f2937', borderColor: '#374151', color: '#fff' }}
+                                                />
+                                                <Area type="monotone" dataKey="views" stroke="#8b5cf6" fillOpacity={1} fill="url(#colorViews)" />
+                                            </AreaChart>
+                                        </ResponsiveContainer>
                                     </div>
                                 </div>
                             </div>

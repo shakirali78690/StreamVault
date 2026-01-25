@@ -9,8 +9,26 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Trash2, Edit, Plus, Save, X, Upload, FileJson, LogOut, Mail, Send, Bell, Megaphone, User as UserIcon, Vote, Target } from "lucide-react";
+import {
+  Trash2, Edit, Plus, Search,
+  Settings,
+  ChevronRight,
+  LogOut,
+  Save,
+  X,
+  User as UserIcon,
+  Vote,
+  Target,
+  Award,
+  Mail,
+  FileJson,
+  Upload,
+  Send,
+  Megaphone,
+  Bell
+} from "lucide-react";
 import type { Show, Episode, Movie, BlogPost, Anime, AnimeEpisode } from "@shared/schema";
 import { getAuthHeaders, logout as authLogout } from "@/lib/auth";
 
@@ -137,8 +155,11 @@ export default function AdminPage() {
               Polls
             </TabsTrigger>
             <TabsTrigger value="challenges" className="gap-2">
-              <Target className="w-4 h-4" />
               Challenges
+            </TabsTrigger>
+            <TabsTrigger value="badges" className="gap-2">
+              <Award className="w-4 h-4" />
+              Badges
             </TabsTrigger>
           </TabsList>
 
@@ -221,6 +242,11 @@ export default function AdminPage() {
           {/* Challenges Management Tab */}
           <TabsContent value="challenges">
             <ChallengesManager />
+          </TabsContent>
+
+          {/* Badges Management Tab */}
+          <TabsContent value="badges">
+            <BadgesManager />
           </TabsContent>
         </Tabs>
       </div>
@@ -3972,6 +3998,154 @@ function ChallengesManager() {
             </div>
           ) : (
             <p className="text-muted-foreground text-center py-8">No challenges created yet</p>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function BadgesManager() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [imageUrl, setImageUrl] = useState('');
+  const [category, setCategory] = useState('general');
+
+  const { data: badges, isLoading } = useQuery<any[]>({
+    queryKey: ["/api/badges"],
+    queryFn: async () => {
+      const res = await fetch("/api/badges", {
+        headers: getAuthHeaders(),
+      });
+      if (!res.ok) throw new Error("Failed to fetch badges");
+      return res.json();
+    },
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/admin/badges", {
+        method: "POST",
+        headers: {
+          ...getAuthHeaders(),
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name,
+          description,
+          imageUrl,
+          category,
+          active: true,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to create badge");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/badges"] });
+      toast({ title: "Success", description: "Badge created successfully" });
+      setName('');
+      setDescription('');
+      setImageUrl('');
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to create badge", variant: "destructive" });
+    },
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name || !description || !imageUrl) {
+      toast({ title: "Error", description: "Please fill all fields", variant: "destructive" });
+      return;
+    }
+    createMutation.mutate();
+  };
+
+  return (
+    <div className="space-y-8">
+      <Card>
+        <CardHeader>
+          <CardTitle>Create Badge</CardTitle>
+          <CardDescription>Create new badges for users to collect</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="badge-name">Name</Label>
+                <Input
+                  id="badge-name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Movie Buff"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="badge-image">Image URL</Label>
+                <Input
+                  id="badge-image"
+                  value={imageUrl}
+                  onChange={(e) => setImageUrl(e.target.value)}
+                  placeholder="https://example.com/badge.png"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="badge-desc">Description</Label>
+              <Textarea
+                id="badge-desc"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Watch 50 movies to earn this badge"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="badge-category">Category</Label>
+              <Select value={category} onValueChange={setCategory}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select Category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="general">General</SelectItem>
+                  <SelectItem value="achievement">Achievement</SelectItem>
+                  <SelectItem value="challenge">Challenge</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <Button type="submit" disabled={createMutation.isPending}>
+              {createMutation.isPending ? "Creating..." : "Create Badge"}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Active Badges ({badges?.length || 0})</CardTitle>
+          <CardDescription>Manage existing badges</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <p className="text-muted-foreground">Loading badges...</p>
+          ) : badges && badges.length > 0 ? (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {badges.map((badge: any) => (
+                <div key={badge.id} className="p-4 border rounded-lg flex flex-col items-center text-center space-y-2 hover:bg-muted/50 transition opacity-0 animate-in fade-in zoom-in duration-300">
+                  <img src={badge.imageUrl} alt={badge.name} className="w-16 h-16 object-contain" />
+                  <div>
+                    <p className="font-medium">{badge.name}</p>
+                    <p className="text-xs text-muted-foreground max-w-[200px] truncate">{badge.description}</p>
+                  </div>
+                  <Badge variant="outline">{badge.category}</Badge>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-muted-foreground text-center py-8">No badges created yet</p>
           )}
         </CardContent>
       </Card>

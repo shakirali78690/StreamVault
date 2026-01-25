@@ -260,10 +260,17 @@ export default function ProfilePage() {
 
                                         return (
                                             <div key={badge.id} className="flex flex-col items-center p-2 bg-muted/30 rounded-lg min-w-[80px]" title={badge.description}>
-                                                <div className="w-10 h-10 rounded-full bg-yellow-500/10 flex items-center justify-center text-yellow-500 mb-1">
-                                                    <IconComponent className="w-5 h-5" />
-                                                </div>
-                                                {/* Fix truncate logic or styling if needed */}
+                                                {badge.imageUrl ? (
+                                                    <img
+                                                        src={badge.imageUrl}
+                                                        alt={badge.name}
+                                                        className="w-10 h-10 rounded-full object-cover mb-1 bg-background border border-border"
+                                                    />
+                                                ) : (
+                                                    <div className="w-10 h-10 rounded-full bg-yellow-500/10 flex items-center justify-center text-yellow-500 mb-1">
+                                                        <IconComponent className="w-5 h-5" />
+                                                    </div>
+                                                )}
                                                 <span className="text-[10px] text-center font-medium truncate w-full">{badge.name}</span>
                                             </div>
                                         );

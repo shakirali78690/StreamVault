@@ -9,12 +9,15 @@
       "emailVerified": false,
       "id": "b59fe60c-35c8-4689-b83a-feda335caa19",
       "createdAt": "2026-01-20T13:03:43.162Z",
-      "updatedAt": "2026-01-22T08:04:23.103Z",
+      "updatedAt": "2026-01-25T11:53:18.424Z",
       "favorites": "{\"shows\":[\"3a8ff251-ed95-41a9-9cac-8246ab2e59d5\"],\"movies\":[],\"anime\":[]}",
       "badges": "[{\"id\":\"social-1\",\"name\":\"Friendly Face\",\"description\":\"Have 1 Friend\",\"icon\":\"user-plus\",\"earnedAt\":\"2026-01-23T14:31:25.526Z\"}]",
-      "xp": 50,
+      "xp": 100,
       "level": 1,
-      "referralCode": "0F3B5A8F"
+      "referralCode": "0F3B5A8F",
+      "currentStreak": 1,
+      "longestStreak": 1,
+      "lastWatchDate": "2026-01-25"
     },
     {
       "email": "legend12@email.com",
@@ -44,5 +47,5 @@
       "updatedAt": "2026-01-22T19:29:32.130Z"
     }
   ],
-  "lastUpdated": "2026-01-24T17:44:33.687Z"
+  "lastUpdated": "2026-01-25T11:53:18.424Z"
 }

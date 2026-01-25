@@ -288,6 +288,21 @@
       "read": true,
       "id": "bf983db6-b937-44e2-827f-f735422d959b",
       "createdAt": "2026-01-23T14:49:25.855Z"
+    },
+    {
+      "userId": "b59fe60c-35c8-4689-b83a-feda335caa19",
+      "type": "xp_earned",
+      "title": "XP Earned! 🌟",
+      "message": "You earned 50 XP",
+      "data": {
+        "amount": 50,
+        "newXp": 100,
+        "newLevel": 1,
+        "levelUp": false
+      },
+      "read": true,
+      "id": "e594dc51-b4d9-4b3e-b6da-6dd1ab122b40",
+      "createdAt": "2026-01-25T11:53:18.427Z"
     }
   ],
   "directMessages": [
