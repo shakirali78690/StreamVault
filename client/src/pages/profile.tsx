@@ -239,13 +239,20 @@ export default function ProfilePage() {
                                                                 src={badge.imageUrl}
                                                                 alt={badge.name}
                                                                 className="w-10 h-10 object-contain mb-2 drop-shadow-sm transition-transform group-hover:scale-110"
+                                                                onError={(e) => {
+                                                                    e.currentTarget.style.display = 'none';
+                                                                    e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                                                                }}
                                                             />
-                                                        ) : (
-                                                            <div className="w-10 h-10 rounded-full bg-yellow-500/10 flex items-center justify-center text-yellow-500 mb-2 group-hover:bg-yellow-500/20 transition-colors">
-                                                                <IconComponent className="w-5 h-5" />
-                                                            </div>
-                                                        )}
-                                                        <span className="text-[10px] text-center font-medium truncate w-full px-1 text-muted-foreground group-hover:text-foreground transition-colors">{badge.name}</span>
+                                                        ) : null}
+
+                                                        <div className={`w-10 h-10 rounded-full bg-yellow-500/10 flex items-center justify-center text-yellow-500 mb-2 group-hover:bg-yellow-500/20 transition-colors ${badge.imageUrl ? 'hidden' : ''}`}>
+                                                            <IconComponent className="w-5 h-5" />
+                                                        </div>
+
+                                                        <span className="text-[10px] text-center font-medium leading-tight w-full px-1 text-muted-foreground group-hover:text-foreground transition-colors line-clamp-2">
+                                                            {badge.name}
+                                                        </span>
                                                     </div>
                                                 );
                                             })}
