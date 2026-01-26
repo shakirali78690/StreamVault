@@ -327,7 +327,7 @@ export function Header() {
             <Link href="/login">
               <Button variant="default" size="sm" className="hidden sm:flex gap-2">
                 <UserPlus className="h-4 w-4" />
-                {t('nav.signup')}
+                Join
               </Button>
             </Link>
           )}
