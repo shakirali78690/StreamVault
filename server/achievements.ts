@@ -155,6 +155,7 @@ export async function checkAndAwardAchievements(userId: string): Promise<string[
             const metCondition = await achievement.condition(user);
             console.log(`[Achievements] Checking ${achievement.id}: metCondition=${metCondition}`);
             if (metCondition) {
+                // Use addBadge which handles user.badges JSON directly for achievement badges
                 await storage.addBadge(userId, {
                     id: achievement.id,
                     name: achievement.name,

@@ -1873,6 +1873,36 @@ export class MemStorage implements IStorage {
     });
   }
 
+  // Add badge directly to user's badges JSON field (for achievements that aren't in the badges table)
+  async addBadge(userId: string, badgeData: { id: string; name: string; description: string; icon: string; imageUrl?: string; earnedAt?: string }): Promise<void> {
+    const user = this.users.get(userId);
+    if (!user) throw new Error("User not found");
+
+    let currentBadges: any[] = [];
+    try {
+      currentBadges = JSON.parse(user.badges || "[]");
+    } catch (e) { currentBadges = []; }
+
+    // Check if already has this badge
+    if (currentBadges.find((b: any) => b.id === badgeData.id)) {
+      return; // Already has it
+    }
+
+    currentBadges.push({
+      id: badgeData.id,
+      name: badgeData.name,
+      description: badgeData.description,
+      icon: badgeData.icon,
+      imageUrl: badgeData.imageUrl || null,
+      earnedAt: badgeData.earnedAt || new Date().toISOString()
+    });
+
+    user.badges = JSON.stringify(currentBadges);
+    this.users.set(userId, user);
+    this.saveUsers();
+    console.log(`✅ Added badge "${badgeData.name}" to user ${userId}`);
+  }
+
   async awardBadge(userId: string, badgeId: string): Promise<UserBadge> {
     // Check if valid badge
     const badge = this.badges.get(badgeId);
