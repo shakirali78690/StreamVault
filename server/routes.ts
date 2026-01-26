@@ -955,9 +955,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get All Achievements (Simplified)
-  app.get("/api/achievements", (_req, res) => {
-    // Import ACHIEVEMENTS dynamically to avoid circular dependencies if any
-    import("./achievements").then(({ ACHIEVEMENTS }) => {
+  app.get("/api/achievements", async (req, res) => {
+    try {
+      // Import ACHIEVEMENTS dynamically to avoid circular dependencies
+      const { ACHIEVEMENTS, checkAndAwardAchievements } = await import("./achievements");
+
+      // Auto-heal: Check achievements if user is logged in
+      const token = req.cookies.authToken;
+      if (token) {
+        const payload = verifyToken(token);
+        if (payload) {
+          await checkAndAwardAchievements(payload.userId);
+        }
+      }
+
       const simplified = ACHIEVEMENTS.map(a => ({
         id: a.id,
         name: a.name,
@@ -965,7 +976,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         icon: a.icon
       }));
       res.json(simplified);
-    });
+    } catch (error) {
+      console.error("Error fetching achievements:", error);
+      res.status(500).json({ error: "Failed to fetch achievements" });
+    }
   });
 
   // Debug Achievements

@@ -417,7 +417,7 @@ export default function ProfilePage() {
                                 <Button
                                     variant="destructive"
                                     onClick={handleLogout}
-                                    className="w-full md:w-auto text-destructive hover:bg-destructive/10 border-destructive/30"
+                                    className="w-full md:w-auto hover:bg-destructive/90 border-destructive/30"
                                 >
                                     <LogOut className="mr-2 h-4 w-4" />
                                     Sign Out

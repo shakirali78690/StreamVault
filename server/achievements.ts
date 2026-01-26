@@ -146,11 +146,14 @@ export async function checkAndAwardAchievements(userId: string): Promise<string[
     const existingBadges = user.badges ? JSON.parse(user.badges) : [];
     const existingBadgeIds = new Set(existingBadges.map((b: any) => b.id));
 
+    console.log(`[Achievements] Checking for user ${userId}. Existing badges: ${Array.from(existingBadgeIds).join(',')}`);
+
     for (const achievement of ACHIEVEMENTS) {
         if (existingBadgeIds.has(achievement.id)) continue;
 
         try {
             const metCondition = await achievement.condition(user);
+            console.log(`[Achievements] Checking ${achievement.id}: metCondition=${metCondition}`);
             if (metCondition) {
                 await storage.addBadge(userId, {
                     id: achievement.id,
