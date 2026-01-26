@@ -2621,7 +2621,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Check if badge exists
-      const badge = await storage.getBadgeById(badgeId);
+      const badge = await storage.getBadge(badgeId);
       if (!badge) {
         return res.status(404).json({ error: "Badge not found" });
       }
