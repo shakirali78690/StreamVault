@@ -93,6 +93,14 @@ A professional Netflix-inspired streaming platform for both TV shows and movies,
 - **Privacy Settings** - Control friend activity visibility
 - **Playback Preferences** - Default video quality and autoplay settings
 
+### 🏆 **Gamification & Community (NEW!)**
+- **Leaderboard** - Track top viewers by XP, levels, and watch streaks
+- **Daily Challenges** - Earn XP by completing daily and weekly watch tasks
+- **Achievements** - Unlock badges for milestones (e.g., "Binge Elite", "Night Owl")
+- **Community Polls** - Vote on trending topics and future content additions
+- **Reviews & Ratings** - Rate and review content with spoiler tags
+- **Release Calendar** - Track upcoming episodes and movie releases
+
 
 ### 🛠️ **Tech Stack**
 - **Frontend:** React 18 + TypeScript
@@ -302,6 +310,13 @@ Edit `server/storage.ts` - add shows to the `shows` array
 ### Categories
 - `GET /api/categories` - Get all categories
 
+### Gamification & Community
+- `GET /api/leaderboard` - Get user leaderboard
+- `GET /api/challenges` - Get active challenges
+- `GET /api/polls` - Get community polls
+- `POST /api/polls/:id/vote` - Vote on a poll
+- `GET /api/achievements` - Get all achievements
+
 ---
 
 ## 🎬 Sample Content
@@ -435,6 +450,13 @@ MIT License - feel free to use for personal or commercial projects
 ---
 
 ## 🎉 What's New
+
+### Latest Updates (v5.2) - January 26, 2026
+- ✅ **Forgot Password Flow** - Secure email recovery with Resend integration
+- ✅ **Profile UI Redesign** - Stunning Hero Card layout & refined streak display
+- ✅ **Badge System Overhaul** - Admin tools for bulk awarding, live search & revocation
+- ✅ **New Badges** - "Founder" (Golden S) & "Stream King" (Animated)
+- ✅ **Smart Achievements** - Auto-healing logic for missing badges
 
 ### Latest Updates (v5.1) - January 2026
 - ✅ **Settings Page** - Dedicated `/settings` page with app preferences
