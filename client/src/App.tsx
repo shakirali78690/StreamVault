@@ -54,6 +54,7 @@ import { AnalyticsTracker } from "@/components/analytics-tracker";
 import NotFound from "@/pages/not-found";
 import Login from "@/pages/login";
 import Register from "@/pages/register";
+import ForgotPasswordPage from "@/pages/forgot-password";
 import Profile from "@/pages/profile";
 import Settings from "@/pages/settings";
 import Friends from "@/pages/friends";
@@ -122,6 +123,7 @@ function Router() {
           <Route path="/create-room" component={CreateRoom} />
           <Route path="/login" component={Login} />
           <Route path="/register" component={Register} />
+          <Route path="/forgot-password" component={ForgotPasswordPage} />
           <Route path="/profile" component={Profile} />
           <Route path="/settings" component={Settings} />
           <Route path="/friends" component={Friends} />

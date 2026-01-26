@@ -96,6 +96,12 @@ export interface ApiKey {
   lastDayReset: string;
 }
 
+export interface PasswordResetToken {
+  email: string;
+  token: string;
+  expiresAt: number;
+}
+
 export interface IStorage {
   // Shows
   getAllShows(): Promise<Show[]>;
@@ -188,6 +194,11 @@ export interface IStorage {
   createUser(user: Omit<User, 'id' | 'createdAt' | 'updatedAt'>): Promise<User>;
   updateUser(id: string, updates: Partial<User>): Promise<User>;
   searchUsers(query: string): Promise<User[]>;
+
+  // Password Reset
+  createPasswordResetToken(email: string): Promise<string>;
+  verifyPasswordResetToken(email: string, token: string): Promise<boolean>;
+  deletePasswordResetToken(email: string): Promise<void>;
 
   // Friends
   getFriends(userId: string): Promise<Friend[]>;
@@ -322,6 +333,7 @@ export class MemStorage implements IStorage {
   private xpHistory: Map<string, XpHistoryEntry>;
   private badges: Map<string, Badge>;
   private userBadges: Map<string, UserBadge>;
+  private passwordResetTokens: Map<string, PasswordResetToken>;
   private dataFile: string;
   private usersFile: string;
   private friendsFile!: string;
@@ -357,6 +369,7 @@ export class MemStorage implements IStorage {
     this.xpHistory = new Map();
     this.badges = new Map();
     this.userBadges = new Map();
+    this.passwordResetTokens = new Map();
     this.categories = [
       { id: "action", name: "Action & Thriller", slug: "action" },
       { id: "drama", name: "Drama & Romance", slug: "drama" },
@@ -1478,6 +1491,39 @@ export class MemStorage implements IStorage {
       .slice(0, 10);
   }
 
+
+  // Password Reset Methods
+  async createPasswordResetToken(email: string): Promise<string> {
+    // Generate 6-digit code
+    const token = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = Date.now() + 15 * 60 * 1000; // 15 minutes
+
+    this.passwordResetTokens.set(email, {
+      email,
+      token,
+      expiresAt
+    });
+
+    return token;
+  }
+
+  async verifyPasswordResetToken(email: string, token: string): Promise<boolean> {
+    const record = this.passwordResetTokens.get(email);
+    if (!record) return false;
+
+    if (Date.now() > record.expiresAt) {
+      this.passwordResetTokens.delete(email);
+      return false;
+    }
+
+    // crypto-safe comparison not strictly necessary for simple 6-digit code but good practice? 
+    // simple string comparison is fine here.
+    return record.token === token;
+  }
+
+  async deletePasswordResetToken(email: string): Promise<void> {
+    this.passwordResetTokens.delete(email);
+  }
 
 
   // Friends methods

@@ -10,7 +10,7 @@ import { readFileSync, existsSync, writeFileSync, mkdirSync } from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { setupSitemaps } from "./sitemap";
-import { sendContentRequestEmail, sendIssueReportEmail } from "./email-service";
+import { sendContentRequestEmail, sendIssueReportEmail, sendPasswordResetEmail } from "./email-service";
 import { searchSubtitles, downloadSubtitle, getCachedSubtitle } from "./subtitle-service";
 import { checkAndAwardAchievements } from "./achievements";
 import { getActiveRooms } from "./watch-together";
@@ -307,6 +307,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/auth/logout", (_req, res) => {
     clearAuthCookie(res);
     res.json({ success: true });
+  });
+
+  // Forgot Password - Request Token
+  app.post("/api/auth/forgot-password", async (req, res) => {
+    try {
+      const { email } = req.body;
+      if (!email) {
+        return res.status(400).json({ error: "Email is required" });
+      }
+
+      const user = await storage.getUserByEmail(email);
+      if (!user) {
+        return res.status(404).json({ error: "No account found with this email" });
+      }
+
+      const token = await storage.createPasswordResetToken(email);
+      const sent = await sendPasswordResetEmail(email, token);
+
+      if (sent) {
+        res.json({ success: true, message: "Reset code sent to your email" });
+      } else {
+        res.status(500).json({ error: "Failed to send email" });
+      }
+    } catch (error) {
+      console.error("Forgot password error:", error);
+      res.status(500).json({ error: "An error occurred" });
+    }
+  });
+
+  // Verify and Reset Password
+  app.post("/api/auth/reset-password", async (req, res) => {
+    try {
+      const { email, code, newPassword } = req.body;
+      if (!email || !code || !newPassword) {
+        return res.status(400).json({ error: "All fields are required" });
+      }
+
+      const isValid = await storage.verifyPasswordResetToken(email, code);
+      if (!isValid) {
+        return res.status(400).json({ error: "Invalid or expired code" });
+      }
+
+      const user = await storage.getUserByEmail(email);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      const passwordHash = await hashPassword(newPassword);
+      await storage.updateUser(user.id, { passwordHash });
+      await storage.deletePasswordResetToken(email);
+
+      res.json({ success: true, message: "Password updated successfully" });
+    } catch (error) {
+      console.error("Reset password error:", error);
+      res.status(500).json({ error: "Failed to reset password" });
+    }
   });
 
   // Get current user

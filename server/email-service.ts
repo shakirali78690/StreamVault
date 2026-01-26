@@ -321,3 +321,71 @@ Manage in Admin Panel: https://streamvault.live/admin
     text,
   });
 }
+
+export async function sendPasswordResetEmail(email: string, token: string): Promise<boolean> {
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reset Your Password</title>
+</head>
+<body style="margin:0; padding:0; background-color:#141414; font-family:'Helvetica Neue', Helvetica, Arial, sans-serif;">
+  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color:#141414;">
+    <tr>
+      <td align="center" style="padding: 40px 0;">
+        <table width="600" border="0" cellspacing="0" cellpadding="0" style="background-color:#1f1f1f; border-radius:8px; overflow:hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.5);">
+          <!-- Logo Header -->
+          <tr>
+            <td align="center" style="padding: 30px; background-color:#000000;">
+              <h1 style="margin:0; color:#E50914; font-size:36px; font-weight:900; letter-spacing:2px; text-transform:uppercase;">STREAMVAULT</h1>
+            </td>
+          </tr>
+          
+          <!-- Main Content -->
+          <tr>
+            <td style="padding: 40px 40px 20px 40px; text-align: center;">
+              <h2 style="margin:0 0 10px 0; color:#ffffff; font-size:24px; font-weight:bold;">Reset Your Password</h2>
+              <p style="margin:0 0 30px 0; color:#b3b3b3; font-size:16px;">Biometric scan failed? Don't worry. Use the code below to reset your password.</p>
+              
+              <div style="background-color:#2a2a2a; border:1px solid #333; border-radius: 8px; padding: 20px; margin-bottom: 30px;">
+                <span style="color:#E50914; font-size: 32px; font-weight: bold; letter-spacing: 5px;">${token}</span>
+              </div>
+
+              <p style="margin:0 0 10px 0; color:#666; font-size:14px;">This code will expire in 15 minutes.</p>
+              <p style="margin:0; color:#666; font-size:14px;">If you didn't request this, you can safely ignore this email.</p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td align="center" style="padding: 30px; background-color:#181818; border-top:1px solid #2a2a2a;">
+              <p style="margin:0; color:#666; font-size:12px;">© ${new Date().getFullYear()} StreamVault. All rights reserved.</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `;
+
+  const text = `RESET YOUR PASSWORD
+  
+Use the code below to reset your password:
+
+${token}
+
+This code will expire in 15 minutes.
+If you didn't request this, please ignore this email.
+`;
+
+  return sendEmail({
+    to: email,
+    subject: "🔐 Reset Your Password",
+    html,
+    text,
+  });
+}
