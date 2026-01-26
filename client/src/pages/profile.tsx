@@ -233,7 +233,7 @@ export default function ProfilePage() {
                                                 const IconComponent = (icons as any)[PascalName] || (icons as any)[iconName] || Star;
 
                                                 return (
-                                                    <div key={badge.id} className="group relative flex flex-col items-center justify-center p-3 bg-gradient-to-b from-muted/50 to-muted/20 border border-white/5 hover:border-primary/20 rounded-xl min-w-[90px] w-[90px] h-[90px] transition-all hover:-translate-y-1 hover:shadow-lg" title={badge.description}>
+                                                    <div key={badge.id} className="group relative flex flex-col items-center justify-center p-3 bg-gradient-to-b from-muted/50 to-muted/20 border border-white/5 hover:border-primary/20 rounded-xl min-w-[90px] w-[90px] h-[110px] transition-all hover:-translate-y-1 hover:shadow-lg" title={badge.description}>
                                                         {badge.imageUrl ? (
                                                             <img
                                                                 src={badge.imageUrl}
