@@ -28,14 +28,14 @@ export function EditBadgeDialog({ badge, open, onOpenChange }: { badge: any, ope
     const queryClient = useQueryClient();
     const [name, setName] = useState(badge.name);
     const [description, setDescription] = useState(badge.description);
-    const [imageUrl, setImageUrl] = useState(badge.imageUrl);
+    const [imageUrl, setImageUrl] = useState(badge.imageUrl || "");
     const [category, setCategory] = useState(badge.category);
 
     // Reset form when badge changes
     useEffect(() => {
         setName(badge.name);
         setDescription(badge.description);
-        setImageUrl(badge.imageUrl);
+        setImageUrl(badge.imageUrl || "");
         setCategory(badge.category);
     }, [badge]);
 

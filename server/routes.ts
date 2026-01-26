@@ -12,7 +12,7 @@ import { fileURLToPath } from "url";
 import { setupSitemaps } from "./sitemap";
 import { sendContentRequestEmail, sendIssueReportEmail, sendPasswordResetEmail } from "./email-service";
 import { searchSubtitles, downloadSubtitle, getCachedSubtitle } from "./subtitle-service";
-import { checkAndAwardAchievements } from "./achievements";
+import { checkAndAwardAchievements, ACHIEVEMENTS } from "./achievements";
 import { getActiveRooms } from "./watch-together";
 import webpush from "web-push";
 import { hashPassword, verifyPassword, generateToken, verifyToken, setAuthCookie, clearAuthCookie, type AuthRequest } from "./auth";
@@ -217,7 +217,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       setAuthCookie(res, token);
 
-      // Auto-subscribe to newsletter
+      // Auto-subscribe to newsletter logic... (keep existing)
       try {
         let data = { subscribers: [] as any[] };
         if (existsSync(SUBSCRIBERS_FILE)) {
@@ -238,6 +238,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.error("Failed to auto-subscribe user:", subError);
         // Don't fail registration if subscription fails
       }
+
+      // Check for 'New Comer' achievement
+      await checkAndAwardAchievements(user.id);
 
       res.status(201).json({
         user: {
@@ -470,6 +473,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         favorites = user.favorites ? JSON.parse(user.favorites as string) : null;
       } catch (e) { }
 
+      // Check achievements (Bio-hazed, etc.)
+      await checkAndAwardAchievements(user.id);
+
       res.json({
         user: {
           id: user.id,
@@ -508,6 +514,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const avatarUrl = `/uploads/avatars/${req.file.filename}`;
       const user = await storage.updateUser(payload.userId, { avatarUrl });
+
+      // Check achievements (Identity Crisis)
+      await checkAndAwardAchievements(payload.userId);
 
       res.json({
         avatarUrl: user.avatarUrl,
@@ -1010,8 +1019,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get All Achievements (Simplified)
+  // Get All Achievements (with custom images from DB)
   app.get("/api/achievements", async (req, res) => {
+    // Disable caching to ensure fresh data after admin updates
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+
     try {
       // Import ACHIEVEMENTS dynamically to avoid circular dependencies
       const { ACHIEVEMENTS, checkAndAwardAchievements } = await import("./achievements");
@@ -1025,13 +1039,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      const simplified = ACHIEVEMENTS.map(a => ({
-        id: a.id,
-        name: a.name,
-        description: a.description,
-        icon: a.icon
-      }));
-      res.json(simplified);
+      // CRITICAL: Fetch badge overrides from DB for custom images
+      const allBadges = await storage.getBadges();
+
+      const definitions = ACHIEVEMENTS.map(a => {
+        const dbBadge = allBadges.find(b => b.id === a.id);
+        return {
+          id: a.id,
+          name: dbBadge?.name || a.name,
+          description: dbBadge?.description || a.description,
+          icon: a.icon,
+          imageUrl: dbBadge?.imageUrl || null, // Include custom image from DB!
+          category: a.category
+        };
+      });
+
+      res.json(definitions);
     } catch (error) {
       console.error("Error fetching achievements:", error);
       res.status(500).json({ error: "Failed to fetch achievements" });
@@ -2337,6 +2360,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // If user is authenticated, we might want to merge guest progress? 
       // For now, simpler is better: just save to current key.
       const entry = await storage.updateViewingProgress(key, progress);
+
+      // Check achievements if user is logged in
+      if (key.startsWith("user:")) {
+        const userId = key.split(":")[1];
+        await checkAndAwardAchievements(userId);
+      }
+
       res.json(entry);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -5326,6 +5356,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/admin/badges/:id", requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
+      console.log(`🔧 Updating badge ${id} with:`, req.body); // DEBUG LOG
       const badge = await storage.updateBadge(id, req.body);
       if (!badge) return res.status(404).json({ error: "Badge not found" });
       res.json(badge);
@@ -5343,6 +5374,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.sendStatus(204);
     } catch (error: any) {
       res.status(400).json({ error: error.message });
+    }
+  });
+
+
+  // Sync system achievements to badges DB
+  app.post("/api/admin/badges/sync", requireAdmin, async (_req, res) => {
+    try {
+      const existingBadges = await storage.getBadges();
+      const existingIds = new Set(existingBadges.map(b => b.id));
+
+      let created = 0;
+
+      for (const achievement of ACHIEVEMENTS) {
+        if (!existingIds.has(achievement.id)) {
+          // Force use of ID from achievement definition
+          await storage.createBadge({
+            id: achievement.id,
+            name: achievement.name,
+            description: achievement.description,
+            imageUrl: "",
+            category: "achievement",
+            active: true
+          });
+          created++;
+        }
+      }
+
+      res.json({ success: true, created, message: `Synced ${created} new achievements to database.` });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
     }
   });
 

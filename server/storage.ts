@@ -1832,8 +1832,8 @@ export class MemStorage implements IStorage {
     return this.badges.get(id);
   }
 
-  async createBadge(badgeInit: InsertBadge): Promise<Badge> {
-    const id = randomUUID();
+  async createBadge(badgeInit: InsertBadge & { id?: string }): Promise<Badge> {
+    const id = badgeInit.id || randomUUID();
     const badge: Badge = {
       ...badgeInit,
       id,

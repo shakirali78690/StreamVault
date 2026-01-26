@@ -357,6 +357,36 @@
       "read": true,
       "id": "0012fd98-aec3-43c1-aaa9-1d669daa6f38",
       "createdAt": "2026-01-25T17:51:27.644Z"
+    },
+    {
+      "userId": "b59fe60c-35c8-4689-b83a-feda335caa19",
+      "type": "achievement",
+      "title": "Achievement Unlocked! 🏆",
+      "message": "You earned the \"New Comer\" badge!",
+      "data": {
+        "achievementId": "new-comer",
+        "name": "New Comer",
+        "description": "Create your account",
+        "icon": "user-plus"
+      },
+      "read": true,
+      "id": "616e20a3-2860-4437-847e-a041aeb2de76",
+      "createdAt": "2026-01-26T14:39:35.936Z"
+    },
+    {
+      "userId": "b59fe60c-35c8-4689-b83a-feda335caa19",
+      "type": "achievement",
+      "title": "Achievement Unlocked! 🏆",
+      "message": "You earned the \"Identity Crisis\" badge!",
+      "data": {
+        "achievementId": "identity-crisis",
+        "name": "Identity Crisis",
+        "description": "Upload an avatar",
+        "icon": "image"
+      },
+      "read": true,
+      "id": "e78222e5-45c9-4880-9e90-bba24873b85f",
+      "createdAt": "2026-01-26T14:39:35.946Z"
     }
   ],
   "directMessages": [

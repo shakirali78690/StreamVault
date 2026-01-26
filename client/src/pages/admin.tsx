@@ -4137,9 +4137,12 @@ function BadgesManager() {
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Active Badges ({badges?.length || 0})</CardTitle>
-          <CardDescription>Manage existing badges</CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>Active Badges ({badges?.length || 0})</CardTitle>
+            <CardDescription>Manage existing badges</CardDescription>
+          </div>
+          <SyncAchievementsButton />
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -4156,6 +4159,44 @@ function BadgesManager() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+function SyncAchievementsButton() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const syncMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/admin/badges/sync", {
+        method: "POST",
+        headers: getAuthHeaders()
+      });
+      if (!res.ok) throw new Error("Sync failed");
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/badges"] });
+      toast({
+        title: "Sync Complete",
+        description: data.message || `Synced ${data.created} new achievements`
+      });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to sync achievements", variant: "destructive" });
+    }
+  });
+
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={() => syncMutation.mutate()}
+      disabled={syncMutation.isPending}
+    >
+      <Save className="w-4 h-4 mr-2" />
+      {syncMutation.isPending ? "Syncing..." : "Sync System Achievements"}
+    </Button>
   );
 }
 

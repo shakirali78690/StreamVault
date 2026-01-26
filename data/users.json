@@ -11,7 +11,7 @@
       "createdAt": "2026-01-20T13:03:43.162Z",
       "updatedAt": "2026-01-25T19:13:34.648Z",
       "favorites": "{\"shows\":[\"3a8ff251-ed95-41a9-9cac-8246ab2e59d5\",\"3e3b9c62-956b-48bf-b455-4b43471436a1\"],\"movies\":[],\"anime\":[]}",
-      "badges": "[{\"id\":\"social-1\",\"name\":\"Friendly Face\",\"description\":\"Have 1 Friend\",\"icon\":\"user-plus\",\"earnedAt\":\"2026-01-23T14:31:25.526Z\"}]",
+      "badges": "[{\"id\":\"social-1\",\"name\":\"Friendly Face\",\"description\":\"Have 1 Friend\",\"icon\":\"user-plus\",\"earnedAt\":\"2026-01-23T14:31:25.526Z\"},{\"id\":\"new-comer\",\"name\":\"New Comer\",\"description\":\"Create your account\",\"icon\":\"user-plus\",\"imageUrl\":null,\"earnedAt\":\"2026-01-26T14:39:35.930Z\"},{\"id\":\"identity-crisis\",\"name\":\"Identity Crisis\",\"description\":\"Upload an avatar\",\"icon\":\"image\",\"imageUrl\":null,\"earnedAt\":\"2026-01-26T14:39:35.942Z\"}]",
       "xp": 200,
       "level": 1,
       "referralCode": "0F3B5A8F",
@@ -51,5 +51,5 @@
       "updatedAt": "2026-01-22T19:29:32.130Z"
     }
   ],
-  "lastUpdated": "2026-01-25T19:13:34.648Z"
+  "lastUpdated": "2026-01-26T14:39:35.942Z"
 }
