@@ -2633,14 +2633,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (user) {
           const currentBadges = user.badges ? JSON.parse(user.badges as string) : [];
           if (!currentBadges.find((b: any) => b.id === badgeId)) {
-            await storage.addBadge(userId, {
-              id: badge.id,
-              name: badge.name,
-              description: badge.description,
-              icon: badge.imageUrl || 'star', // Fallback or use image
-              imageUrl: badge.imageUrl,
-              earnedAt: new Date().toISOString()
-            });
+            // Use correct storage method
+            await storage.awardBadge(userId, badgeId);
 
             // Notify user
             await storage.createNotification({
@@ -2658,1327 +2652,1332 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
             awardedCount++;
           }
+          read: false
+        });
+
+  awardedCount++;
+}
         }
       }
 
-      res.json({ success: true, awardedCount });
+res.json({ success: true, awardedCount });
     } catch (error: any) {
-      console.error("Award badge error:", error);
-      res.status(500).json({ error: "Failed to award badges" });
-    }
+  console.error("Award badge error:", error);
+  res.status(500).json({ error: "Failed to award badges" });
+}
   });
 
-  // Revoke badge from user (Admin)
-  app.post("/api/admin/badges/revoke", requireAdmin, async (req, res) => {
-    try {
-      const { userId, badgeId } = req.body;
-      if (!userId || !badgeId) {
-        return res.status(400).json({ error: "UserId and BadgeId required" });
+// Revoke badge from user (Admin)
+app.post("/api/admin/badges/revoke", requireAdmin, async (req, res) => {
+  try {
+    const { userId, badgeId } = req.body;
+    if (!userId || !badgeId) {
+      return res.status(400).json({ error: "UserId and BadgeId required" });
+    }
+
+    await storage.revokeBadge(userId, badgeId);
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Revoke badge error:", error);
+    res.status(500).json({ error: "Failed to revoke badge" });
+  }
+});
+
+// Update anime
+app.put("/api/admin/anime/:animeId", requireAdmin, async (req, res) => {
+  try {
+    const { animeId } = req.params;
+    const anime = await storage.updateAnime(animeId, req.body);
+    res.json(anime);
+  } catch (error: any) {
+    res.status(500).json({ error: "Failed to update anime", details: error.message });
+  }
+});
+
+// Delete anime (and its episodes)
+app.delete("/api/admin/anime/:animeId", requireAdmin, async (req, res) => {
+  try {
+    const { animeId } = req.params;
+    // Delete all anime episodes first
+    const episodes = await storage.getAnimeEpisodesByAnimeId(animeId);
+    for (const ep of episodes) {
+      await storage.deleteAnimeEpisode(ep.id);
+    }
+    // Then delete the anime
+    await storage.deleteAnime(animeId);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to delete anime" });
+  }
+});
+
+// Add anime episode
+app.post("/api/admin/anime-episodes", requireAdmin, async (req, res) => {
+  try {
+    const episode = await storage.createAnimeEpisode(req.body);
+    res.json(episode);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to create anime episode" });
+  }
+});
+
+// Delete anime episode
+app.delete("/api/admin/anime-episodes/:episodeId", requireAdmin, async (req, res) => {
+  try {
+    const { episodeId } = req.params;
+    await storage.deleteAnimeEpisode(episodeId);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to delete anime episode" });
+  }
+});
+
+// Add new episode
+app.post("/api/admin/episodes", requireAdmin, async (req, res) => {
+  try {
+    const episode = await storage.createEpisode(req.body);
+    res.json(episode);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to create episode" });
+  }
+});
+
+// Bulk add episodes to a show by slug
+app.post("/api/admin/episodes/bulk", requireAdmin, async (req, res) => {
+  try {
+    const { slug, episodes } = req.body;
+
+    if (!slug || !episodes || !Array.isArray(episodes)) {
+      return res.status(400).json({ error: "Slug and episodes array are required" });
+    }
+
+    // Find show by slug
+    const show = await storage.getShowBySlug(slug);
+    if (!show) {
+      return res.status(404).json({ error: `Show with slug "${slug}" not found` });
+    }
+
+    console.log(`🚀 Adding episodes to: ${show.title}`);
+
+    // Get existing episodes to avoid duplicates
+    const existingEpisodes = await storage.getEpisodesByShowId(show.id);
+    const existingKeys = new Set(
+      existingEpisodes.map(ep => `${ep.season}-${ep.episodeNumber}`)
+    );
+
+    let added = 0;
+    let skipped = 0;
+
+    for (const ep of episodes) {
+      const key = `${ep.season}-${ep.episodeNumber}`;
+
+      if (existingKeys.has(key)) {
+        console.log(`   ⏭️  Skipping S${ep.season}E${ep.episodeNumber} (already exists)`);
+        skipped++;
+        continue;
       }
 
-      await storage.revokeBadge(userId, badgeId);
-      res.json({ success: true });
-    } catch (error) {
-      console.error("Revoke badge error:", error);
-      res.status(500).json({ error: "Failed to revoke badge" });
-    }
-  });
+      // Generate thumbnail from Google Drive if not provided
+      let thumbnailUrl = ep.thumbnailUrl;
+      if (!thumbnailUrl && ep.googleDriveUrl) {
+        const driveIdMatch = ep.googleDriveUrl.match(/\/d\/([^\/]+)/);
+        if (driveIdMatch) {
+          const fileId = driveIdMatch[1];
+          thumbnailUrl = `https://drive.google.com/thumbnail?id=${fileId}&sz=w1280`;
+        }
+      }
+      if (!thumbnailUrl) {
+        thumbnailUrl = `https://images.unsplash.com/photo-${1500000000000 + Math.floor(Math.random() * 100000000)}?w=1280&h=720&fit=crop`;
+      }
 
-  // Update anime
-  app.put("/api/admin/anime/:animeId", requireAdmin, async (req, res) => {
+      const newEpisode: InsertEpisode = {
+        showId: show.id,
+        season: ep.season,
+        episodeNumber: ep.episodeNumber,
+        title: ep.title || `Episode ${ep.episodeNumber}`,
+        description: ep.description || `Episode ${ep.episodeNumber} of ${show.title}`,
+        thumbnailUrl,
+        duration: ep.duration || 45,
+        googleDriveUrl: ep.googleDriveUrl,
+        airDate: ep.airDate || new Date().toISOString().split("T")[0],
+      };
+
+      try {
+        await storage.createEpisode(newEpisode);
+        console.log(`   ✅ Added S${ep.season}E${ep.episodeNumber}`);
+        added++;
+      } catch (error) {
+        console.error(`   ❌ Failed to add S${ep.season}E${ep.episodeNumber}:`, error);
+        skipped++;
+      }
+    }
+
+    console.log(`\n✨ Completed! Added: ${added}, Skipped: ${skipped}`);
+
+    res.json({
+      success: true,
+      show: show.title,
+      added,
+      skipped,
+      total: added + skipped
+    });
+  } catch (error: any) {
+    console.error("❌ Bulk add failed:", error);
+    res.status(500).json({
+      error: "Failed to add episodes",
+      details: error.message
+    });
+  }
+});
+
+// Update episode
+app.put("/api/admin/episodes/:episodeId", requireAdmin, async (req, res) => {
+  try {
+    const { episodeId } = req.params;
+    const episode = await storage.updateEpisode(episodeId, req.body);
+    res.json(episode);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to update episode" });
+  }
+});
+
+// Delete episode
+app.delete("/api/admin/episodes/:episodeId", requireAdmin, async (req, res) => {
+  try {
+    const { episodeId } = req.params;
+    await storage.deleteEpisode(episodeId);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to delete episode" });
+  }
+});
+
+// Delete all episodes for a show's season
+app.delete("/api/admin/shows/:showId/seasons/:seasonNumber", requireAdmin, async (req, res) => {
+  try {
+    const { showId, seasonNumber } = req.params;
+    const season = parseInt(seasonNumber);
+
+    // Get all episodes for this show
+    const allEpisodes = await storage.getEpisodesByShowId(showId);
+
+    // Filter episodes for this season
+    const seasonEpisodes = allEpisodes.filter(ep => ep.season === season);
+
+    // Delete each episode
+    let deleted = 0;
+    for (const episode of seasonEpisodes) {
+      await storage.deleteEpisode(episode.id);
+      deleted++;
+    }
+
+    console.log(`🗑️ Deleted ${deleted} episodes from season ${season}`);
+
+    res.json({
+      success: true,
+      deleted,
+      season
+    });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to delete season episodes" });
+  }
+});
+
+// Import shows and episodes from JSON file
+app.post("/api/admin/import-shows-episodes", requireAdmin, async (req, res) => {
+  try {
+    const { filePath } = req.body;
+
+    if (!filePath) {
+      return res.status(400).json({ error: "File path is required" });
+    }
+
+    console.log(`🚀 Starting show and episode import from: ${filePath}`);
+
+    // Check if file exists
+    if (!existsSync(filePath)) {
+      console.error(`❌ File not found: ${filePath}`);
+      return res.status(404).json({
+        error: "File not found",
+        details: `The file "${filePath}" does not exist. Please check the path and try again.`
+      });
+    }
+
+    // Read and parse JSON
+    let rawData: string;
+    let importData: any;
     try {
-      const { animeId } = req.params;
-      const anime = await storage.updateAnime(animeId, req.body);
-      res.json(anime);
+      rawData = readFileSync(filePath, "utf-8");
+      importData = JSON.parse(rawData);
     } catch (error: any) {
-      res.status(500).json({ error: "Failed to update anime", details: error.message });
+      return res.status(400).json({
+        error: "Invalid JSON file",
+        details: error.message
+      });
     }
-  });
 
-  // Delete anime (and its episodes)
-  app.delete("/api/admin/anime/:animeId", requireAdmin, async (req, res) => {
-    try {
-      const { animeId } = req.params;
-      // Delete all anime episodes first
-      const episodes = await storage.getAnimeEpisodesByAnimeId(animeId);
-      for (const ep of episodes) {
-        await storage.deleteAnimeEpisode(ep.id);
-      }
-      // Then delete the anime
-      await storage.deleteAnime(animeId);
-      res.json({ success: true });
-    } catch (error) {
-      res.status(500).json({ error: "Failed to delete anime" });
-    }
-  });
+    // Handle new format (single show with episodes array)
+    if (importData.showSlug && importData.episodes) {
+      console.log(`📊 Found episodes for show: ${importData.showSlug}`);
 
-  // Add anime episode
-  app.post("/api/admin/anime-episodes", requireAdmin, async (req, res) => {
-    try {
-      const episode = await storage.createAnimeEpisode(req.body);
-      res.json(episode);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to create anime episode" });
-    }
-  });
+      // Find the show by slug
+      const existingShow = await storage.getShowBySlug(importData.showSlug);
 
-  // Delete anime episode
-  app.delete("/api/admin/anime-episodes/:episodeId", requireAdmin, async (req, res) => {
-    try {
-      const { episodeId } = req.params;
-      await storage.deleteAnimeEpisode(episodeId);
-      res.json({ success: true });
-    } catch (error) {
-      res.status(500).json({ error: "Failed to delete anime episode" });
-    }
-  });
-
-  // Add new episode
-  app.post("/api/admin/episodes", requireAdmin, async (req, res) => {
-    try {
-      const episode = await storage.createEpisode(req.body);
-      res.json(episode);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to create episode" });
-    }
-  });
-
-  // Bulk add episodes to a show by slug
-  app.post("/api/admin/episodes/bulk", requireAdmin, async (req, res) => {
-    try {
-      const { slug, episodes } = req.body;
-
-      if (!slug || !episodes || !Array.isArray(episodes)) {
-        return res.status(400).json({ error: "Slug and episodes array are required" });
+      if (!existingShow) {
+        return res.status(404).json({
+          error: "Show not found",
+          details: `No show found with slug "${importData.showSlug}". Please create the show first.`
+        });
       }
 
-      // Find show by slug
-      const show = await storage.getShowBySlug(slug);
-      if (!show) {
-        return res.status(404).json({ error: `Show with slug "${slug}" not found` });
-      }
+      let episodesImported = 0;
+      let episodesSkipped = 0;
 
-      console.log(`🚀 Adding episodes to: ${show.title}`);
-
-      // Get existing episodes to avoid duplicates
-      const existingEpisodes = await storage.getEpisodesByShowId(show.id);
-      const existingKeys = new Set(
+      // Get existing episodes
+      const existingEpisodes = await storage.getEpisodesByShowId(existingShow.id);
+      const existingEpisodeKeys = new Set(
         existingEpisodes.map(ep => `${ep.season}-${ep.episodeNumber}`)
       );
 
-      let added = 0;
-      let skipped = 0;
+      // Import each episode
+      for (const episode of importData.episodes) {
+        const episodeKey = `${episode.seasonNumber}-${episode.episodeNumber}`;
 
-      for (const ep of episodes) {
-        const key = `${ep.season}-${ep.episodeNumber}`;
-
-        if (existingKeys.has(key)) {
-          console.log(`   ⏭️  Skipping S${ep.season}E${ep.episodeNumber} (already exists)`);
-          skipped++;
+        if (existingEpisodeKeys.has(episodeKey)) {
+          episodesSkipped++;
           continue;
         }
 
         // Generate thumbnail from Google Drive if not provided
-        let thumbnailUrl = ep.thumbnailUrl;
-        if (!thumbnailUrl && ep.googleDriveUrl) {
-          const driveIdMatch = ep.googleDriveUrl.match(/\/d\/([^\/]+)/);
+        let thumbnailUrl = episode.thumbnailUrl;
+        if (!thumbnailUrl && episode.videoUrl) {
+          // Extract Google Drive file ID and create thumbnail URL
+          const driveIdMatch = episode.videoUrl.match(/\/d\/([^\/]+)/);
           if (driveIdMatch) {
             const fileId = driveIdMatch[1];
             thumbnailUrl = `https://drive.google.com/thumbnail?id=${fileId}&sz=w1280`;
           }
         }
+        // Fallback to random Unsplash image if still no thumbnail
         if (!thumbnailUrl) {
           thumbnailUrl = `https://images.unsplash.com/photo-${1500000000000 + Math.floor(Math.random() * 100000000)}?w=1280&h=720&fit=crop`;
         }
 
         const newEpisode: InsertEpisode = {
-          showId: show.id,
-          season: ep.season,
-          episodeNumber: ep.episodeNumber,
-          title: ep.title || `Episode ${ep.episodeNumber}`,
-          description: ep.description || `Episode ${ep.episodeNumber} of ${show.title}`,
+          showId: existingShow.id,
+          season: episode.seasonNumber,
+          episodeNumber: episode.episodeNumber,
+          title: episode.title,
+          description: episode.description,
           thumbnailUrl,
-          duration: ep.duration || 45,
-          googleDriveUrl: ep.googleDriveUrl,
-          airDate: ep.airDate || new Date().toISOString().split("T")[0],
+          googleDriveUrl: episode.videoUrl,
+          duration: episode.duration,
+          airDate: null
         };
 
-        try {
-          await storage.createEpisode(newEpisode);
-          console.log(`   ✅ Added S${ep.season}E${ep.episodeNumber}`);
-          added++;
-        } catch (error) {
-          console.error(`   ❌ Failed to add S${ep.season}E${ep.episodeNumber}:`, error);
-          skipped++;
-        }
+        await storage.createEpisode(newEpisode);
+        episodesImported++;
       }
 
-      console.log(`\n✨ Completed! Added: ${added}, Skipped: ${skipped}`);
-
-      res.json({
-        success: true,
-        show: show.title,
-        added,
-        skipped,
-        total: added + skipped
-      });
-    } catch (error: any) {
-      console.error("❌ Bulk add failed:", error);
-      res.status(500).json({
-        error: "Failed to add episodes",
-        details: error.message
-      });
-    }
-  });
-
-  // Update episode
-  app.put("/api/admin/episodes/:episodeId", requireAdmin, async (req, res) => {
-    try {
-      const { episodeId } = req.params;
-      const episode = await storage.updateEpisode(episodeId, req.body);
-      res.json(episode);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to update episode" });
-    }
-  });
-
-  // Delete episode
-  app.delete("/api/admin/episodes/:episodeId", requireAdmin, async (req, res) => {
-    try {
-      const { episodeId } = req.params;
-      await storage.deleteEpisode(episodeId);
-      res.json({ success: true });
-    } catch (error) {
-      res.status(500).json({ error: "Failed to delete episode" });
-    }
-  });
-
-  // Delete all episodes for a show's season
-  app.delete("/api/admin/shows/:showId/seasons/:seasonNumber", requireAdmin, async (req, res) => {
-    try {
-      const { showId, seasonNumber } = req.params;
-      const season = parseInt(seasonNumber);
-
-      // Get all episodes for this show
-      const allEpisodes = await storage.getEpisodesByShowId(showId);
-
-      // Filter episodes for this season
-      const seasonEpisodes = allEpisodes.filter(ep => ep.season === season);
-
-      // Delete each episode
-      let deleted = 0;
-      for (const episode of seasonEpisodes) {
-        await storage.deleteEpisode(episode.id);
-        deleted++;
-      }
-
-      console.log(`🗑️ Deleted ${deleted} episodes from season ${season}`);
-
-      res.json({
-        success: true,
-        deleted,
-        season
-      });
-    } catch (error) {
-      res.status(500).json({ error: "Failed to delete season episodes" });
-    }
-  });
-
-  // Import shows and episodes from JSON file
-  app.post("/api/admin/import-shows-episodes", requireAdmin, async (req, res) => {
-    try {
-      const { filePath } = req.body;
-
-      if (!filePath) {
-        return res.status(400).json({ error: "File path is required" });
-      }
-
-      console.log(`🚀 Starting show and episode import from: ${filePath}`);
-
-      // Check if file exists
-      if (!existsSync(filePath)) {
-        console.error(`❌ File not found: ${filePath}`);
-        return res.status(404).json({
-          error: "File not found",
-          details: `The file "${filePath}" does not exist. Please check the path and try again.`
+      // Update totalSeasons if needed
+      const allEpisodes = await storage.getEpisodesByShowId(existingShow.id);
+      const maxSeason = Math.max(...allEpisodes.map(ep => ep.season));
+      if (maxSeason > existingShow.totalSeasons) {
+        await storage.updateShow(existingShow.id, {
+          totalSeasons: maxSeason
         });
+        console.log(`📊 Updated totalSeasons to ${maxSeason}`);
       }
 
-      // Read and parse JSON
-      let rawData: string;
-      let importData: any;
-      try {
-        rawData = readFileSync(filePath, "utf-8");
-        importData = JSON.parse(rawData);
-      } catch (error: any) {
-        return res.status(400).json({
-          error: "Invalid JSON file",
-          details: error.message
-        });
-      }
+      console.log(`✅ Import complete!`);
+      console.log(`   Episodes imported: ${episodesImported}`);
+      console.log(`   Episodes skipped: ${episodesSkipped}`);
 
-      // Handle new format (single show with episodes array)
-      if (importData.showSlug && importData.episodes) {
-        console.log(`📊 Found episodes for show: ${importData.showSlug}`);
-
-        // Find the show by slug
-        const existingShow = await storage.getShowBySlug(importData.showSlug);
-
-        if (!existingShow) {
-          return res.status(404).json({
-            error: "Show not found",
-            details: `No show found with slug "${importData.showSlug}". Please create the show first.`
-          });
+      return res.json({
+        success: true,
+        summary: {
+          showsCreated: 0,
+          showsSkipped: 1,
+          episodesImported,
+          episodesSkipped,
+          showTitle: existingShow.title,
+          totalEpisodes: importData.episodes.length
         }
+      });
+    }
 
-        let episodesImported = 0;
-        let episodesSkipped = 0;
+    // Handle old format (multiple shows with seasons)
+    console.log(`📊 Found ${importData.total_shows} shows with ${importData.total_episodes} episodes`);
 
-        // Get existing episodes
-        const existingEpisodes = await storage.getEpisodesByShowId(existingShow.id);
-        const existingEpisodeKeys = new Set(
-          existingEpisodes.map(ep => `${ep.season}-${ep.episodeNumber}`)
-        );
+    let showsCreated = 0;
+    let showsSkipped = 0;
+    let episodesImported = 0;
+    let episodesSkipped = 0;
 
-        // Import each episode
-        for (const episode of importData.episodes) {
-          const episodeKey = `${episode.seasonNumber}-${episode.episodeNumber}`;
+    // Process each show
+    for (const importedShow of importData.shows) {
+      // Check if show already exists
+      const existingShow = await storage.getShowBySlug(importedShow.slug);
+
+      let showId: string;
+      if (existingShow) {
+        console.log(`⏭️  Show already exists: ${importedShow.title}`);
+        showId = existingShow.id;
+        showsSkipped++;
+      } else {
+        // Create new show with default values
+        const totalSeasons = Object.keys(importedShow.seasons).length;
+        const newShow = await storage.createShow({
+          title: importedShow.title,
+          slug: importedShow.slug,
+          description: `${importedShow.title} - Hindi Dubbed Series`,
+          posterUrl: "https://images.unsplash.com/photo-1574267432644-f65e2d32b5c1?w=600&h=900&fit=crop",
+          backdropUrl: "https://images.unsplash.com/photo-1574267432644-f65e2d32b5c1?w=1920&h=800&fit=crop",
+          year: 2024,
+          rating: "TV-14",
+          imdbRating: "7.5",
+          genres: "Drama",
+          language: "Hindi",
+          totalSeasons: totalSeasons,
+          cast: "",
+          creators: "",
+          featured: false,
+          trending: false,
+          category: "drama"
+        });
+        showId = newShow.id;
+        showsCreated++;
+        console.log(`✅ Created show: ${importedShow.title}`);
+      }
+
+      // Import episodes for this show
+      const existingEpisodes = await storage.getEpisodesByShowId(showId);
+      const existingEpisodeKeys = new Set(
+        existingEpisodes.map(ep => `${ep.season}-${ep.episodeNumber}`)
+      );
+
+      for (const [seasonKey, episodes] of Object.entries(importedShow.seasons)) {
+        const seasonNumber = parseInt(seasonKey.replace("season_", ""));
+
+        for (const episode of episodes as any[]) {
+          const episodeKey = `${seasonNumber}-${episode.episode}`;
 
           if (existingEpisodeKeys.has(episodeKey)) {
             episodesSkipped++;
             continue;
           }
 
-          // Generate thumbnail from Google Drive if not provided
-          let thumbnailUrl = episode.thumbnailUrl;
-          if (!thumbnailUrl && episode.videoUrl) {
-            // Extract Google Drive file ID and create thumbnail URL
-            const driveIdMatch = episode.videoUrl.match(/\/d\/([^\/]+)/);
-            if (driveIdMatch) {
-              const fileId = driveIdMatch[1];
-              thumbnailUrl = `https://drive.google.com/thumbnail?id=${fileId}&sz=w1280`;
-            }
-          }
-          // Fallback to random Unsplash image if still no thumbnail
-          if (!thumbnailUrl) {
-            thumbnailUrl = `https://images.unsplash.com/photo-${1500000000000 + Math.floor(Math.random() * 100000000)}?w=1280&h=720&fit=crop`;
-          }
-
           const newEpisode: InsertEpisode = {
-            showId: existingShow.id,
-            season: episode.seasonNumber,
-            episodeNumber: episode.episodeNumber,
-            title: episode.title,
-            description: episode.description,
-            thumbnailUrl,
-            googleDriveUrl: episode.videoUrl,
-            duration: episode.duration,
-            airDate: null
+            showId: showId,
+            season: seasonNumber,
+            episodeNumber: episode.episode,
+            title: `Episode ${episode.episode}`,
+            description: `Episode ${episode.episode} of ${importedShow.title}`,
+            thumbnailUrl: `https://images.unsplash.com/photo-${1500000000000 + Math.floor(Math.random() * 100000000)}?w=1280&h=720&fit=crop`,
+            duration: 45,
+            googleDriveUrl: episode.embed_url,
+            airDate: new Date().toISOString().split("T")[0],
           };
 
-          await storage.createEpisode(newEpisode);
-          episodesImported++;
-        }
-
-        // Update totalSeasons if needed
-        const allEpisodes = await storage.getEpisodesByShowId(existingShow.id);
-        const maxSeason = Math.max(...allEpisodes.map(ep => ep.season));
-        if (maxSeason > existingShow.totalSeasons) {
-          await storage.updateShow(existingShow.id, {
-            totalSeasons: maxSeason
-          });
-          console.log(`📊 Updated totalSeasons to ${maxSeason}`);
-        }
-
-        console.log(`✅ Import complete!`);
-        console.log(`   Episodes imported: ${episodesImported}`);
-        console.log(`   Episodes skipped: ${episodesSkipped}`);
-
-        return res.json({
-          success: true,
-          summary: {
-            showsCreated: 0,
-            showsSkipped: 1,
-            episodesImported,
-            episodesSkipped,
-            showTitle: existingShow.title,
-            totalEpisodes: importData.episodes.length
-          }
-        });
-      }
-
-      // Handle old format (multiple shows with seasons)
-      console.log(`📊 Found ${importData.total_shows} shows with ${importData.total_episodes} episodes`);
-
-      let showsCreated = 0;
-      let showsSkipped = 0;
-      let episodesImported = 0;
-      let episodesSkipped = 0;
-
-      // Process each show
-      for (const importedShow of importData.shows) {
-        // Check if show already exists
-        const existingShow = await storage.getShowBySlug(importedShow.slug);
-
-        let showId: string;
-        if (existingShow) {
-          console.log(`⏭️  Show already exists: ${importedShow.title}`);
-          showId = existingShow.id;
-          showsSkipped++;
-        } else {
-          // Create new show with default values
-          const totalSeasons = Object.keys(importedShow.seasons).length;
-          const newShow = await storage.createShow({
-            title: importedShow.title,
-            slug: importedShow.slug,
-            description: `${importedShow.title} - Hindi Dubbed Series`,
-            posterUrl: "https://images.unsplash.com/photo-1574267432644-f65e2d32b5c1?w=600&h=900&fit=crop",
-            backdropUrl: "https://images.unsplash.com/photo-1574267432644-f65e2d32b5c1?w=1920&h=800&fit=crop",
-            year: 2024,
-            rating: "TV-14",
-            imdbRating: "7.5",
-            genres: "Drama",
-            language: "Hindi",
-            totalSeasons: totalSeasons,
-            cast: "",
-            creators: "",
-            featured: false,
-            trending: false,
-            category: "drama"
-          });
-          showId = newShow.id;
-          showsCreated++;
-          console.log(`✅ Created show: ${importedShow.title}`);
-        }
-
-        // Import episodes for this show
-        const existingEpisodes = await storage.getEpisodesByShowId(showId);
-        const existingEpisodeKeys = new Set(
-          existingEpisodes.map(ep => `${ep.season}-${ep.episodeNumber}`)
-        );
-
-        for (const [seasonKey, episodes] of Object.entries(importedShow.seasons)) {
-          const seasonNumber = parseInt(seasonKey.replace("season_", ""));
-
-          for (const episode of episodes as any[]) {
-            const episodeKey = `${seasonNumber}-${episode.episode}`;
-
-            if (existingEpisodeKeys.has(episodeKey)) {
-              episodesSkipped++;
-              continue;
-            }
-
-            const newEpisode: InsertEpisode = {
-              showId: showId,
-              season: seasonNumber,
-              episodeNumber: episode.episode,
-              title: `Episode ${episode.episode}`,
-              description: `Episode ${episode.episode} of ${importedShow.title}`,
-              thumbnailUrl: `https://images.unsplash.com/photo-${1500000000000 + Math.floor(Math.random() * 100000000)}?w=1280&h=720&fit=crop`,
-              duration: 45,
-              googleDriveUrl: episode.embed_url,
-              airDate: new Date().toISOString().split("T")[0],
-            };
-
-            try {
-              await storage.createEpisode(newEpisode);
-              episodesImported++;
-            } catch (error) {
-              episodesSkipped++;
-            }
+          try {
+            await storage.createEpisode(newEpisode);
+            episodesImported++;
+          } catch (error) {
+            episodesSkipped++;
           }
         }
       }
-
-      const summary = {
-        showsCreated,
-        showsSkipped,
-        episodesImported,
-        episodesSkipped,
-        totalShows: showsCreated + showsSkipped,
-        totalEpisodes: episodesImported + episodesSkipped
-      };
-
-      console.log(`\n\n📊 Import Summary:`);
-      console.log(`   Shows created: ${showsCreated}`);
-      console.log(`   Shows skipped: ${showsSkipped}`);
-      console.log(`   Episodes imported: ${episodesImported}`);
-      console.log(`   Episodes skipped: ${episodesSkipped}`);
-      console.log(`\n✨ Import completed!`);
-
-      res.json({
-        success: true,
-        message: "Import completed successfully",
-        summary
-      });
-    } catch (error: any) {
-      console.error("❌ Import failed:", error);
-      res.status(500).json({
-        error: "Failed to import",
-        details: error.message
-      });
     }
-  });
 
-  // Import episodes from JSON file
-  app.post("/api/admin/import-episodes", requireAdmin, async (req, res) => {
-    try {
-      const { filePath } = req.body;
-
-      if (!filePath) {
-        return res.status(400).json({ error: "File path is required" });
-      }
-
-      console.log(`🚀 Starting episode import from: ${filePath}`);
-
-      // Check if file exists
-      if (!existsSync(filePath)) {
-        console.error(`❌ File not found: ${filePath}`);
-        return res.status(404).json({
-          error: "File not found",
-          details: `The file "${filePath}" does not exist. Please check the path and try again.`
-        });
-      }
-
-      // Read the JSON file
-      let rawData: string;
-      try {
-        rawData = readFileSync(filePath, "utf-8");
-      } catch (readError: any) {
-        console.error(`❌ Error reading file:`, readError);
-        return res.status(500).json({
-          error: "Failed to read file",
-          details: readError.message
-        });
-      }
-
-      // Parse JSON
-      let importData: any;
-      try {
-        importData = JSON.parse(rawData);
-      } catch (parseError: any) {
-        console.error(`❌ Error parsing JSON:`, parseError);
-        return res.status(400).json({
-          error: "Invalid JSON file",
-          details: `The file contains invalid JSON: ${parseError.message}`
-        });
-      }
-
-      console.log(`📊 Found ${importData.total_shows} shows with ${importData.total_episodes} episodes`);
-
-      // Get all existing shows from the database
-      const existingShows = await storage.getAllShows();
-      console.log(`💾 Found ${existingShows.length} shows in database`);
-
-      // Create a map of slug to show ID
-      const slugToShowMap = new Map<string, string>();
-      existingShows.forEach(show => {
-        slugToShowMap.set(show.slug, show.id);
-      });
-
-      let totalImported = 0;
-      let totalSkipped = 0;
-      let showsMatched = 0;
-      let showsNotFound = 0;
-      const notFoundShows: string[] = [];
-
-      // Process each show in the import data
-      for (const importedShow of importData.shows) {
-        const showId = slugToShowMap.get(importedShow.slug);
-
-        if (!showId) {
-          console.log(`⚠️  Show not found in database: ${importedShow.title} (${importedShow.slug})`);
-          notFoundShows.push(`${importedShow.title} (${importedShow.slug})`);
-          showsNotFound++;
-          totalSkipped += importedShow.total_episodes;
-          continue;
-        }
-
-        showsMatched++;
-        console.log(`✅ Processing: ${importedShow.title}`);
-
-        // Get existing episodes for this show to avoid duplicates
-        const existingEpisodes = await storage.getEpisodesByShowId(showId);
-        const existingEpisodeKeys = new Set(
-          existingEpisodes.map(ep => `${ep.season}-${ep.episodeNumber}`)
-        );
-
-        // Process each season
-        for (const [seasonKey, episodes] of Object.entries(importedShow.seasons)) {
-          const seasonNumber = parseInt(seasonKey.replace("season_", ""));
-
-          for (const episode of episodes as any[]) {
-            const episodeKey = `${seasonNumber}-${episode.episode}`;
-
-            // Skip if episode already exists
-            if (existingEpisodeKeys.has(episodeKey)) {
-              console.log(`   ⏭️  Skipping S${seasonNumber}E${episode.episode} (already exists)`);
-              totalSkipped++;
-              continue;
-            }
-
-            // Create the episode
-            const newEpisode: InsertEpisode = {
-              showId: showId,
-              season: seasonNumber,
-              episodeNumber: episode.episode,
-              title: `Episode ${episode.episode}`,
-              description: `Episode ${episode.episode} of ${importedShow.title}`,
-              thumbnailUrl: `https://images.unsplash.com/photo-${1500000000000 + Math.floor(Math.random() * 100000000)}?w=1280&h=720&fit=crop`,
-              duration: 45,
-              googleDriveUrl: episode.embed_url,
-              airDate: new Date().toISOString().split("T")[0],
-            };
-
-            try {
-              await storage.createEpisode(newEpisode);
-              console.log(`   ✅ Added S${seasonNumber}E${episode.episode}`);
-              totalImported++;
-            } catch (error) {
-              console.error(`   ❌ Failed to add S${seasonNumber}E${episode.episode}:`, error);
-              totalSkipped++;
-            }
-          }
-        }
-      }
-
-      const summary = {
-        showsMatched,
-        showsNotFound,
-        notFoundShows,
-        episodesImported: totalImported,
-        episodesSkipped: totalSkipped,
-        totalProcessed: totalImported + totalSkipped
-      };
-
-      console.log(`\n\n📊 Import Summary:`);
-      console.log(`   Shows matched: ${showsMatched}`);
-      console.log(`   Shows not found: ${showsNotFound}`);
-      console.log(`   Episodes imported: ${totalImported}`);
-      console.log(`   Episodes skipped: ${totalSkipped}`);
-      console.log(`\n✨ Import completed!`);
-
-      res.json({
-        success: true,
-        message: "Import completed successfully",
-        summary
-      });
-    } catch (error: any) {
-      console.error("❌ Import failed:", error);
-      res.status(500).json({
-        error: "Failed to import episodes",
-        details: error.message
-      });
-    }
-  });
-
-  // Admin: Get all content requests
-  app.get("/api/admin/content-requests", requireAdmin, async (req, res) => {
-    try {
-      const requests = await storage.getAllContentRequests();
-      res.json(requests);
-    } catch (error: any) {
-      console.error('Error fetching content requests:', error);
-      res.status(500).json({ error: 'Failed to fetch content requests' });
-    }
-  });
-
-  // Admin: Get all issue reports
-  app.get("/api/admin/issue-reports", requireAdmin, async (req, res) => {
-    try {
-      const reports = await storage.getAllIssueReports();
-      res.json(reports);
-    } catch (error: any) {
-      console.error('Error fetching issue reports:', error);
-      res.status(500).json({ error: 'Failed to fetch issue reports' });
-    }
-  });
-
-  // Admin: Get all comments
-  app.get("/api/admin/comments", requireAdmin, async (req, res) => {
-    try {
-      const comments = await storage.getAllComments();
-      res.json(comments);
-    } catch (error: any) {
-      console.error('Error fetching comments:', error);
-      res.status(500).json({ error: 'Failed to fetch comments' });
-    }
-  });
-
-  // Admin: Delete comment
-  app.delete("/api/admin/comments/:commentId", requireAdmin, async (req, res) => {
-    try {
-      const { commentId } = req.params;
-      await storage.deleteComment(commentId);
-      res.json({ success: true, message: 'Comment deleted successfully' });
-    } catch (error: any) {
-      console.error('Error deleting comment:', error);
-      res.status(500).json({ error: 'Failed to delete comment' });
-    }
-  });
-
-  // Handle issue reports
-  app.post("/api/report-issue", async (req, res) => {
-    try {
-      const { issueType, title, description, url, email } = req.body;
-
-      // Save to storage
-      const report = await storage.createIssueReport({
-        issueType,
-        title,
-        description,
-        url,
-        email,
-      });
-
-      console.log('📝 Issue Report Received:', report.id);
-      console.log('Type:', issueType);
-      console.log('Title:', title);
-      console.log('---');
-
-      // Send email notification (don't wait for it)
-      sendIssueReportEmail(report).catch(err =>
-        console.error('Failed to send issue report email:', err)
-      );
-
-      res.json({
-        success: true,
-        message: 'Report submitted successfully',
-        reportId: report.id
-      });
-    } catch (error: any) {
-      console.error('Error submitting report:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Failed to submit report'
-      });
-    }
-  });
-
-  // Handle content requests
-  app.post("/api/request-content", async (req, res) => {
-    try {
-      const { contentType, title, year, genre, description, reason, email } = req.body;
-
-      // Save to storage (increments count if duplicate)
-      const request = await storage.createContentRequest({
-        contentType,
-        title,
-        year,
-        genre,
-        description,
-        reason,
-        email,
-      });
-
-      console.log('🎬 Content Request:', request.title, `(${request.requestCount} requests)`);
-
-      // Send email notification (don't wait for it)
-      sendContentRequestEmail(request).catch(err =>
-        console.error('Failed to send content request email:', err)
-      );
-
-      res.json({
-        success: true,
-        message: 'Content request submitted successfully',
-        requestCount: request.requestCount
-      });
-    } catch (error: any) {
-      console.error('Error submitting content request:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Failed to submit content request'
-      });
-    }
-  });
-
-  // Get top content requests
-  app.get("/api/top-requests", async (_req, res) => {
-    try {
-      const topRequests = await storage.getTopContentRequests(5);
-      res.json(topRequests);
-    } catch (error: any) {
-      console.error('Error fetching top requests:', error);
-      res.status(500).json({ error: 'Failed to fetch top requests' });
-    }
-  });
-
-  // Admin - Get all content requests
-  app.get("/api/admin/content-requests", async (_req, res) => {
-    try {
-      const requests = await storage.getAllContentRequests();
-      res.json(requests);
-    } catch (error) {
-      console.error('Error fetching content requests:', error);
-      res.status(500).json({ error: "Failed to fetch content requests" });
-    }
-  });
-
-  // Admin - Update content request status
-  app.patch("/api/admin/content-requests/:id", async (req, res) => {
-    try {
-      const { id } = req.params;
-      const updates = req.body;
-      const updated = await storage.updateContentRequest(id, updates);
-      res.json(updated);
-    } catch (error) {
-      console.error('Error updating content request:', error);
-      res.status(500).json({ error: "Failed to update content request" });
-    }
-  });
-
-  // Admin - Get all issue reports
-  app.get("/api/admin/issue-reports", async (_req, res) => {
-    try {
-      const reports = await storage.getAllIssueReports();
-      res.json(reports);
-    } catch (error) {
-      console.error('Error fetching issue reports:', error);
-      res.status(500).json({ error: "Failed to fetch issue reports" });
-    }
-  });
-
-  // Admin - Update issue report status
-  app.patch("/api/admin/issue-reports/:id", async (req, res) => {
-    try {
-      const { id } = req.params;
-      const updates = req.body;
-      const updated = await storage.updateIssueReport(id, updates);
-      res.json(updated);
-    } catch (error) {
-      console.error('Error updating issue report:', error);
-      res.status(500).json({ error: "Failed to update issue report" });
-    }
-  });
-
-  // Comments - Get comments for an episode
-  app.get("/api/comments/episode/:episodeId", async (req, res) => {
-    try {
-      const { episodeId } = req.params;
-      const comments = await storage.getCommentsByEpisodeId(episodeId);
-      res.json(comments);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch comments" });
-    }
-  });
-
-  // Comments - Get comments for a movie
-  app.get("/api/comments/movie/:movieId", async (req, res) => {
-    try {
-      const { movieId } = req.params;
-      const comments = await storage.getCommentsByMovieId(movieId);
-      res.json(comments);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch comments" });
-    }
-  });
-
-  // Comments - Create a new comment
-  app.post("/api/comments", async (req, res) => {
-    try {
-      const { episodeId, movieId, parentId, userName, comment } = req.body;
-
-      // Validate input
-      if (!userName || !comment) {
-        return res.status(400).json({ error: "userName and comment are required" });
-      }
-
-      if (!episodeId && !movieId) {
-        return res.status(400).json({ error: "Either episodeId or movieId is required" });
-      }
-
-      // Try to get authenticated user details to link comment
-      let userId: string | undefined;
-      let avatarUrl: string | undefined;
-
-      const token = req.cookies?.authToken;
-      if (token) {
-        const payload = verifyToken(token);
-        if (payload) {
-          userId = payload.userId;
-          // Get latest avatar from DB
-          const user = await storage.getUserById(userId);
-          if (user && user.avatarUrl) {
-            avatarUrl = user.avatarUrl;
-          }
-        }
-      }
-
-      const newComment = await storage.createComment({
-        episodeId: episodeId || null,
-        movieId: movieId || null,
-        parentId: parentId || null,
-        userId: userId || null,
-        userName,
-        avatarUrl: avatarUrl || null,
-        comment,
-      });
-
-      res.status(201).json(newComment);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to create comment" });
-    }
-  });
-
-  // ============ BLOG POSTS API ============
-
-  // Get all published blog posts (public)
-  app.get("/api/blog", async (_req, res) => {
-    try {
-      const posts = await storage.getPublishedBlogPosts();
-      res.json(posts);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch blog posts" });
-    }
-  });
-
-  // Get blog post by slug (public)
-  app.get("/api/blog/:slug", async (req, res) => {
-    try {
-      const { slug } = req.params;
-      const post = await storage.getBlogPostBySlug(slug);
-
-      if (!post) {
-        return res.status(404).json({ error: "Blog post not found" });
-      }
-
-      // Only return published posts to public
-      if (!post.published) {
-        return res.status(404).json({ error: "Blog post not found" });
-      }
-
-      res.json(post);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch blog post" });
-    }
-  });
-
-  // Admin: Get all blog posts (including unpublished)
-  app.get("/api/admin/blog", requireAdmin, async (_req, res) => {
-    try {
-      const posts = await storage.getAllBlogPosts();
-      res.json(posts);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch blog posts" });
-    }
-  });
-
-  // Admin: Get blog post by ID
-  app.get("/api/admin/blog/:id", requireAdmin, async (req, res) => {
-    try {
-      const { id } = req.params;
-      const post = await storage.getBlogPostById(id);
-
-      if (!post) {
-        return res.status(404).json({ error: "Blog post not found" });
-      }
-
-      res.json(post);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch blog post" });
-    }
-  });
-
-  // Admin: Create blog post
-  app.post("/api/admin/blog", requireAdmin, async (req, res) => {
-    try {
-      const validatedData = insertBlogPostSchema.parse(req.body);
-      const post = await storage.createBlogPost(validatedData);
-      res.status(201).json(post);
-    } catch (error: any) {
-      if (error.name === "ZodError") {
-        return res.status(400).json({ error: "Invalid blog post data", details: error.errors });
-      }
-      res.status(500).json({ error: "Failed to create blog post" });
-    }
-  });
-
-  // Admin: Update blog post
-  app.put("/api/admin/blog/:id", requireAdmin, async (req, res) => {
-    try {
-      const { id } = req.params;
-      const post = await storage.updateBlogPost(id, req.body);
-      res.json(post);
-    } catch (error: any) {
-      if (error.message === "Blog post not found") {
-        return res.status(404).json({ error: "Blog post not found" });
-      }
-      res.status(500).json({ error: "Failed to update blog post" });
-    }
-  });
-
-  // Admin: Delete blog post
-  app.delete("/api/admin/blog/:id", requireAdmin, async (req, res) => {
-    try {
-      const { id } = req.params;
-      await storage.deleteBlogPost(id);
-      res.json({ success: true });
-    } catch (error) {
-      res.status(500).json({ error: "Failed to delete blog post" });
-    }
-  });
-
-  // ========== NEWSLETTER SUBSCRIPTION ==========
-
-  // Subscribe to newsletter
-  app.post("/api/newsletter/subscribe", async (req, res) => {
-    try {
-      const { email } = req.body;
-
-      if (!email || !email.includes("@")) {
-        return res.status(400).json({ error: "Valid email required" });
-      }
-
-      // Read existing subscribers
-      let data = { subscribers: [] as any[] };
-      if (existsSync(SUBSCRIBERS_FILE)) {
-        data = JSON.parse(readFileSync(SUBSCRIBERS_FILE, "utf-8"));
-      }
-
-      // Check if already subscribed
-      const exists = data.subscribers.some((s: any) => s.email === email);
-      if (exists) {
-        return res.json({ success: true, message: "Already subscribed" });
-      }
-
-      // Add new subscriber
-      data.subscribers.push({
-        email,
-        subscribedAt: new Date().toISOString(),
-        source: "footer"
-      });
-
-      // Save to file
-      writeFileSync(SUBSCRIBERS_FILE, JSON.stringify(data, null, 2));
-
-      console.log(`📧 New newsletter subscriber: ${email}`);
-
-      res.json({ success: true, message: "Successfully subscribed!" });
-    } catch (error) {
-      console.error("Newsletter subscription error:", error);
-      res.status(500).json({ error: "Failed to subscribe" });
-    }
-  });
-
-  // Get subscriber count (admin only)
-  app.get("/api/admin/newsletter/subscribers", requireAdmin, async (_req, res) => {
-    try {
-      if (!existsSync(SUBSCRIBERS_FILE)) {
-        return res.json({ count: 0, subscribers: [] });
-      }
-      const data = JSON.parse(readFileSync(SUBSCRIBERS_FILE, "utf-8"));
-      res.json({
-        count: data.subscribers.length,
-        subscribers: data.subscribers
-      });
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch subscribers" });
-    }
-  });
-
-  // ==========================================
-  // PUSH NOTIFICATIONS
-  // ==========================================
-
-  const PUSH_SUBSCRIPTIONS_FILE = path.join(__dirname, "..", "data", "push-subscriptions.json");
-
-  // Configure web-push with VAPID keys
-  const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY;
-  const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
-
-  if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
-    webpush.setVapidDetails(
-      'mailto:contact@streamvault.live',
-      VAPID_PUBLIC_KEY,
-      VAPID_PRIVATE_KEY
-    );
+    const summary = {
+      showsCreated,
+      showsSkipped,
+      episodesImported,
+      episodesSkipped,
+      totalShows: showsCreated + showsSkipped,
+      totalEpisodes: episodesImported + episodesSkipped
+    };
+
+    console.log(`\n\n📊 Import Summary:`);
+    console.log(`   Shows created: ${showsCreated}`);
+    console.log(`   Shows skipped: ${showsSkipped}`);
+    console.log(`   Episodes imported: ${episodesImported}`);
+    console.log(`   Episodes skipped: ${episodesSkipped}`);
+    console.log(`\n✨ Import completed!`);
+
+    res.json({
+      success: true,
+      message: "Import completed successfully",
+      summary
+    });
+  } catch (error: any) {
+    console.error("❌ Import failed:", error);
+    res.status(500).json({
+      error: "Failed to import",
+      details: error.message
+    });
   }
+});
 
-  // Get VAPID public key
-  app.get("/api/push/vapid-key", (_req, res) => {
-    if (!VAPID_PUBLIC_KEY) {
-      return res.status(500).json({ error: "VAPID key not configured" });
+// Import episodes from JSON file
+app.post("/api/admin/import-episodes", requireAdmin, async (req, res) => {
+  try {
+    const { filePath } = req.body;
+
+    if (!filePath) {
+      return res.status(400).json({ error: "File path is required" });
     }
-    res.json({ publicKey: VAPID_PUBLIC_KEY });
-  });
 
-  // Subscribe to push notifications
-  app.post("/api/push/subscribe", async (req, res) => {
-    try {
-      const subscription = req.body;
+    console.log(`🚀 Starting episode import from: ${filePath}`);
 
-      if (!subscription || !subscription.endpoint) {
-        return res.status(400).json({ error: "Invalid subscription" });
-      }
-
-      // Load existing subscriptions
-      let data = { subscriptions: [] as any[] };
-      if (existsSync(PUSH_SUBSCRIPTIONS_FILE)) {
-        data = JSON.parse(readFileSync(PUSH_SUBSCRIPTIONS_FILE, "utf-8"));
-      }
-
-      // Check for duplicate
-      const exists = data.subscriptions.some((s: any) => s.endpoint === subscription.endpoint);
-      if (!exists) {
-        data.subscriptions.push({
-          ...subscription,
-          subscribedAt: new Date().toISOString()
-        });
-        writeFileSync(PUSH_SUBSCRIPTIONS_FILE, JSON.stringify(data, null, 2));
-        console.log(`🔔 New push subscriber (total: ${data.subscriptions.length})`);
-      }
-
-      res.json({ success: true });
-    } catch (error) {
-      console.error("Push subscription error:", error);
-      res.status(500).json({ error: "Failed to subscribe" });
-    }
-  });
-
-  // Unsubscribe from push notifications
-  app.post("/api/push/unsubscribe", async (req, res) => {
-    try {
-      const { endpoint } = req.body;
-
-      if (!existsSync(PUSH_SUBSCRIPTIONS_FILE)) {
-        return res.json({ success: true });
-      }
-
-      const data = JSON.parse(readFileSync(PUSH_SUBSCRIPTIONS_FILE, "utf-8"));
-      data.subscriptions = data.subscriptions.filter((s: any) => s.endpoint !== endpoint);
-      writeFileSync(PUSH_SUBSCRIPTIONS_FILE, JSON.stringify(data, null, 2));
-
-      res.json({ success: true });
-    } catch (error) {
-      res.status(500).json({ error: "Failed to unsubscribe" });
-    }
-  });
-
-  // Get push subscriber count (admin only)
-  app.get("/api/admin/push/subscribers", requireAdmin, async (_req, res) => {
-    try {
-      if (!existsSync(PUSH_SUBSCRIPTIONS_FILE)) {
-        return res.json({ count: 0 });
-      }
-      const data = JSON.parse(readFileSync(PUSH_SUBSCRIPTIONS_FILE, "utf-8"));
-      res.json({ count: data.subscriptions?.length || 0 });
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch count" });
-    }
-  });
-
-  // Send push notification (admin only)
-  app.post("/api/admin/push/send", requireAdmin, async (req, res) => {
-    try {
-      const { title, body, url, type, contentId } = req.body;
-
-      if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
-        return res.status(400).json({ error: "VAPID keys not configured" });
-      }
-
-      if (!existsSync(PUSH_SUBSCRIPTIONS_FILE)) {
-        return res.status(400).json({ error: "No push subscribers" });
-      }
-
-      const data = JSON.parse(readFileSync(PUSH_SUBSCRIPTIONS_FILE, "utf-8"));
-      const subscriptions = data.subscriptions || [];
-
-      if (subscriptions.length === 0) {
-        return res.status(400).json({ error: "No push subscribers" });
-      }
-
-      // Build notification based on type
-      let notificationTitle = title || "StreamVault Update";
-      let notificationBody = body || "Check out what's new!";
-      let notificationUrl = url || "https://streamvault.live";
-      let notificationIcon = "https://streamvault.live/favicon.svg";
-      let notificationImage = ""; // Large banner image
-
-      // If content type is specified, fetch content details
-      if (type && contentId) {
-        if (type === 'show') {
-          const shows = await storage.getAllShows();
-          const show = shows.find((s: any) => s.id === contentId);
-          if (show) {
-            notificationTitle = `🎬 New on StreamVault: ${show.title}`;
-            notificationBody = show.description?.substring(0, 100) + '...' || `Watch ${show.title} now!`;
-            notificationUrl = `https://streamvault.live/show/${show.slug}`;
-            notificationIcon = show.posterUrl || notificationIcon;
-            notificationImage = show.backdropUrl || show.posterUrl || '';
-          }
-        } else if (type === 'movie') {
-          const movies = await storage.getAllMovies();
-          const movie = movies.find((m: any) => m.id === contentId);
-          if (movie) {
-            notificationTitle = `🎬 New Movie: ${movie.title}`;
-            notificationBody = movie.description?.substring(0, 100) + '...' || `Watch ${movie.title} now!`;
-            notificationUrl = `https://streamvault.live/movie/${movie.slug}`;
-            notificationIcon = movie.posterUrl || notificationIcon;
-            notificationImage = movie.backdropUrl || movie.posterUrl || '';
-          }
-        } else if (type === 'episode') {
-          // For episodes, use the show's images
-          const shows = await storage.getAllShows();
-          const show = shows.find((s: any) => s.id === contentId);
-          if (show) {
-            notificationTitle = `📺 New Episode: ${show.title}`;
-            notificationBody = `A new episode is now available!`;
-            notificationUrl = `https://streamvault.live/show/${show.slug}`;
-            notificationIcon = show.posterUrl || notificationIcon;
-            notificationImage = show.backdropUrl || show.posterUrl || '';
-          }
-        }
-      }
-
-      const payload = JSON.stringify({
-        title: notificationTitle,
-        body: notificationBody,
-        icon: notificationIcon,
-        image: notificationImage, // Large banner image
-        badge: "https://streamvault.live/favicon.svg",
-        url: notificationUrl,
-        timestamp: Date.now()
+    // Check if file exists
+    if (!existsSync(filePath)) {
+      console.error(`❌ File not found: ${filePath}`);
+      return res.status(404).json({
+        error: "File not found",
+        details: `The file "${filePath}" does not exist. Please check the path and try again.`
       });
+    }
 
-      let sent = 0;
-      let failed = 0;
-      const failedEndpoints: string[] = [];
+    // Read the JSON file
+    let rawData: string;
+    try {
+      rawData = readFileSync(filePath, "utf-8");
+    } catch (readError: any) {
+      console.error(`❌ Error reading file:`, readError);
+      return res.status(500).json({
+        error: "Failed to read file",
+        details: readError.message
+      });
+    }
 
-      for (const sub of subscriptions) {
-        try {
-          await webpush.sendNotification(sub, payload);
-          sent++;
-        } catch (err: any) {
-          failed++;
-          // Remove invalid subscriptions (410 Gone or 404)
-          if (err.statusCode === 410 || err.statusCode === 404) {
-            failedEndpoints.push(sub.endpoint);
+    // Parse JSON
+    let importData: any;
+    try {
+      importData = JSON.parse(rawData);
+    } catch (parseError: any) {
+      console.error(`❌ Error parsing JSON:`, parseError);
+      return res.status(400).json({
+        error: "Invalid JSON file",
+        details: `The file contains invalid JSON: ${parseError.message}`
+      });
+    }
+
+    console.log(`📊 Found ${importData.total_shows} shows with ${importData.total_episodes} episodes`);
+
+    // Get all existing shows from the database
+    const existingShows = await storage.getAllShows();
+    console.log(`💾 Found ${existingShows.length} shows in database`);
+
+    // Create a map of slug to show ID
+    const slugToShowMap = new Map<string, string>();
+    existingShows.forEach(show => {
+      slugToShowMap.set(show.slug, show.id);
+    });
+
+    let totalImported = 0;
+    let totalSkipped = 0;
+    let showsMatched = 0;
+    let showsNotFound = 0;
+    const notFoundShows: string[] = [];
+
+    // Process each show in the import data
+    for (const importedShow of importData.shows) {
+      const showId = slugToShowMap.get(importedShow.slug);
+
+      if (!showId) {
+        console.log(`⚠️  Show not found in database: ${importedShow.title} (${importedShow.slug})`);
+        notFoundShows.push(`${importedShow.title} (${importedShow.slug})`);
+        showsNotFound++;
+        totalSkipped += importedShow.total_episodes;
+        continue;
+      }
+
+      showsMatched++;
+      console.log(`✅ Processing: ${importedShow.title}`);
+
+      // Get existing episodes for this show to avoid duplicates
+      const existingEpisodes = await storage.getEpisodesByShowId(showId);
+      const existingEpisodeKeys = new Set(
+        existingEpisodes.map(ep => `${ep.season}-${ep.episodeNumber}`)
+      );
+
+      // Process each season
+      for (const [seasonKey, episodes] of Object.entries(importedShow.seasons)) {
+        const seasonNumber = parseInt(seasonKey.replace("season_", ""));
+
+        for (const episode of episodes as any[]) {
+          const episodeKey = `${seasonNumber}-${episode.episode}`;
+
+          // Skip if episode already exists
+          if (existingEpisodeKeys.has(episodeKey)) {
+            console.log(`   ⏭️  Skipping S${seasonNumber}E${episode.episode} (already exists)`);
+            totalSkipped++;
+            continue;
+          }
+
+          // Create the episode
+          const newEpisode: InsertEpisode = {
+            showId: showId,
+            season: seasonNumber,
+            episodeNumber: episode.episode,
+            title: `Episode ${episode.episode}`,
+            description: `Episode ${episode.episode} of ${importedShow.title}`,
+            thumbnailUrl: `https://images.unsplash.com/photo-${1500000000000 + Math.floor(Math.random() * 100000000)}?w=1280&h=720&fit=crop`,
+            duration: 45,
+            googleDriveUrl: episode.embed_url,
+            airDate: new Date().toISOString().split("T")[0],
+          };
+
+          try {
+            await storage.createEpisode(newEpisode);
+            console.log(`   ✅ Added S${seasonNumber}E${episode.episode}`);
+            totalImported++;
+          } catch (error) {
+            console.error(`   ❌ Failed to add S${seasonNumber}E${episode.episode}:`, error);
+            totalSkipped++;
           }
         }
       }
-
-      // Clean up invalid subscriptions
-      if (failedEndpoints.length > 0) {
-        data.subscriptions = data.subscriptions.filter(
-          (s: any) => !failedEndpoints.includes(s.endpoint)
-        );
-        writeFileSync(PUSH_SUBSCRIPTIONS_FILE, JSON.stringify(data, null, 2));
-      }
-
-      console.log(`🔔 Push sent: ${sent} success, ${failed} failed`);
-      res.json({ success: true, sent, failed, cleaned: failedEndpoints.length });
-    } catch (error: any) {
-      console.error("Push send error:", error);
-      res.status(500).json({ error: error.message || "Failed to send push" });
     }
-  });
 
-  // Send newsletter to single subscriber (admin only)
-  app.post("/api/admin/newsletter/send-one", requireAdmin, async (req, res) => {
-    try {
-      const { email } = req.body;
-      if (!email) {
-        return res.status(400).json({ error: "Email is required" });
+    const summary = {
+      showsMatched,
+      showsNotFound,
+      notFoundShows,
+      episodesImported: totalImported,
+      episodesSkipped: totalSkipped,
+      totalProcessed: totalImported + totalSkipped
+    };
+
+    console.log(`\n\n📊 Import Summary:`);
+    console.log(`   Shows matched: ${showsMatched}`);
+    console.log(`   Shows not found: ${showsNotFound}`);
+    console.log(`   Episodes imported: ${totalImported}`);
+    console.log(`   Episodes skipped: ${totalSkipped}`);
+    console.log(`\n✨ Import completed!`);
+
+    res.json({
+      success: true,
+      message: "Import completed successfully",
+      summary
+    });
+  } catch (error: any) {
+    console.error("❌ Import failed:", error);
+    res.status(500).json({
+      error: "Failed to import episodes",
+      details: error.message
+    });
+  }
+});
+
+// Admin: Get all content requests
+app.get("/api/admin/content-requests", requireAdmin, async (req, res) => {
+  try {
+    const requests = await storage.getAllContentRequests();
+    res.json(requests);
+  } catch (error: any) {
+    console.error('Error fetching content requests:', error);
+    res.status(500).json({ error: 'Failed to fetch content requests' });
+  }
+});
+
+// Admin: Get all issue reports
+app.get("/api/admin/issue-reports", requireAdmin, async (req, res) => {
+  try {
+    const reports = await storage.getAllIssueReports();
+    res.json(reports);
+  } catch (error: any) {
+    console.error('Error fetching issue reports:', error);
+    res.status(500).json({ error: 'Failed to fetch issue reports' });
+  }
+});
+
+// Admin: Get all comments
+app.get("/api/admin/comments", requireAdmin, async (req, res) => {
+  try {
+    const comments = await storage.getAllComments();
+    res.json(comments);
+  } catch (error: any) {
+    console.error('Error fetching comments:', error);
+    res.status(500).json({ error: 'Failed to fetch comments' });
+  }
+});
+
+// Admin: Delete comment
+app.delete("/api/admin/comments/:commentId", requireAdmin, async (req, res) => {
+  try {
+    const { commentId } = req.params;
+    await storage.deleteComment(commentId);
+    res.json({ success: true, message: 'Comment deleted successfully' });
+  } catch (error: any) {
+    console.error('Error deleting comment:', error);
+    res.status(500).json({ error: 'Failed to delete comment' });
+  }
+});
+
+// Handle issue reports
+app.post("/api/report-issue", async (req, res) => {
+  try {
+    const { issueType, title, description, url, email } = req.body;
+
+    // Save to storage
+    const report = await storage.createIssueReport({
+      issueType,
+      title,
+      description,
+      url,
+      email,
+    });
+
+    console.log('📝 Issue Report Received:', report.id);
+    console.log('Type:', issueType);
+    console.log('Title:', title);
+    console.log('---');
+
+    // Send email notification (don't wait for it)
+    sendIssueReportEmail(report).catch(err =>
+      console.error('Failed to send issue report email:', err)
+    );
+
+    res.json({
+      success: true,
+      message: 'Report submitted successfully',
+      reportId: report.id
+    });
+  } catch (error: any) {
+    console.error('Error submitting report:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to submit report'
+    });
+  }
+});
+
+// Handle content requests
+app.post("/api/request-content", async (req, res) => {
+  try {
+    const { contentType, title, year, genre, description, reason, email } = req.body;
+
+    // Save to storage (increments count if duplicate)
+    const request = await storage.createContentRequest({
+      contentType,
+      title,
+      year,
+      genre,
+      description,
+      reason,
+      email,
+    });
+
+    console.log('🎬 Content Request:', request.title, `(${request.requestCount} requests)`);
+
+    // Send email notification (don't wait for it)
+    sendContentRequestEmail(request).catch(err =>
+      console.error('Failed to send content request email:', err)
+    );
+
+    res.json({
+      success: true,
+      message: 'Content request submitted successfully',
+      requestCount: request.requestCount
+    });
+  } catch (error: any) {
+    console.error('Error submitting content request:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to submit content request'
+    });
+  }
+});
+
+// Get top content requests
+app.get("/api/top-requests", async (_req, res) => {
+  try {
+    const topRequests = await storage.getTopContentRequests(5);
+    res.json(topRequests);
+  } catch (error: any) {
+    console.error('Error fetching top requests:', error);
+    res.status(500).json({ error: 'Failed to fetch top requests' });
+  }
+});
+
+// Admin - Get all content requests
+app.get("/api/admin/content-requests", async (_req, res) => {
+  try {
+    const requests = await storage.getAllContentRequests();
+    res.json(requests);
+  } catch (error) {
+    console.error('Error fetching content requests:', error);
+    res.status(500).json({ error: "Failed to fetch content requests" });
+  }
+});
+
+// Admin - Update content request status
+app.patch("/api/admin/content-requests/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updates = req.body;
+    const updated = await storage.updateContentRequest(id, updates);
+    res.json(updated);
+  } catch (error) {
+    console.error('Error updating content request:', error);
+    res.status(500).json({ error: "Failed to update content request" });
+  }
+});
+
+// Admin - Get all issue reports
+app.get("/api/admin/issue-reports", async (_req, res) => {
+  try {
+    const reports = await storage.getAllIssueReports();
+    res.json(reports);
+  } catch (error) {
+    console.error('Error fetching issue reports:', error);
+    res.status(500).json({ error: "Failed to fetch issue reports" });
+  }
+});
+
+// Admin - Update issue report status
+app.patch("/api/admin/issue-reports/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updates = req.body;
+    const updated = await storage.updateIssueReport(id, updates);
+    res.json(updated);
+  } catch (error) {
+    console.error('Error updating issue report:', error);
+    res.status(500).json({ error: "Failed to update issue report" });
+  }
+});
+
+// Comments - Get comments for an episode
+app.get("/api/comments/episode/:episodeId", async (req, res) => {
+  try {
+    const { episodeId } = req.params;
+    const comments = await storage.getCommentsByEpisodeId(episodeId);
+    res.json(comments);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch comments" });
+  }
+});
+
+// Comments - Get comments for a movie
+app.get("/api/comments/movie/:movieId", async (req, res) => {
+  try {
+    const { movieId } = req.params;
+    const comments = await storage.getCommentsByMovieId(movieId);
+    res.json(comments);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch comments" });
+  }
+});
+
+// Comments - Create a new comment
+app.post("/api/comments", async (req, res) => {
+  try {
+    const { episodeId, movieId, parentId, userName, comment } = req.body;
+
+    // Validate input
+    if (!userName || !comment) {
+      return res.status(400).json({ error: "userName and comment are required" });
+    }
+
+    if (!episodeId && !movieId) {
+      return res.status(400).json({ error: "Either episodeId or movieId is required" });
+    }
+
+    // Try to get authenticated user details to link comment
+    let userId: string | undefined;
+    let avatarUrl: string | undefined;
+
+    const token = req.cookies?.authToken;
+    if (token) {
+      const payload = verifyToken(token);
+      if (payload) {
+        userId = payload.userId;
+        // Get latest avatar from DB
+        const user = await storage.getUserById(userId);
+        if (user && user.avatarUrl) {
+          avatarUrl = user.avatarUrl;
+        }
       }
+    }
 
-      const DATA_FILE = path.join(__dirname, "..", "data", "streamvault-data.json");
-      const RESEND_API_KEY = process.env.RESEND_API_KEY;
+    const newComment = await storage.createComment({
+      episodeId: episodeId || null,
+      movieId: movieId || null,
+      parentId: parentId || null,
+      userId: userId || null,
+      userName,
+      avatarUrl: avatarUrl || null,
+      comment,
+    });
 
-      if (!RESEND_API_KEY) {
-        return res.status(400).json({ error: "RESEND_API_KEY not configured" });
+    res.status(201).json(newComment);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to create comment" });
+  }
+});
+
+// ============ BLOG POSTS API ============
+
+// Get all published blog posts (public)
+app.get("/api/blog", async (_req, res) => {
+  try {
+    const posts = await storage.getPublishedBlogPosts();
+    res.json(posts);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch blog posts" });
+  }
+});
+
+// Get blog post by slug (public)
+app.get("/api/blog/:slug", async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const post = await storage.getBlogPostBySlug(slug);
+
+    if (!post) {
+      return res.status(404).json({ error: "Blog post not found" });
+    }
+
+    // Only return published posts to public
+    if (!post.published) {
+      return res.status(404).json({ error: "Blog post not found" });
+    }
+
+    res.json(post);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch blog post" });
+  }
+});
+
+// Admin: Get all blog posts (including unpublished)
+app.get("/api/admin/blog", requireAdmin, async (_req, res) => {
+  try {
+    const posts = await storage.getAllBlogPosts();
+    res.json(posts);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch blog posts" });
+  }
+});
+
+// Admin: Get blog post by ID
+app.get("/api/admin/blog/:id", requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const post = await storage.getBlogPostById(id);
+
+    if (!post) {
+      return res.status(404).json({ error: "Blog post not found" });
+    }
+
+    res.json(post);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch blog post" });
+  }
+});
+
+// Admin: Create blog post
+app.post("/api/admin/blog", requireAdmin, async (req, res) => {
+  try {
+    const validatedData = insertBlogPostSchema.parse(req.body);
+    const post = await storage.createBlogPost(validatedData);
+    res.status(201).json(post);
+  } catch (error: any) {
+    if (error.name === "ZodError") {
+      return res.status(400).json({ error: "Invalid blog post data", details: error.errors });
+    }
+    res.status(500).json({ error: "Failed to create blog post" });
+  }
+});
+
+// Admin: Update blog post
+app.put("/api/admin/blog/:id", requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const post = await storage.updateBlogPost(id, req.body);
+    res.json(post);
+  } catch (error: any) {
+    if (error.message === "Blog post not found") {
+      return res.status(404).json({ error: "Blog post not found" });
+    }
+    res.status(500).json({ error: "Failed to update blog post" });
+  }
+});
+
+// Admin: Delete blog post
+app.delete("/api/admin/blog/:id", requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    await storage.deleteBlogPost(id);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to delete blog post" });
+  }
+});
+
+// ========== NEWSLETTER SUBSCRIPTION ==========
+
+// Subscribe to newsletter
+app.post("/api/newsletter/subscribe", async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email || !email.includes("@")) {
+      return res.status(400).json({ error: "Valid email required" });
+    }
+
+    // Read existing subscribers
+    let data = { subscribers: [] as any[] };
+    if (existsSync(SUBSCRIBERS_FILE)) {
+      data = JSON.parse(readFileSync(SUBSCRIBERS_FILE, "utf-8"));
+    }
+
+    // Check if already subscribed
+    const exists = data.subscribers.some((s: any) => s.email === email);
+    if (exists) {
+      return res.json({ success: true, message: "Already subscribed" });
+    }
+
+    // Add new subscriber
+    data.subscribers.push({
+      email,
+      subscribedAt: new Date().toISOString(),
+      source: "footer"
+    });
+
+    // Save to file
+    writeFileSync(SUBSCRIBERS_FILE, JSON.stringify(data, null, 2));
+
+    console.log(`📧 New newsletter subscriber: ${email}`);
+
+    res.json({ success: true, message: "Successfully subscribed!" });
+  } catch (error) {
+    console.error("Newsletter subscription error:", error);
+    res.status(500).json({ error: "Failed to subscribe" });
+  }
+});
+
+// Get subscriber count (admin only)
+app.get("/api/admin/newsletter/subscribers", requireAdmin, async (_req, res) => {
+  try {
+    if (!existsSync(SUBSCRIBERS_FILE)) {
+      return res.json({ count: 0, subscribers: [] });
+    }
+    const data = JSON.parse(readFileSync(SUBSCRIBERS_FILE, "utf-8"));
+    res.json({
+      count: data.subscribers.length,
+      subscribers: data.subscribers
+    });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch subscribers" });
+  }
+});
+
+// ==========================================
+// PUSH NOTIFICATIONS
+// ==========================================
+
+const PUSH_SUBSCRIPTIONS_FILE = path.join(__dirname, "..", "data", "push-subscriptions.json");
+
+// Configure web-push with VAPID keys
+const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY;
+const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
+
+if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
+  webpush.setVapidDetails(
+    'mailto:contact@streamvault.live',
+    VAPID_PUBLIC_KEY,
+    VAPID_PRIVATE_KEY
+  );
+}
+
+// Get VAPID public key
+app.get("/api/push/vapid-key", (_req, res) => {
+  if (!VAPID_PUBLIC_KEY) {
+    return res.status(500).json({ error: "VAPID key not configured" });
+  }
+  res.json({ publicKey: VAPID_PUBLIC_KEY });
+});
+
+// Subscribe to push notifications
+app.post("/api/push/subscribe", async (req, res) => {
+  try {
+    const subscription = req.body;
+
+    if (!subscription || !subscription.endpoint) {
+      return res.status(400).json({ error: "Invalid subscription" });
+    }
+
+    // Load existing subscriptions
+    let data = { subscriptions: [] as any[] };
+    if (existsSync(PUSH_SUBSCRIPTIONS_FILE)) {
+      data = JSON.parse(readFileSync(PUSH_SUBSCRIPTIONS_FILE, "utf-8"));
+    }
+
+    // Check for duplicate
+    const exists = data.subscriptions.some((s: any) => s.endpoint === subscription.endpoint);
+    if (!exists) {
+      data.subscriptions.push({
+        ...subscription,
+        subscribedAt: new Date().toISOString()
+      });
+      writeFileSync(PUSH_SUBSCRIPTIONS_FILE, JSON.stringify(data, null, 2));
+      console.log(`🔔 New push subscriber (total: ${data.subscriptions.length})`);
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Push subscription error:", error);
+    res.status(500).json({ error: "Failed to subscribe" });
+  }
+});
+
+// Unsubscribe from push notifications
+app.post("/api/push/unsubscribe", async (req, res) => {
+  try {
+    const { endpoint } = req.body;
+
+    if (!existsSync(PUSH_SUBSCRIPTIONS_FILE)) {
+      return res.json({ success: true });
+    }
+
+    const data = JSON.parse(readFileSync(PUSH_SUBSCRIPTIONS_FILE, "utf-8"));
+    data.subscriptions = data.subscriptions.filter((s: any) => s.endpoint !== endpoint);
+    writeFileSync(PUSH_SUBSCRIPTIONS_FILE, JSON.stringify(data, null, 2));
+
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to unsubscribe" });
+  }
+});
+
+// Get push subscriber count (admin only)
+app.get("/api/admin/push/subscribers", requireAdmin, async (_req, res) => {
+  try {
+    if (!existsSync(PUSH_SUBSCRIPTIONS_FILE)) {
+      return res.json({ count: 0 });
+    }
+    const data = JSON.parse(readFileSync(PUSH_SUBSCRIPTIONS_FILE, "utf-8"));
+    res.json({ count: data.subscriptions?.length || 0 });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch count" });
+  }
+});
+
+// Send push notification (admin only)
+app.post("/api/admin/push/send", requireAdmin, async (req, res) => {
+  try {
+    const { title, body, url, type, contentId } = req.body;
+
+    if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
+      return res.status(400).json({ error: "VAPID keys not configured" });
+    }
+
+    if (!existsSync(PUSH_SUBSCRIPTIONS_FILE)) {
+      return res.status(400).json({ error: "No push subscribers" });
+    }
+
+    const data = JSON.parse(readFileSync(PUSH_SUBSCRIPTIONS_FILE, "utf-8"));
+    const subscriptions = data.subscriptions || [];
+
+    if (subscriptions.length === 0) {
+      return res.status(400).json({ error: "No push subscribers" });
+    }
+
+    // Build notification based on type
+    let notificationTitle = title || "StreamVault Update";
+    let notificationBody = body || "Check out what's new!";
+    let notificationUrl = url || "https://streamvault.live";
+    let notificationIcon = "https://streamvault.live/favicon.svg";
+    let notificationImage = ""; // Large banner image
+
+    // If content type is specified, fetch content details
+    if (type && contentId) {
+      if (type === 'show') {
+        const shows = await storage.getAllShows();
+        const show = shows.find((s: any) => s.id === contentId);
+        if (show) {
+          notificationTitle = `🎬 New on StreamVault: ${show.title}`;
+          notificationBody = show.description?.substring(0, 100) + '...' || `Watch ${show.title} now!`;
+          notificationUrl = `https://streamvault.live/show/${show.slug}`;
+          notificationIcon = show.posterUrl || notificationIcon;
+          notificationImage = show.backdropUrl || show.posterUrl || '';
+        }
+      } else if (type === 'movie') {
+        const movies = await storage.getAllMovies();
+        const movie = movies.find((m: any) => m.id === contentId);
+        if (movie) {
+          notificationTitle = `🎬 New Movie: ${movie.title}`;
+          notificationBody = movie.description?.substring(0, 100) + '...' || `Watch ${movie.title} now!`;
+          notificationUrl = `https://streamvault.live/movie/${movie.slug}`;
+          notificationIcon = movie.posterUrl || notificationIcon;
+          notificationImage = movie.backdropUrl || movie.posterUrl || '';
+        }
+      } else if (type === 'episode') {
+        // For episodes, use the show's images
+        const shows = await storage.getAllShows();
+        const show = shows.find((s: any) => s.id === contentId);
+        if (show) {
+          notificationTitle = `📺 New Episode: ${show.title}`;
+          notificationBody = `A new episode is now available!`;
+          notificationUrl = `https://streamvault.live/show/${show.slug}`;
+          notificationIcon = show.posterUrl || notificationIcon;
+          notificationImage = show.backdropUrl || show.posterUrl || '';
+        }
       }
+    }
 
-      // Load content data
-      if (!existsSync(DATA_FILE)) {
-        return res.status(400).json({ error: "No content data found" });
+    const payload = JSON.stringify({
+      title: notificationTitle,
+      body: notificationBody,
+      icon: notificationIcon,
+      image: notificationImage, // Large banner image
+      badge: "https://streamvault.live/favicon.svg",
+      url: notificationUrl,
+      timestamp: Date.now()
+    });
+
+    let sent = 0;
+    let failed = 0;
+    const failedEndpoints: string[] = [];
+
+    for (const sub of subscriptions) {
+      try {
+        await webpush.sendNotification(sub, payload);
+        sent++;
+      } catch (err: any) {
+        failed++;
+        // Remove invalid subscriptions (410 Gone or 404)
+        if (err.statusCode === 410 || err.statusCode === 404) {
+          failedEndpoints.push(sub.endpoint);
+        }
       }
+    }
 
-      const contentData = JSON.parse(readFileSync(DATA_FILE, "utf-8"));
+    // Clean up invalid subscriptions
+    if (failedEndpoints.length > 0) {
+      data.subscriptions = data.subscriptions.filter(
+        (s: any) => !failedEndpoints.includes(s.endpoint)
+      );
+      writeFileSync(PUSH_SUBSCRIPTIONS_FILE, JSON.stringify(data, null, 2));
+    }
 
-      // Get content - prioritize by most recent date (createdAt or updatedAt)
-      const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    console.log(`🔔 Push sent: ${sent} success, ${failed} failed`);
+    res.json({ success: true, sent, failed, cleaned: failedEndpoints.length });
+  } catch (error: any) {
+    console.error("Push send error:", error);
+    res.status(500).json({ error: error.message || "Failed to send push" });
+  }
+});
 
-      // Helper to get most recent date (createdAt or updatedAt)
-      const getLatestDate = (item: any) => {
-        const created = item.createdAt ? new Date(item.createdAt).getTime() : 0;
-        const updated = item.updatedAt ? new Date(item.updatedAt).getTime() : 0;
-        return Math.max(created, updated);
-      };
+// Send newsletter to single subscriber (admin only)
+app.post("/api/admin/newsletter/send-one", requireAdmin, async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ error: "Email is required" });
+    }
 
-      // Sort shows by most recent date (newest first)
-      let allShows = (contentData.shows || [])
-        .sort((a: any, b: any) => getLatestDate(b) - getLatestDate(a));
+    const DATA_FILE = path.join(__dirname, "..", "data", "streamvault-data.json");
+    const RESEND_API_KEY = process.env.RESEND_API_KEY;
 
-      // Get new/updated shows (in last week) or fall back to trending/featured
-      let newShows = allShows.filter((s: any) => {
-        const latestDate = new Date(Math.max(
-          s.createdAt ? new Date(s.createdAt).getTime() : 0,
-          s.updatedAt ? new Date(s.updatedAt).getTime() : 0
-        )).toISOString();
-        return latestDate >= oneWeekAgo;
-      }).slice(0, 6);
-      if (newShows.length < 5) {
-        newShows = allShows.filter((s: any) => s.trending || s.featured).slice(0, 6);
-      }
-      if (newShows.length === 0) {
-        newShows = allShows.slice(0, 6);
-      }
+    if (!RESEND_API_KEY) {
+      return res.status(400).json({ error: "RESEND_API_KEY not configured" });
+    }
 
-      // Sort movies by most recent date (newest first)
-      let allMovies = (contentData.movies || [])
-        .sort((a: any, b: any) => getLatestDate(b) - getLatestDate(a));
+    // Load content data
+    if (!existsSync(DATA_FILE)) {
+      return res.status(400).json({ error: "No content data found" });
+    }
 
-      // Get new movies (in last week) or fall back to trending/featured
-      let newMovies = allMovies.filter((m: any) => {
-        const latestDate = new Date(Math.max(
-          m.createdAt ? new Date(m.createdAt).getTime() : 0,
-          m.updatedAt ? new Date(m.updatedAt).getTime() : 0
-        )).toISOString();
-        return latestDate >= oneWeekAgo;
-      }).slice(0, 6);
-      if (newMovies.length < 5) {
-        newMovies = allMovies.filter((m: any) => m.trending || m.featured).slice(0, 6);
-      }
-      if (newMovies.length === 0) {
-        newMovies = allMovies.slice(0, 6);
-      }
+    const contentData = JSON.parse(readFileSync(DATA_FILE, "utf-8"));
 
-      // Sort anime by most recent date (newest first)
-      let allAnime = (contentData.anime || [])
-        .sort((a: any, b: any) => getLatestDate(b) - getLatestDate(a));
+    // Get content - prioritize by most recent date (createdAt or updatedAt)
+    const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
-      // Get new anime (in last week) or fall back to trending/featured
-      let newAnime = allAnime.filter((a: any) => {
-        const latestDate = new Date(Math.max(
-          a.createdAt ? new Date(a.createdAt).getTime() : 0,
-          a.updatedAt ? new Date(a.updatedAt).getTime() : 0
-        )).toISOString();
-        return latestDate >= oneWeekAgo;
-      }).slice(0, 6);
-      if (newAnime.length < 5) {
-        newAnime = allAnime.filter((a: any) => a.trending || a.featured).slice(0, 6);
-      }
-      if (newAnime.length === 0) {
-        newAnime = allAnime.slice(0, 6);
-      }
+    // Helper to get most recent date (createdAt or updatedAt)
+    const getLatestDate = (item: any) => {
+      const created = item.createdAt ? new Date(item.createdAt).getTime() : 0;
+      const updated = item.updatedAt ? new Date(item.updatedAt).getTime() : 0;
+      return Math.max(created, updated);
+    };
 
-      // Get blog posts
-      const blogPosts = await storage.getAllBlogPosts();
-      const featuredBlogs = blogPosts.filter((b: any) => b.featured).slice(0, 5);
-      const latestBlogs = featuredBlogs.length > 0 ? featuredBlogs : blogPosts.slice(0, 5);
+    // Sort shows by most recent date (newest first)
+    let allShows = (contentData.shows || [])
+      .sort((a: any, b: any) => getLatestDate(b) - getLatestDate(a));
 
-      // Generate email HTML (simplified version)
-      const totalShows = (contentData.shows || []).length;
-      const totalMovies = (contentData.movies || []).length;
-      const totalAnime = (contentData.anime || []).length;
+    // Get new/updated shows (in last week) or fall back to trending/featured
+    let newShows = allShows.filter((s: any) => {
+      const latestDate = new Date(Math.max(
+        s.createdAt ? new Date(s.createdAt).getTime() : 0,
+        s.updatedAt ? new Date(s.updatedAt).getTime() : 0
+      )).toISOString();
+      return latestDate >= oneWeekAgo;
+    }).slice(0, 6);
+    if (newShows.length < 5) {
+      newShows = allShows.filter((s: any) => s.trending || s.featured).slice(0, 6);
+    }
+    if (newShows.length === 0) {
+      newShows = allShows.slice(0, 6);
+    }
 
-      const generateContentRow = (items: any[], type: string) => {
-        return items.slice(0, 5).map((item: any) => {
-          let url;
-          if (type === 'show') url = `https://streamvault.live/show/${item.slug}`;
-          else if (type === 'movie') url = `https://streamvault.live/movie/${item.slug}`;
-          else url = `https://streamvault.live/anime/${item.slug}`;
-          return `
+    // Sort movies by most recent date (newest first)
+    let allMovies = (contentData.movies || [])
+      .sort((a: any, b: any) => getLatestDate(b) - getLatestDate(a));
+
+    // Get new movies (in last week) or fall back to trending/featured
+    let newMovies = allMovies.filter((m: any) => {
+      const latestDate = new Date(Math.max(
+        m.createdAt ? new Date(m.createdAt).getTime() : 0,
+        m.updatedAt ? new Date(m.updatedAt).getTime() : 0
+      )).toISOString();
+      return latestDate >= oneWeekAgo;
+    }).slice(0, 6);
+    if (newMovies.length < 5) {
+      newMovies = allMovies.filter((m: any) => m.trending || m.featured).slice(0, 6);
+    }
+    if (newMovies.length === 0) {
+      newMovies = allMovies.slice(0, 6);
+    }
+
+    // Sort anime by most recent date (newest first)
+    let allAnime = (contentData.anime || [])
+      .sort((a: any, b: any) => getLatestDate(b) - getLatestDate(a));
+
+    // Get new anime (in last week) or fall back to trending/featured
+    let newAnime = allAnime.filter((a: any) => {
+      const latestDate = new Date(Math.max(
+        a.createdAt ? new Date(a.createdAt).getTime() : 0,
+        a.updatedAt ? new Date(a.updatedAt).getTime() : 0
+      )).toISOString();
+      return latestDate >= oneWeekAgo;
+    }).slice(0, 6);
+    if (newAnime.length < 5) {
+      newAnime = allAnime.filter((a: any) => a.trending || a.featured).slice(0, 6);
+    }
+    if (newAnime.length === 0) {
+      newAnime = allAnime.slice(0, 6);
+    }
+
+    // Get blog posts
+    const blogPosts = await storage.getAllBlogPosts();
+    const featuredBlogs = blogPosts.filter((b: any) => b.featured).slice(0, 5);
+    const latestBlogs = featuredBlogs.length > 0 ? featuredBlogs : blogPosts.slice(0, 5);
+
+    // Generate email HTML (simplified version)
+    const totalShows = (contentData.shows || []).length;
+    const totalMovies = (contentData.movies || []).length;
+    const totalAnime = (contentData.anime || []).length;
+
+    const generateContentRow = (items: any[], type: string) => {
+      return items.slice(0, 5).map((item: any) => {
+        let url;
+        if (type === 'show') url = `https://streamvault.live/show/${item.slug}`;
+        else if (type === 'movie') url = `https://streamvault.live/movie/${item.slug}`;
+        else url = `https://streamvault.live/anime/${item.slug}`;
+        return `
             <tr>
               <td style="padding:15px 0;border-bottom:1px solid #2a2a2a;">
                 <table cellpadding="0" cellspacing="0" border="0" width="100%">
@@ -4007,10 +4006,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
               </td>
             </tr>
           `;
-        }).join('');
-      };
+      }).join('');
+    };
 
-      const emailHTML = `
+    const emailHTML = `
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -4091,9 +4090,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   </td>
                 </tr>
                 ${latestBlogs.map((blog: any) => {
-        const blogType = blog.contentType || 'show';
-        const blogImage = blog.featuredImage || '';
-        return `
+      const blogType = blog.contentType || 'show';
+      const blogImage = blog.featuredImage || '';
+      return `
                 <tr>
                   <td style="padding:8px 0;">
                     <a href="https://streamvault.live/blog/${blogType}/${blog.slug}" style="text-decoration:none;display:block;">
@@ -4116,7 +4115,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   </td>
                 </tr>
                 `;
-      }).join('')}
+    }).join('')}
               </table>
               ` : ''}
 
@@ -4192,146 +4191,146 @@ export async function registerRoutes(app: Express): Promise<Server> {
 </html>
       `;
 
-      const subject = '🎬 StreamVault Weekly: Top Picks Just For You!';
+    const subject = '🎬 StreamVault Weekly: Top Picks Just For You!';
 
-      const response = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${RESEND_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          from: 'StreamVault <noreply@streamvault.live>',
-          to: [email],
-          subject: subject,
-          html: emailHTML,
-        }),
-      });
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${RESEND_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: 'StreamVault <noreply@streamvault.live>',
+        to: [email],
+        subject: subject,
+        html: emailHTML,
+      }),
+    });
 
-      if (response.ok) {
-        console.log(`✅ Newsletter sent to ${email}`);
-        res.json({ success: true, message: `Newsletter sent to ${email}` });
-      } else {
-        const errorText = await response.text();
-        console.error(`❌ Failed to send to ${email}:`, errorText);
-        res.status(500).json({ error: `Failed to send: ${errorText}` });
-      }
-    } catch (error: any) {
-      console.error("Newsletter send error:", error);
-      res.status(500).json({ error: error.message || "Failed to send newsletter" });
+    if (response.ok) {
+      console.log(`✅ Newsletter sent to ${email}`);
+      res.json({ success: true, message: `Newsletter sent to ${email}` });
+    } else {
+      const errorText = await response.text();
+      console.error(`❌ Failed to send to ${email}:`, errorText);
+      res.status(500).json({ error: `Failed to send: ${errorText}` });
     }
-  });
+  } catch (error: any) {
+    console.error("Newsletter send error:", error);
+    res.status(500).json({ error: error.message || "Failed to send newsletter" });
+  }
+});
 
-  // Send newsletter (admin only) - inline version to avoid child_process
-  app.post("/api/admin/newsletter/send", requireAdmin, async (_req, res) => {
-    try {
-      const DATA_FILE = path.join(__dirname, "..", "data", "streamvault-data.json");
-      const RESEND_API_KEY = process.env.RESEND_API_KEY;
+// Send newsletter (admin only) - inline version to avoid child_process
+app.post("/api/admin/newsletter/send", requireAdmin, async (_req, res) => {
+  try {
+    const DATA_FILE = path.join(__dirname, "..", "data", "streamvault-data.json");
+    const RESEND_API_KEY = process.env.RESEND_API_KEY;
 
-      // Check for subscribers
-      if (!existsSync(SUBSCRIBERS_FILE)) {
-        return res.status(400).json({ error: "No subscribers file found" });
-      }
+    // Check for subscribers
+    if (!existsSync(SUBSCRIBERS_FILE)) {
+      return res.status(400).json({ error: "No subscribers file found" });
+    }
 
-      const subscribersData = JSON.parse(readFileSync(SUBSCRIBERS_FILE, "utf-8"));
-      const subscribers = subscribersData.subscribers || [];
+    const subscribersData = JSON.parse(readFileSync(SUBSCRIBERS_FILE, "utf-8"));
+    const subscribers = subscribersData.subscribers || [];
 
-      if (subscribers.length === 0) {
-        return res.status(400).json({ error: "No subscribers found" });
-      }
+    if (subscribers.length === 0) {
+      return res.status(400).json({ error: "No subscribers found" });
+    }
 
-      // Load content data
-      if (!existsSync(DATA_FILE)) {
-        return res.status(400).json({ error: "No content data found" });
-      }
+    // Load content data
+    if (!existsSync(DATA_FILE)) {
+      return res.status(400).json({ error: "No content data found" });
+    }
 
-      const contentData = JSON.parse(readFileSync(DATA_FILE, "utf-8"));
+    const contentData = JSON.parse(readFileSync(DATA_FILE, "utf-8"));
 
-      // Get new/updated content from last 7 days (uses max of createdAt and updatedAt)
-      const cutoffDate = new Date();
-      cutoffDate.setDate(cutoffDate.getDate() - 7);
+    // Get new/updated content from last 7 days (uses max of createdAt and updatedAt)
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - 7);
 
-      const getLatestDate = (item: any) => Math.max(
-        item.createdAt ? new Date(item.createdAt).getTime() : 0,
-        item.updatedAt ? new Date(item.updatedAt).getTime() : 0
-      );
+    const getLatestDate = (item: any) => Math.max(
+      item.createdAt ? new Date(item.createdAt).getTime() : 0,
+      item.updatedAt ? new Date(item.updatedAt).getTime() : 0
+    );
 
-      // Sort shows by most recent date
-      let allShows = (contentData.shows || [])
-        .sort((a: any, b: any) => getLatestDate(b) - getLatestDate(a));
+    // Sort shows by most recent date
+    let allShows = (contentData.shows || [])
+      .sort((a: any, b: any) => getLatestDate(b) - getLatestDate(a));
 
-      let newShows = allShows.filter((show: any) => {
-        const latestDate = new Date(getLatestDate(show));
-        return latestDate >= cutoffDate;
-      }).slice(0, 5);
+    let newShows = allShows.filter((show: any) => {
+      const latestDate = new Date(getLatestDate(show));
+      return latestDate >= cutoffDate;
+    }).slice(0, 5);
 
-      // Sort movies by most recent date  
-      let allMovies = (contentData.movies || [])
-        .sort((a: any, b: any) => getLatestDate(b) - getLatestDate(a));
+    // Sort movies by most recent date  
+    let allMovies = (contentData.movies || [])
+      .sort((a: any, b: any) => getLatestDate(b) - getLatestDate(a));
 
-      let newMovies = allMovies.filter((movie: any) => {
-        const latestDate = new Date(getLatestDate(movie));
-        return latestDate >= cutoffDate;
-      }).slice(0, 5);
+    let newMovies = allMovies.filter((movie: any) => {
+      const latestDate = new Date(getLatestDate(movie));
+      return latestDate >= cutoffDate;
+    }).slice(0, 5);
 
-      // If not enough new content, add trending/featured content
-      if (newShows.length < 5) {
-        const trendingShows = allShows.filter((s: any) => s.trending || s.featured && !newShows.find((ns: any) => ns.id === s.id));
-        newShows = [...newShows, ...trendingShows].slice(0, 5);
-      }
-      if (newShows.length === 0) {
-        newShows = allShows.slice(0, 5);
-      }
+    // If not enough new content, add trending/featured content
+    if (newShows.length < 5) {
+      const trendingShows = allShows.filter((s: any) => s.trending || s.featured && !newShows.find((ns: any) => ns.id === s.id));
+      newShows = [...newShows, ...trendingShows].slice(0, 5);
+    }
+    if (newShows.length === 0) {
+      newShows = allShows.slice(0, 5);
+    }
 
-      if (newMovies.length < 5) {
-        const trendingMovies = allMovies.filter((m: any) => m.trending || m.featured && !newMovies.find((nm: any) => nm.id === m.id));
-        newMovies = [...newMovies, ...trendingMovies].slice(0, 5);
-      }
-      if (newMovies.length === 0) {
-        newMovies = allMovies.slice(0, 5);
-      }
+    if (newMovies.length < 5) {
+      const trendingMovies = allMovies.filter((m: any) => m.trending || m.featured && !newMovies.find((nm: any) => nm.id === m.id));
+      newMovies = [...newMovies, ...trendingMovies].slice(0, 5);
+    }
+    if (newMovies.length === 0) {
+      newMovies = allMovies.slice(0, 5);
+    }
 
-      // Sort anime by most recent date
-      let allAnime = (contentData.anime || [])
-        .sort((a: any, b: any) => getLatestDate(b) - getLatestDate(a));
+    // Sort anime by most recent date
+    let allAnime = (contentData.anime || [])
+      .sort((a: any, b: any) => getLatestDate(b) - getLatestDate(a));
 
-      let newAnime = allAnime.filter((anime: any) => {
-        const latestDate = new Date(getLatestDate(anime));
-        return latestDate >= cutoffDate;
-      }).slice(0, 5);
+    let newAnime = allAnime.filter((anime: any) => {
+      const latestDate = new Date(getLatestDate(anime));
+      return latestDate >= cutoffDate;
+    }).slice(0, 5);
 
-      if (newAnime.length < 5) {
-        const trendingAnime = allAnime.filter((a: any) => a.trending || a.featured && !newAnime.find((na: any) => na.id === a.id));
-        newAnime = [...newAnime, ...trendingAnime].slice(0, 5);
-      }
-      if (newAnime.length === 0) {
-        newAnime = allAnime.slice(0, 5);
-      }
+    if (newAnime.length < 5) {
+      const trendingAnime = allAnime.filter((a: any) => a.trending || a.featured && !newAnime.find((na: any) => na.id === a.id));
+      newAnime = [...newAnime, ...trendingAnime].slice(0, 5);
+    }
+    if (newAnime.length === 0) {
+      newAnime = allAnime.slice(0, 5);
+    }
 
-      // Get blog posts - sorted by most recent, limit 5
-      const blogPosts = await storage.getAllBlogPosts();
-      const sortedBlogs = [...blogPosts].sort((a: any, b: any) => {
-        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-        return dateB - dateA;
-      });
-      const featuredBlogs = sortedBlogs.filter((b: any) => b.featured).slice(0, 5);
-      const latestBlogs = featuredBlogs.length >= 5 ? featuredBlogs : sortedBlogs.slice(0, 5);
+    // Get blog posts - sorted by most recent, limit 5
+    const blogPosts = await storage.getAllBlogPosts();
+    const sortedBlogs = [...blogPosts].sort((a: any, b: any) => {
+      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return dateB - dateA;
+    });
+    const featuredBlogs = sortedBlogs.filter((b: any) => b.featured).slice(0, 5);
+    const latestBlogs = featuredBlogs.length >= 5 ? featuredBlogs : sortedBlogs.slice(0, 5);
 
-      // Total counts for stats (auto-updated from actual data)
-      const totalShows = (contentData.shows || []).length;
-      const totalMovies = (contentData.movies || []).length;
-      const totalAnime = (contentData.anime || []).length;
-      const totalNew = newShows.length + newMovies.length + newAnime.length;
+    // Total counts for stats (auto-updated from actual data)
+    const totalShows = (contentData.shows || []).length;
+    const totalMovies = (contentData.movies || []).length;
+    const totalAnime = (contentData.anime || []).length;
+    const totalNew = newShows.length + newMovies.length + newAnime.length;
 
-      // Generate professional email HTML
-      const generateContentRow = (items: any[], type: string) => {
-        return items.map((item: any) => {
-          let url;
-          if (type === 'show') url = `https://streamvault.live/show/${item.slug}`;
-          else if (type === 'movie') url = `https://streamvault.live/movie/${item.slug}`;
-          else url = `https://streamvault.live/anime/${item.slug}`;
-          return `
+    // Generate professional email HTML
+    const generateContentRow = (items: any[], type: string) => {
+      return items.map((item: any) => {
+        let url;
+        if (type === 'show') url = `https://streamvault.live/show/${item.slug}`;
+        else if (type === 'movie') url = `https://streamvault.live/movie/${item.slug}`;
+        else url = `https://streamvault.live/anime/${item.slug}`;
+        return `
             <tr>
               <td style="padding:15px 0;border-bottom:1px solid #2a2a2a;">
                 <table cellpadding="0" cellspacing="0" border="0" width="100%">
@@ -4360,10 +4359,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
               </td>
             </tr>
           `;
-        }).join('');
-      };
+      }).join('');
+    };
 
-      const emailHTML = `
+    const emailHTML = `
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -4540,854 +4539,854 @@ export async function registerRoutes(app: Express): Promise<Server> {
 </html>
       `;
 
-      const subject = '🎬 StreamVault Weekly: Top Picks Just For You!';
+    const subject = '🎬 StreamVault Weekly: Top Picks Just For You!';
 
-      // Send to all subscribers
-      let sent = 0;
-      let failed = 0;
+    // Send to all subscribers
+    let sent = 0;
+    let failed = 0;
 
-      for (const subscriber of subscribers) {
-        try {
-          if (!RESEND_API_KEY) {
-            console.log(`📧 [DRY RUN] Would send to: ${subscriber.email}`);
-            sent++;
-            continue;
-          }
+    for (const subscriber of subscribers) {
+      try {
+        if (!RESEND_API_KEY) {
+          console.log(`📧 [DRY RUN] Would send to: ${subscriber.email}`);
+          sent++;
+          continue;
+        }
 
-          const response = await fetch('https://api.resend.com/emails', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${RESEND_API_KEY}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              from: 'StreamVault <noreply@streamvault.live>',
-              to: [subscriber.email],
-              subject: subject,
-              html: emailHTML,
-            }),
-          });
+        const response = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${RESEND_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            from: 'StreamVault <noreply@streamvault.live>',
+            to: [subscriber.email],
+            subject: subject,
+            html: emailHTML,
+          }),
+        });
 
-          if (response.ok) {
-            sent++;
-            console.log(`✅ Newsletter sent to ${subscriber.email}`);
-          } else {
-            const errorText = await response.text();
-            console.error(`❌ Failed to send to ${subscriber.email}:`, errorText);
-            failed++;
-          }
-        } catch (err: any) {
-          console.error(`❌ Error sending to ${subscriber.email}:`, err.message);
+        if (response.ok) {
+          sent++;
+          console.log(`✅ Newsletter sent to ${subscriber.email}`);
+        } else {
+          const errorText = await response.text();
+          console.error(`❌ Failed to send to ${subscriber.email}:`, errorText);
           failed++;
         }
-
-        // Rate limiting - 2 requests per second max
-        await new Promise(r => setTimeout(r, 600));
+      } catch (err: any) {
+        console.error(`❌ Error sending to ${subscriber.email}:`, err.message);
+        failed++;
       }
 
-      res.json({
-        success: true,
-        message: `Newsletter sent to ${sent} subscribers`,
-        sent,
-        failed,
-        newShows: newShows.length,
-        newMovies: newMovies.length
-      });
-    } catch (error) {
-      console.error("Newsletter send error:", error);
-      res.status(500).json({ error: "Failed to send newsletter" });
+      // Rate limiting - 2 requests per second max
+      await new Promise(r => setTimeout(r, 600));
     }
-  });
 
-  // Broadcast in-app notifications to all users (admin only)
-  app.post("/api/admin/broadcast-notification", requireAdmin, async (req, res) => {
-    try {
-      const { type, contentType, contentId, contentTitle, contentPoster, customTitle, customMessage, customLink } = req.body;
-
-      // Get all users
-      const users = await storage.getAllUsers();
-
-      let sentCount = 0;
-      let title = '';
-      let message = '';
-      let notificationData: any = {};
-
-      // Determine notification content based on type
-      if (type === 'custom') {
-        title = customTitle;
-        message = customMessage;
-        notificationData = {
-          type: 'announcement',
-          link: customLink || undefined
-        };
-      } else if (type === 'new_content') {
-        title = '🆕 New Content Added!';
-        message = `${contentTitle} is now available on StreamVault!`;
-        notificationData = {
-          type: 'new_content',
-          contentType,
-          contentId,
-          contentTitle,
-          contentPoster,
-          link: customLink || undefined // Allow overriding link for content too
-        };
-      } else if (type === 'new_episode') {
-        title = '📺 New Episode Available!';
-        message = `A new episode of ${contentTitle} is now streaming!`;
-        notificationData = {
-          type: 'new_episode',
-          contentType,
-          contentId,
-          contentTitle,
-          contentPoster,
-          link: customLink || undefined
-        };
-      }
-
-      // Create notification for each user
-      for (const user of users) {
-        try {
-          await storage.createNotification({
-            userId: user.id,
-            type: type === 'custom' ? 'announcement' : 'content_update',
-            title,
-            message,
-            data: notificationData,
-            read: false,
-          });
-          sentCount++;
-        } catch (err) {
-          console.error(`Failed to create notification for user ${user.id}:`, err);
-        }
-      }
-
-      console.log(`📢 Broadcast notification sent to ${sentCount} users: ${title}`);
-
-      res.json({
-        success: true,
-        sentCount,
-        title,
-        message
-      });
-    } catch (error) {
-      console.error("Broadcast notification error:", error);
-      res.status(500).json({ error: "Failed to broadcast notification" });
-    }
-  });
-
-  // ========== VIDEO PROXY ==========
-  // Proxy endpoint to stream external videos with correct headers
-  app.get("/api/proxy-video", async (req, res) => {
-    try {
-      const videoUrl = req.query.url as string;
-
-      if (!videoUrl) {
-        return res.status(400).json({ error: "URL parameter required" });
-      }
-
-      // Only allow whitelisted domains for security
-      const allowedDomains = [
-        'worthcrete.com',
-        'www.worthcrete.com'
-      ];
-
-      let urlOrigin: string;
-      try {
-        const parsedUrl = new URL(videoUrl);
-        urlOrigin = parsedUrl.hostname;
-      } catch {
-        return res.status(400).json({ error: "Invalid URL" });
-      }
-
-      if (!allowedDomains.some(domain => urlOrigin.includes(domain))) {
-        return res.status(403).json({ error: "Domain not allowed" });
-      }
-
-      console.log(`📹 Proxying video: ${videoUrl}`);
-
-      try {
-        // Build headers to mimic browser request
-        const headers: Record<string, string> = {
-          'Referer': 'https://www.worthcrete.com/',
-          'Origin': 'https://www.worthcrete.com',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Accept': 'video/mp4,video/webm,video/*,*/*;q=0.9',
-          'Accept-Encoding': 'identity',
-          'Accept-Language': 'en-US,en;q=0.9',
-          'Connection': 'keep-alive',
-          'Sec-Fetch-Dest': 'video',
-          'Sec-Fetch-Mode': 'no-cors',
-          'Sec-Fetch-Site': 'same-origin',
-          'Sec-Ch-Ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
-          'Sec-Ch-Ua-Mobile': '?0',
-          'Sec-Ch-Ua-Platform': '"Windows"',
-        };
-
-        // Forward range header if present
-        if (req.headers.range) {
-          headers['Range'] = req.headers.range as string;
-        }
-
-        const fetchResponse = await fetch(videoUrl, {
-          method: 'GET',
-          headers,
-          redirect: 'follow',
-        });
-
-        console.log(`📹 Proxy response: ${fetchResponse.status}`);
-
-        if (!fetchResponse.ok && fetchResponse.status !== 206) {
-          return res.status(fetchResponse.status).json({
-            error: 'Video source unavailable',
-            status: fetchResponse.status
-          });
-        }
-
-        // Forward headers
-        res.status(fetchResponse.status);
-
-        const contentType = fetchResponse.headers.get('content-type');
-        if (contentType) {
-          res.setHeader('Content-Type', contentType);
-        }
-
-        const contentLength = fetchResponse.headers.get('content-length');
-        if (contentLength) {
-          res.setHeader('Content-Length', contentLength);
-        }
-
-        const contentRange = fetchResponse.headers.get('content-range');
-        if (contentRange) {
-          res.setHeader('Content-Range', contentRange);
-        }
-
-        const acceptRanges = fetchResponse.headers.get('accept-ranges');
-        if (acceptRanges) {
-          res.setHeader('Accept-Ranges', acceptRanges);
-        }
-
-        res.setHeader('Access-Control-Allow-Origin', '*');
-        res.setHeader('Cache-Control', 'public, max-age=3600');
-
-        // Stream the response body
-        if (fetchResponse.body) {
-          const reader = fetchResponse.body.getReader();
-
-          const pump = async () => {
-            try {
-              while (true) {
-                const { done, value } = await reader.read();
-                if (done) {
-                  res.end();
-                  break;
-                }
-                res.write(Buffer.from(value));
-              }
-            } catch (streamError) {
-              console.error('Stream error:', streamError);
-              res.end();
-            }
-          };
-
-          pump();
-        } else {
-          res.end();
-        }
-      } catch (fetchError: any) {
-        console.error('❌ Fetch error:', fetchError.message);
-        res.status(500).json({ error: 'Proxy failed', details: fetchError.message });
-      }
-    } catch (error: any) {
-      console.error("❌ Video proxy error:", error.message);
-      res.status(500).json({ error: "Proxy failed", details: error.message });
-    }
-  });
-
-  // ============================================
-  // Subtitle API - Wyzie Subs Integration
-  // ============================================
-
-  // Search for subtitles by IMDB ID
-  app.get("/api/subtitles/search", async (req, res) => {
-    try {
-      const imdbId = req.query.imdbId as string;
-      const season = req.query.season ? parseInt(req.query.season as string) : undefined;
-      const episode = req.query.episode ? parseInt(req.query.episode as string) : undefined;
-      const language = (req.query.language as string) || 'en';
-
-      if (!imdbId) {
-        return res.status(400).json({ error: "imdbId parameter required" });
-      }
-
-      console.log(`🔍 Subtitle search: imdbId=${imdbId}, season=${season}, episode=${episode}, lang=${language}`);
-
-      const result = await searchSubtitles(imdbId, season, episode, language);
-
-      // Transform results to include download URLs
-      const subtitles = result.subtitles.map(sub => ({
-        ...sub,
-        downloadUrl: `/api/subtitles/download?url=${encodeURIComponent(sub.url)}`
-      }));
-
-      res.json({ subtitles, error: result.error });
-    } catch (error: any) {
-      console.error("❌ Subtitle search error:", error.message);
-      res.status(500).json({ error: "Search failed", details: error.message });
-    }
-  });
-
-  // Download and serve a subtitle file (with caching)
-  app.get("/api/subtitles/download", async (req, res) => {
-    try {
-      const subtitleUrl = req.query.url as string;
-
-      if (!subtitleUrl) {
-        return res.status(400).json({ error: "url parameter required" });
-      }
-
-      console.log(`⬇️ Subtitle download request: ${subtitleUrl}`);
-
-      const cachedPath = await downloadSubtitle(subtitleUrl);
-
-      if (!cachedPath) {
-        return res.status(404).json({ error: "Subtitle not found or download failed" });
-      }
-
-      // Set headers for VTT file
-      res.setHeader('Content-Type', 'text/vtt');
-      res.setHeader('Access-Control-Allow-Origin', '*');
-      res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 1 day
-
-      // Send the file
-      const fs = await import('fs');
-      const content = fs.readFileSync(cachedPath, 'utf-8');
-      res.send(content);
-    } catch (error: any) {
-      console.error("❌ Subtitle download error:", error.message);
-      res.status(500).json({ error: "Download failed", details: error.message });
-    }
-  });
-
-  // Serve cached subtitle file by hash
-  app.get("/api/subtitles/file/:hash", async (req, res) => {
-    try {
-      const hash = req.params.hash;
-      const cachedPath = getCachedSubtitle(hash);
-
-      if (!cachedPath) {
-        return res.status(404).json({ error: "Subtitle not found in cache" });
-      }
-
-      res.setHeader('Content-Type', 'text/vtt');
-      res.setHeader('Access-Control-Allow-Origin', '*');
-      res.setHeader('Cache-Control', 'public, max-age=86400');
-
-      const fs = await import('fs');
-      const content = fs.readFileSync(cachedPath, 'utf-8');
-      res.send(content);
-    } catch (error: any) {
-      console.error("❌ Subtitle file error:", error.message);
-      res.status(500).json({ error: "File read failed", details: error.message });
-    }
-  });
-
-  // ============================================
-  // Widget Analytics - Track clicks from WorthCrete
-  // ============================================
-
-  // In-memory storage for widget analytics (use database in production)
-  interface WidgetClick {
-    timestamp: Date;
-    referrer: string;
-    userAgent: string;
-    ip: string;
-  }
-
-  const widgetAnalytics = {
-    clicks: [] as WidgetClick[],
-    views: [] as { timestamp: Date; referrer: string }[]
-  };
-
-  // Track widget click
-  app.post("/api/widget/click", (req, res) => {
-    try {
-      const referrer = req.headers.referer || req.body.referrer || "direct";
-      const userAgent = req.headers["user-agent"] || "unknown";
-      const ip = req.headers["x-forwarded-for"] || req.socket.remoteAddress || "unknown";
-
-      widgetAnalytics.clicks.push({
-        timestamp: new Date(),
-        referrer: referrer as string,
-        userAgent: userAgent as string,
-        ip: ip as string
-      });
-
-      console.log(`📊 Widget click from: ${referrer}`);
-      res.json({ success: true });
-    } catch (error) {
-      res.status(500).json({ error: "Failed to track click" });
-    }
-  });
-
-  // Track widget view (impression)
-  app.post("/api/widget/view", (req, res) => {
-    try {
-      const referrer = req.headers.referer || req.body.referrer || "direct";
-
-      widgetAnalytics.views.push({
-        timestamp: new Date(),
-        referrer: referrer as string
-      });
-
-      res.json({ success: true });
-    } catch (error) {
-      res.status(500).json({ error: "Failed to track view" });
-    }
-  });
-
-  // Get widget analytics (admin only)
-  app.get("/api/widget/analytics", requireAdmin, (req, res) => {
-    try {
-      const now = new Date();
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
-      const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
-
-      // Calculate stats
-      const todayClicks = widgetAnalytics.clicks.filter(c => c.timestamp >= today).length;
-      const weekClicks = widgetAnalytics.clicks.filter(c => c.timestamp >= weekAgo).length;
-      const monthClicks = widgetAnalytics.clicks.filter(c => c.timestamp >= monthAgo).length;
-      const totalClicks = widgetAnalytics.clicks.length;
-
-      const todayViews = widgetAnalytics.views.filter(v => v.timestamp >= today).length;
-      const weekViews = widgetAnalytics.views.filter(v => v.timestamp >= weekAgo).length;
-      const monthViews = widgetAnalytics.views.filter(v => v.timestamp >= monthAgo).length;
-      const totalViews = widgetAnalytics.views.length;
-
-      // Group by referrer
-      const clicksByReferrer: Record<string, number> = {};
-      widgetAnalytics.clicks.forEach(c => {
-        try {
-          const url = new URL(c.referrer);
-          const domain = url.hostname;
-          clicksByReferrer[domain] = (clicksByReferrer[domain] || 0) + 1;
-        } catch {
-          clicksByReferrer["direct"] = (clicksByReferrer["direct"] || 0) + 1;
-        }
-      });
-
-      // Daily clicks for chart (last 7 days)
-      const dailyClicks: { date: string; clicks: number }[] = [];
-      for (let i = 6; i >= 0; i--) {
-        const date = new Date(today.getTime() - i * 24 * 60 * 60 * 1000);
-        const nextDate = new Date(date.getTime() + 24 * 60 * 60 * 1000);
-        const clicks = widgetAnalytics.clicks.filter(
-          c => c.timestamp >= date && c.timestamp < nextDate
-        ).length;
-        dailyClicks.push({
-          date: date.toISOString().split("T")[0],
-          clicks
-        });
-      }
-
-      // Recent clicks
-      const recentClicks = widgetAnalytics.clicks
-        .slice(-20)
-        .reverse()
-        .map(c => ({
-          timestamp: c.timestamp,
-          referrer: c.referrer,
-          userAgent: c.userAgent.substring(0, 50)
-        }));
-
-      res.json({
-        summary: {
-          clicks: { today: todayClicks, week: weekClicks, month: monthClicks, total: totalClicks },
-          views: { today: todayViews, week: weekViews, month: monthViews, total: totalViews },
-          ctr: totalViews > 0 ? ((totalClicks / totalViews) * 100).toFixed(2) + "%" : "N/A"
-        },
-        clicksByReferrer,
-        dailyClicks,
-        recentClicks
-      });
-    } catch (error) {
-      res.status(500).json({ error: "Failed to get analytics" });
-    }
-  });
-
-  // ============================================
-  // Site Analytics - Track visitors and content
-  // ============================================
-
-  interface PageView {
-    timestamp: Date;
-    path: string;
-    referrer: string;
-    userAgent: string;
-    sessionId: string;
-    ip: string;
-  }
-
-  interface WatchEvent {
-    timestamp: Date;
-    contentType: 'show' | 'movie';
-    contentId: string;
-    contentTitle: string;
-    episodeId?: string;
-    duration: number; // seconds watched
-    sessionId: string;
-  }
-
-  const siteAnalytics = {
-    pageViews: [] as PageView[],
-    watchEvents: [] as WatchEvent[],
-    activeSessions: new Map<string, { lastSeen: Date; pages: number }>()
-  };
-
-  // Clean up old sessions every 5 minutes
-  setInterval(() => {
-    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
-    siteAnalytics.activeSessions.forEach((data, sessionId) => {
-      if (data.lastSeen < fiveMinutesAgo) {
-        siteAnalytics.activeSessions.delete(sessionId);
-      }
+    res.json({
+      success: true,
+      message: `Newsletter sent to ${sent} subscribers`,
+      sent,
+      failed,
+      newShows: newShows.length,
+      newMovies: newMovies.length
     });
-  }, 60 * 1000);
+  } catch (error) {
+    console.error("Newsletter send error:", error);
+    res.status(500).json({ error: "Failed to send newsletter" });
+  }
+});
 
-  // Track page view
-  app.post("/api/analytics/pageview", (req, res) => {
-    try {
-      const { path, sessionId } = req.body;
-      const referrer = req.headers.referer || req.body.referrer || "direct";
-      const userAgent = req.headers["user-agent"] || "unknown";
-      const ip = (req.headers["x-forwarded-for"] || req.socket.remoteAddress || "unknown") as string;
+// Broadcast in-app notifications to all users (admin only)
+app.post("/api/admin/broadcast-notification", requireAdmin, async (req, res) => {
+  try {
+    const { type, contentType, contentId, contentTitle, contentPoster, customTitle, customMessage, customLink } = req.body;
 
-      siteAnalytics.pageViews.push({
-        timestamp: new Date(),
-        path: path || "/",
-        referrer: referrer as string,
-        userAgent: userAgent as string,
-        sessionId: sessionId || "anonymous",
-        ip: ip.split(",")[0].trim()
-      });
+    // Get all users
+    const users = await storage.getAllUsers();
 
-      // Update active session
-      const session = siteAnalytics.activeSessions.get(sessionId) || { lastSeen: new Date(), pages: 0 };
-      session.lastSeen = new Date();
-      session.pages++;
-      siteAnalytics.activeSessions.set(sessionId, session);
+    let sentCount = 0;
+    let title = '';
+    let message = '';
+    let notificationData: any = {};
 
-      res.json({ success: true });
-    } catch (error) {
-      res.status(500).json({ error: "Failed to track pageview" });
-    }
-  });
-
-  // Track watch event
-  app.post("/api/analytics/watch", (req, res) => {
-    try {
-      const { contentType, contentId, contentTitle, episodeId, duration, sessionId } = req.body;
-
-      siteAnalytics.watchEvents.push({
-        timestamp: new Date(),
+    // Determine notification content based on type
+    if (type === 'custom') {
+      title = customTitle;
+      message = customMessage;
+      notificationData = {
+        type: 'announcement',
+        link: customLink || undefined
+      };
+    } else if (type === 'new_content') {
+      title = '🆕 New Content Added!';
+      message = `${contentTitle} is now available on StreamVault!`;
+      notificationData = {
+        type: 'new_content',
         contentType,
         contentId,
         contentTitle,
-        episodeId,
-        duration: duration || 0,
-        sessionId: sessionId || "anonymous"
-      });
-
-      res.json({ success: true });
-    } catch (error) {
-      res.status(500).json({ error: "Failed to track watch" });
+        contentPoster,
+        link: customLink || undefined // Allow overriding link for content too
+      };
+    } else if (type === 'new_episode') {
+      title = '📺 New Episode Available!';
+      message = `A new episode of ${contentTitle} is now streaming!`;
+      notificationData = {
+        type: 'new_episode',
+        contentType,
+        contentId,
+        contentTitle,
+        contentPoster,
+        link: customLink || undefined
+      };
     }
-  });
 
-  // Get site analytics (admin only)
-  app.get("/api/analytics/site", requireAdmin, async (req, res) => {
-    try {
-      const now = new Date();
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
-      const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
-
-      // Page view stats
-      const todayViews = siteAnalytics.pageViews.filter(p => p.timestamp >= today).length;
-      const weekViews = siteAnalytics.pageViews.filter(p => p.timestamp >= weekAgo).length;
-      const monthViews = siteAnalytics.pageViews.filter(p => p.timestamp >= monthAgo).length;
-      const totalViews = siteAnalytics.pageViews.length;
-
-      // Unique visitors (by sessionId)
-      const todayVisitors = new Set(siteAnalytics.pageViews.filter(p => p.timestamp >= today).map(p => p.sessionId)).size;
-      const weekVisitors = new Set(siteAnalytics.pageViews.filter(p => p.timestamp >= weekAgo).map(p => p.sessionId)).size;
-      const totalVisitors = new Set(siteAnalytics.pageViews.map(p => p.sessionId)).size;
-
-      // Active users (sessions in last 5 mins)
-      const activeUsers = siteAnalytics.activeSessions.size;
-
-      // Popular pages
-      const pageCounts: Record<string, number> = {};
-      siteAnalytics.pageViews.forEach(p => {
-        pageCounts[p.path] = (pageCounts[p.path] || 0) + 1;
-      });
-      const popularPages = Object.entries(pageCounts)
-        .sort(([, a], [, b]) => b - a)
-        .slice(0, 10)
-        .map(([path, views]) => ({ path, views }));
-
-      // Traffic sources
-      const sourceCounts: Record<string, number> = {};
-      siteAnalytics.pageViews.forEach(p => {
-        try {
-          if (p.referrer === "direct" || !p.referrer) {
-            sourceCounts["Direct"] = (sourceCounts["Direct"] || 0) + 1;
-          } else {
-            const url = new URL(p.referrer);
-            const domain = url.hostname.replace("www.", "");
-            sourceCounts[domain] = (sourceCounts[domain] || 0) + 1;
-          }
-        } catch {
-          sourceCounts["Direct"] = (sourceCounts["Direct"] || 0) + 1;
-        }
-      });
-      const trafficSources = Object.entries(sourceCounts)
-        .sort(([, a], [, b]) => b - a)
-        .slice(0, 10)
-        .map(([source, visits]) => ({ source, visits }));
-
-      // Device stats
-      const deviceCounts = { mobile: 0, desktop: 0, tablet: 0 };
-      siteAnalytics.pageViews.forEach(p => {
-        const ua = p.userAgent.toLowerCase();
-        if (ua.includes("mobile") || ua.includes("android")) {
-          deviceCounts.mobile++;
-        } else if (ua.includes("tablet") || ua.includes("ipad")) {
-          deviceCounts.tablet++;
-        } else {
-          deviceCounts.desktop++;
-        }
-      });
-
-      // Browser stats
-      const browserCounts: Record<string, number> = {};
-      siteAnalytics.pageViews.forEach(p => {
-        const ua = p.userAgent;
-        let browser = "Other";
-        if (ua.includes("Chrome") && !ua.includes("Edg")) browser = "Chrome";
-        else if (ua.includes("Firefox")) browser = "Firefox";
-        else if (ua.includes("Safari") && !ua.includes("Chrome")) browser = "Safari";
-        else if (ua.includes("Edg")) browser = "Edge";
-        browserCounts[browser] = (browserCounts[browser] || 0) + 1;
-      });
-
-      // Watch stats - top content
-      const showWatchCounts: Record<string, { title: string; watches: number; duration: number }> = {};
-      const movieWatchCounts: Record<string, { title: string; watches: number; duration: number }> = {};
-
-      siteAnalytics.watchEvents.forEach(w => {
-        if (w.contentType === "show") {
-          if (!showWatchCounts[w.contentId]) {
-            showWatchCounts[w.contentId] = { title: w.contentTitle, watches: 0, duration: 0 };
-          }
-          showWatchCounts[w.contentId].watches++;
-          showWatchCounts[w.contentId].duration += w.duration;
-        } else {
-          if (!movieWatchCounts[w.contentId]) {
-            movieWatchCounts[w.contentId] = { title: w.contentTitle, watches: 0, duration: 0 };
-          }
-          movieWatchCounts[w.contentId].watches++;
-          movieWatchCounts[w.contentId].duration += w.duration;
-        }
-      });
-
-      const topShows = Object.entries(showWatchCounts)
-        .sort(([, a], [, b]) => b.watches - a.watches)
-        .slice(0, 10)
-        .map(([id, data]) => ({ id, ...data }));
-
-      const topMovies = Object.entries(movieWatchCounts)
-        .sort(([, a], [, b]) => b.watches - a.watches)
-        .slice(0, 10)
-        .map(([id, data]) => ({ id, ...data }));
-
-      // Total watch time
-      const totalWatchTime = siteAnalytics.watchEvents.reduce((sum, w) => sum + w.duration, 0);
-
-      // Daily views for chart (last 7 days)
-      const dailyViews: { date: string; views: number; visitors: number }[] = [];
-      for (let i = 6; i >= 0; i--) {
-        const date = new Date(today.getTime() - i * 24 * 60 * 60 * 1000);
-        const nextDate = new Date(date.getTime() + 24 * 60 * 60 * 1000);
-        const dayViews = siteAnalytics.pageViews.filter(
-          p => p.timestamp >= date && p.timestamp < nextDate
-        );
-        dailyViews.push({
-          date: date.toISOString().split("T")[0],
-          views: dayViews.length,
-          visitors: new Set(dayViews.map(p => p.sessionId)).size
-        });
-      }
-
-      // Hourly activity (last 24 hours)
-      const hourlyActivity: { hour: number; views: number }[] = [];
-      const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-      for (let h = 0; h < 24; h++) {
-        const hourViews = siteAnalytics.pageViews.filter(p => {
-          if (p.timestamp < dayAgo) return false;
-          return p.timestamp.getHours() === h;
-        }).length;
-        hourlyActivity.push({ hour: h, views: hourViews });
-      }
-
-      // Recent activity
-      const recentPageViews = siteAnalytics.pageViews
-        .slice(-20)
-        .reverse()
-        .map(p => ({
-          timestamp: p.timestamp,
-          path: p.path,
-          referrer: p.referrer.substring(0, 50)
-        }));
-
-      // Badge stats
-      const badgeStats = await storage.getBadgeStats();
-
-      res.json({
-        overview: {
-          pageViews: { today: todayViews, week: weekViews, month: monthViews, total: totalViews },
-          visitors: { today: todayVisitors, week: weekVisitors, total: totalVisitors },
-          activeUsers,
-          totalWatchTimeHours: Math.round(totalWatchTime / 3600 * 10) / 10
-        },
-        dailyViews,
-        hourlyActivity,
-        popularPages,
-        trafficSources,
-        devices: deviceCounts,
-        browsers: browserCounts,
-        topShows,
-        topMovies,
-        recentPageViews,
-        badgeStats
-      });
-    } catch (error) {
-      res.status(500).json({ error: "Failed to get analytics" });
-    }
-  });
-
-  // Admin Analytics - User Stats
-  app.get("/api/admin/stats/users", requireAdmin, async (_req, res) => {
-    try {
-      // 1. Get User Counts
-      const users = await storage.getAllUsers();
-      const totalUsers = users.length;
-      const activeUsers = users.length;
-
-      // 2. Get Guest Subscribers (Emails)
-      let subscribers: string[] = [];
-      if (existsSync(SUBSCRIBERS_FILE)) {
-        const fileContent = readFileSync(SUBSCRIBERS_FILE, 'utf-8');
-        const data = JSON.parse(fileContent);
-        if (Array.isArray(data)) {
-          subscribers = data;
-        } else if (data.subscribers && Array.isArray(data.subscribers)) {
-          subscribers = data.subscribers.map((s: any) => typeof s === 'string' ? s : s.email);
-        }
-      }
-
-      res.json({
-        totalUsers,
-        activeUsers,
-        subscribers
-      });
-    } catch (error) {
-      console.error("Error fetching user stats:", error);
-      res.status(500).json({ error: "Failed to fetch user stats" });
-    }
-  });
-
-  // ============================================
-  // BADGE MANAGEMENT ROUTES
-  // ============================================
-
-  // Get all badges
-  app.get("/api/badges", async (_req, res) => {
-    const badges = await storage.getBadges();
-    res.json(badges);
-  });
-
-  // Create badge (Admin only)
-  app.post("/api/admin/badges", requireAdmin, async (req, res) => {
-    try {
-      const badge = await storage.createBadge(req.body);
-      res.json(badge);
-    } catch (error: any) {
-      res.status(400).json({ error: error.message });
-    }
-  });
-
-  // Update badge (Admin only)
-  app.patch("/api/admin/badges/:id", requireAdmin, async (req, res) => {
-    try {
-      const { id } = req.params;
-      const badge = await storage.updateBadge(id, req.body);
-      if (!badge) return res.status(404).json({ error: "Badge not found" });
-      res.json(badge);
-    } catch (error: any) {
-      res.status(400).json({ error: error.message });
-    }
-  });
-
-  // Delete badge (Admin only)
-  app.delete("/api/admin/badges/:id", requireAdmin, async (req, res) => {
-    try {
-      const { id } = req.params;
-      // Note: Ideally check for user badges constraints, but strict deletion allowed for now
-      await storage.deleteBadge(id);
-      res.sendStatus(204);
-    } catch (error: any) {
-      res.status(400).json({ error: error.message });
-    }
-  });
-
-  // Award badge to user (Admin only)
-  app.post("/api/admin/badges/award", requireAdmin, async (req, res) => {
-    try {
-      const { userId, userIds, badgeId } = req.body;
-
-      const targets = userIds || (userId ? [userId] : []);
-      if (targets.length === 0) return res.status(400).json({ error: "No users specified" });
-
-      const badge = await storage.getBadge(badgeId);
-      if (!badge) return res.status(404).json({ error: "Badge not found" });
-
-      const results = [];
-      for (const uid of targets) {
-        const user = await storage.getUserById(uid);
-        if (!user) continue;
-
-        await storage.awardBadge(uid, badgeId);
-
-        // Notify User
+    // Create notification for each user
+    for (const user of users) {
+      try {
         await storage.createNotification({
-          userId: uid,
-          type: 'achievement',
-          title: 'New Badge Earned! 🏅',
-          message: `You have been awarded the "${badge.name}" badge!`,
-          data: { badgeId: badge.id, name: badge.name, icon: 'award' },
-          read: false
+          userId: user.id,
+          type: type === 'custom' ? 'announcement' : 'content_update',
+          title,
+          message,
+          data: notificationData,
+          read: false,
         });
-        results.push(uid);
+        sentCount++;
+      } catch (err) {
+        console.error(`Failed to create notification for user ${user.id}:`, err);
+      }
+    }
+
+    console.log(`📢 Broadcast notification sent to ${sentCount} users: ${title}`);
+
+    res.json({
+      success: true,
+      sentCount,
+      title,
+      message
+    });
+  } catch (error) {
+    console.error("Broadcast notification error:", error);
+    res.status(500).json({ error: "Failed to broadcast notification" });
+  }
+});
+
+// ========== VIDEO PROXY ==========
+// Proxy endpoint to stream external videos with correct headers
+app.get("/api/proxy-video", async (req, res) => {
+  try {
+    const videoUrl = req.query.url as string;
+
+    if (!videoUrl) {
+      return res.status(400).json({ error: "URL parameter required" });
+    }
+
+    // Only allow whitelisted domains for security
+    const allowedDomains = [
+      'worthcrete.com',
+      'www.worthcrete.com'
+    ];
+
+    let urlOrigin: string;
+    try {
+      const parsedUrl = new URL(videoUrl);
+      urlOrigin = parsedUrl.hostname;
+    } catch {
+      return res.status(400).json({ error: "Invalid URL" });
+    }
+
+    if (!allowedDomains.some(domain => urlOrigin.includes(domain))) {
+      return res.status(403).json({ error: "Domain not allowed" });
+    }
+
+    console.log(`📹 Proxying video: ${videoUrl}`);
+
+    try {
+      // Build headers to mimic browser request
+      const headers: Record<string, string> = {
+        'Referer': 'https://www.worthcrete.com/',
+        'Origin': 'https://www.worthcrete.com',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'video/mp4,video/webm,video/*,*/*;q=0.9',
+        'Accept-Encoding': 'identity',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Connection': 'keep-alive',
+        'Sec-Fetch-Dest': 'video',
+        'Sec-Fetch-Mode': 'no-cors',
+        'Sec-Fetch-Site': 'same-origin',
+        'Sec-Ch-Ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+        'Sec-Ch-Ua-Mobile': '?0',
+        'Sec-Ch-Ua-Platform': '"Windows"',
+      };
+
+      // Forward range header if present
+      if (req.headers.range) {
+        headers['Range'] = req.headers.range as string;
       }
 
-      res.json({ success: true, awardedCount: results.length });
-    } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      const fetchResponse = await fetch(videoUrl, {
+        method: 'GET',
+        headers,
+        redirect: 'follow',
+      });
+
+      console.log(`📹 Proxy response: ${fetchResponse.status}`);
+
+      if (!fetchResponse.ok && fetchResponse.status !== 206) {
+        return res.status(fetchResponse.status).json({
+          error: 'Video source unavailable',
+          status: fetchResponse.status
+        });
+      }
+
+      // Forward headers
+      res.status(fetchResponse.status);
+
+      const contentType = fetchResponse.headers.get('content-type');
+      if (contentType) {
+        res.setHeader('Content-Type', contentType);
+      }
+
+      const contentLength = fetchResponse.headers.get('content-length');
+      if (contentLength) {
+        res.setHeader('Content-Length', contentLength);
+      }
+
+      const contentRange = fetchResponse.headers.get('content-range');
+      if (contentRange) {
+        res.setHeader('Content-Range', contentRange);
+      }
+
+      const acceptRanges = fetchResponse.headers.get('accept-ranges');
+      if (acceptRanges) {
+        res.setHeader('Accept-Ranges', acceptRanges);
+      }
+
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+
+      // Stream the response body
+      if (fetchResponse.body) {
+        const reader = fetchResponse.body.getReader();
+
+        const pump = async () => {
+          try {
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) {
+                res.end();
+                break;
+              }
+              res.write(Buffer.from(value));
+            }
+          } catch (streamError) {
+            console.error('Stream error:', streamError);
+            res.end();
+          }
+        };
+
+        pump();
+      } else {
+        res.end();
+      }
+    } catch (fetchError: any) {
+      console.error('❌ Fetch error:', fetchError.message);
+      res.status(500).json({ error: 'Proxy failed', details: fetchError.message });
+    }
+  } catch (error: any) {
+    console.error("❌ Video proxy error:", error.message);
+    res.status(500).json({ error: "Proxy failed", details: error.message });
+  }
+});
+
+// ============================================
+// Subtitle API - Wyzie Subs Integration
+// ============================================
+
+// Search for subtitles by IMDB ID
+app.get("/api/subtitles/search", async (req, res) => {
+  try {
+    const imdbId = req.query.imdbId as string;
+    const season = req.query.season ? parseInt(req.query.season as string) : undefined;
+    const episode = req.query.episode ? parseInt(req.query.episode as string) : undefined;
+    const language = (req.query.language as string) || 'en';
+
+    if (!imdbId) {
+      return res.status(400).json({ error: "imdbId parameter required" });
+    }
+
+    console.log(`🔍 Subtitle search: imdbId=${imdbId}, season=${season}, episode=${episode}, lang=${language}`);
+
+    const result = await searchSubtitles(imdbId, season, episode, language);
+
+    // Transform results to include download URLs
+    const subtitles = result.subtitles.map(sub => ({
+      ...sub,
+      downloadUrl: `/api/subtitles/download?url=${encodeURIComponent(sub.url)}`
+    }));
+
+    res.json({ subtitles, error: result.error });
+  } catch (error: any) {
+    console.error("❌ Subtitle search error:", error.message);
+    res.status(500).json({ error: "Search failed", details: error.message });
+  }
+});
+
+// Download and serve a subtitle file (with caching)
+app.get("/api/subtitles/download", async (req, res) => {
+  try {
+    const subtitleUrl = req.query.url as string;
+
+    if (!subtitleUrl) {
+      return res.status(400).json({ error: "url parameter required" });
+    }
+
+    console.log(`⬇️ Subtitle download request: ${subtitleUrl}`);
+
+    const cachedPath = await downloadSubtitle(subtitleUrl);
+
+    if (!cachedPath) {
+      return res.status(404).json({ error: "Subtitle not found or download failed" });
+    }
+
+    // Set headers for VTT file
+    res.setHeader('Content-Type', 'text/vtt');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 1 day
+
+    // Send the file
+    const fs = await import('fs');
+    const content = fs.readFileSync(cachedPath, 'utf-8');
+    res.send(content);
+  } catch (error: any) {
+    console.error("❌ Subtitle download error:", error.message);
+    res.status(500).json({ error: "Download failed", details: error.message });
+  }
+});
+
+// Serve cached subtitle file by hash
+app.get("/api/subtitles/file/:hash", async (req, res) => {
+  try {
+    const hash = req.params.hash;
+    const cachedPath = getCachedSubtitle(hash);
+
+    if (!cachedPath) {
+      return res.status(404).json({ error: "Subtitle not found in cache" });
+    }
+
+    res.setHeader('Content-Type', 'text/vtt');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+
+    const fs = await import('fs');
+    const content = fs.readFileSync(cachedPath, 'utf-8');
+    res.send(content);
+  } catch (error: any) {
+    console.error("❌ Subtitle file error:", error.message);
+    res.status(500).json({ error: "File read failed", details: error.message });
+  }
+});
+
+// ============================================
+// Widget Analytics - Track clicks from WorthCrete
+// ============================================
+
+// In-memory storage for widget analytics (use database in production)
+interface WidgetClick {
+  timestamp: Date;
+  referrer: string;
+  userAgent: string;
+  ip: string;
+}
+
+const widgetAnalytics = {
+  clicks: [] as WidgetClick[],
+  views: [] as { timestamp: Date; referrer: string }[]
+};
+
+// Track widget click
+app.post("/api/widget/click", (req, res) => {
+  try {
+    const referrer = req.headers.referer || req.body.referrer || "direct";
+    const userAgent = req.headers["user-agent"] || "unknown";
+    const ip = req.headers["x-forwarded-for"] || req.socket.remoteAddress || "unknown";
+
+    widgetAnalytics.clicks.push({
+      timestamp: new Date(),
+      referrer: referrer as string,
+      userAgent: userAgent as string,
+      ip: ip as string
+    });
+
+    console.log(`📊 Widget click from: ${referrer}`);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to track click" });
+  }
+});
+
+// Track widget view (impression)
+app.post("/api/widget/view", (req, res) => {
+  try {
+    const referrer = req.headers.referer || req.body.referrer || "direct";
+
+    widgetAnalytics.views.push({
+      timestamp: new Date(),
+      referrer: referrer as string
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to track view" });
+  }
+});
+
+// Get widget analytics (admin only)
+app.get("/api/widget/analytics", requireAdmin, (req, res) => {
+  try {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    // Calculate stats
+    const todayClicks = widgetAnalytics.clicks.filter(c => c.timestamp >= today).length;
+    const weekClicks = widgetAnalytics.clicks.filter(c => c.timestamp >= weekAgo).length;
+    const monthClicks = widgetAnalytics.clicks.filter(c => c.timestamp >= monthAgo).length;
+    const totalClicks = widgetAnalytics.clicks.length;
+
+    const todayViews = widgetAnalytics.views.filter(v => v.timestamp >= today).length;
+    const weekViews = widgetAnalytics.views.filter(v => v.timestamp >= weekAgo).length;
+    const monthViews = widgetAnalytics.views.filter(v => v.timestamp >= monthAgo).length;
+    const totalViews = widgetAnalytics.views.length;
+
+    // Group by referrer
+    const clicksByReferrer: Record<string, number> = {};
+    widgetAnalytics.clicks.forEach(c => {
+      try {
+        const url = new URL(c.referrer);
+        const domain = url.hostname;
+        clicksByReferrer[domain] = (clicksByReferrer[domain] || 0) + 1;
+      } catch {
+        clicksByReferrer["direct"] = (clicksByReferrer["direct"] || 0) + 1;
+      }
+    });
+
+    // Daily clicks for chart (last 7 days)
+    const dailyClicks: { date: string; clicks: number }[] = [];
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date(today.getTime() - i * 24 * 60 * 60 * 1000);
+      const nextDate = new Date(date.getTime() + 24 * 60 * 60 * 1000);
+      const clicks = widgetAnalytics.clicks.filter(
+        c => c.timestamp >= date && c.timestamp < nextDate
+      ).length;
+      dailyClicks.push({
+        date: date.toISOString().split("T")[0],
+        clicks
+      });
+    }
+
+    // Recent clicks
+    const recentClicks = widgetAnalytics.clicks
+      .slice(-20)
+      .reverse()
+      .map(c => ({
+        timestamp: c.timestamp,
+        referrer: c.referrer,
+        userAgent: c.userAgent.substring(0, 50)
+      }));
+
+    res.json({
+      summary: {
+        clicks: { today: todayClicks, week: weekClicks, month: monthClicks, total: totalClicks },
+        views: { today: todayViews, week: weekViews, month: monthViews, total: totalViews },
+        ctr: totalViews > 0 ? ((totalClicks / totalViews) * 100).toFixed(2) + "%" : "N/A"
+      },
+      clicksByReferrer,
+      dailyClicks,
+      recentClicks
+    });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to get analytics" });
+  }
+});
+
+// ============================================
+// Site Analytics - Track visitors and content
+// ============================================
+
+interface PageView {
+  timestamp: Date;
+  path: string;
+  referrer: string;
+  userAgent: string;
+  sessionId: string;
+  ip: string;
+}
+
+interface WatchEvent {
+  timestamp: Date;
+  contentType: 'show' | 'movie';
+  contentId: string;
+  contentTitle: string;
+  episodeId?: string;
+  duration: number; // seconds watched
+  sessionId: string;
+}
+
+const siteAnalytics = {
+  pageViews: [] as PageView[],
+  watchEvents: [] as WatchEvent[],
+  activeSessions: new Map<string, { lastSeen: Date; pages: number }>()
+};
+
+// Clean up old sessions every 5 minutes
+setInterval(() => {
+  const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+  siteAnalytics.activeSessions.forEach((data, sessionId) => {
+    if (data.lastSeen < fiveMinutesAgo) {
+      siteAnalytics.activeSessions.delete(sessionId);
     }
   });
+}, 60 * 1000);
 
-  const httpServer = createServer(app);
+// Track page view
+app.post("/api/analytics/pageview", (req, res) => {
+  try {
+    const { path, sessionId } = req.body;
+    const referrer = req.headers.referer || req.body.referrer || "direct";
+    const userAgent = req.headers["user-agent"] || "unknown";
+    const ip = (req.headers["x-forwarded-for"] || req.socket.remoteAddress || "unknown") as string;
 
-  return httpServer;
+    siteAnalytics.pageViews.push({
+      timestamp: new Date(),
+      path: path || "/",
+      referrer: referrer as string,
+      userAgent: userAgent as string,
+      sessionId: sessionId || "anonymous",
+      ip: ip.split(",")[0].trim()
+    });
+
+    // Update active session
+    const session = siteAnalytics.activeSessions.get(sessionId) || { lastSeen: new Date(), pages: 0 };
+    session.lastSeen = new Date();
+    session.pages++;
+    siteAnalytics.activeSessions.set(sessionId, session);
+
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to track pageview" });
+  }
+});
+
+// Track watch event
+app.post("/api/analytics/watch", (req, res) => {
+  try {
+    const { contentType, contentId, contentTitle, episodeId, duration, sessionId } = req.body;
+
+    siteAnalytics.watchEvents.push({
+      timestamp: new Date(),
+      contentType,
+      contentId,
+      contentTitle,
+      episodeId,
+      duration: duration || 0,
+      sessionId: sessionId || "anonymous"
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to track watch" });
+  }
+});
+
+// Get site analytics (admin only)
+app.get("/api/analytics/site", requireAdmin, async (req, res) => {
+  try {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    // Page view stats
+    const todayViews = siteAnalytics.pageViews.filter(p => p.timestamp >= today).length;
+    const weekViews = siteAnalytics.pageViews.filter(p => p.timestamp >= weekAgo).length;
+    const monthViews = siteAnalytics.pageViews.filter(p => p.timestamp >= monthAgo).length;
+    const totalViews = siteAnalytics.pageViews.length;
+
+    // Unique visitors (by sessionId)
+    const todayVisitors = new Set(siteAnalytics.pageViews.filter(p => p.timestamp >= today).map(p => p.sessionId)).size;
+    const weekVisitors = new Set(siteAnalytics.pageViews.filter(p => p.timestamp >= weekAgo).map(p => p.sessionId)).size;
+    const totalVisitors = new Set(siteAnalytics.pageViews.map(p => p.sessionId)).size;
+
+    // Active users (sessions in last 5 mins)
+    const activeUsers = siteAnalytics.activeSessions.size;
+
+    // Popular pages
+    const pageCounts: Record<string, number> = {};
+    siteAnalytics.pageViews.forEach(p => {
+      pageCounts[p.path] = (pageCounts[p.path] || 0) + 1;
+    });
+    const popularPages = Object.entries(pageCounts)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 10)
+      .map(([path, views]) => ({ path, views }));
+
+    // Traffic sources
+    const sourceCounts: Record<string, number> = {};
+    siteAnalytics.pageViews.forEach(p => {
+      try {
+        if (p.referrer === "direct" || !p.referrer) {
+          sourceCounts["Direct"] = (sourceCounts["Direct"] || 0) + 1;
+        } else {
+          const url = new URL(p.referrer);
+          const domain = url.hostname.replace("www.", "");
+          sourceCounts[domain] = (sourceCounts[domain] || 0) + 1;
+        }
+      } catch {
+        sourceCounts["Direct"] = (sourceCounts["Direct"] || 0) + 1;
+      }
+    });
+    const trafficSources = Object.entries(sourceCounts)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 10)
+      .map(([source, visits]) => ({ source, visits }));
+
+    // Device stats
+    const deviceCounts = { mobile: 0, desktop: 0, tablet: 0 };
+    siteAnalytics.pageViews.forEach(p => {
+      const ua = p.userAgent.toLowerCase();
+      if (ua.includes("mobile") || ua.includes("android")) {
+        deviceCounts.mobile++;
+      } else if (ua.includes("tablet") || ua.includes("ipad")) {
+        deviceCounts.tablet++;
+      } else {
+        deviceCounts.desktop++;
+      }
+    });
+
+    // Browser stats
+    const browserCounts: Record<string, number> = {};
+    siteAnalytics.pageViews.forEach(p => {
+      const ua = p.userAgent;
+      let browser = "Other";
+      if (ua.includes("Chrome") && !ua.includes("Edg")) browser = "Chrome";
+      else if (ua.includes("Firefox")) browser = "Firefox";
+      else if (ua.includes("Safari") && !ua.includes("Chrome")) browser = "Safari";
+      else if (ua.includes("Edg")) browser = "Edge";
+      browserCounts[browser] = (browserCounts[browser] || 0) + 1;
+    });
+
+    // Watch stats - top content
+    const showWatchCounts: Record<string, { title: string; watches: number; duration: number }> = {};
+    const movieWatchCounts: Record<string, { title: string; watches: number; duration: number }> = {};
+
+    siteAnalytics.watchEvents.forEach(w => {
+      if (w.contentType === "show") {
+        if (!showWatchCounts[w.contentId]) {
+          showWatchCounts[w.contentId] = { title: w.contentTitle, watches: 0, duration: 0 };
+        }
+        showWatchCounts[w.contentId].watches++;
+        showWatchCounts[w.contentId].duration += w.duration;
+      } else {
+        if (!movieWatchCounts[w.contentId]) {
+          movieWatchCounts[w.contentId] = { title: w.contentTitle, watches: 0, duration: 0 };
+        }
+        movieWatchCounts[w.contentId].watches++;
+        movieWatchCounts[w.contentId].duration += w.duration;
+      }
+    });
+
+    const topShows = Object.entries(showWatchCounts)
+      .sort(([, a], [, b]) => b.watches - a.watches)
+      .slice(0, 10)
+      .map(([id, data]) => ({ id, ...data }));
+
+    const topMovies = Object.entries(movieWatchCounts)
+      .sort(([, a], [, b]) => b.watches - a.watches)
+      .slice(0, 10)
+      .map(([id, data]) => ({ id, ...data }));
+
+    // Total watch time
+    const totalWatchTime = siteAnalytics.watchEvents.reduce((sum, w) => sum + w.duration, 0);
+
+    // Daily views for chart (last 7 days)
+    const dailyViews: { date: string; views: number; visitors: number }[] = [];
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date(today.getTime() - i * 24 * 60 * 60 * 1000);
+      const nextDate = new Date(date.getTime() + 24 * 60 * 60 * 1000);
+      const dayViews = siteAnalytics.pageViews.filter(
+        p => p.timestamp >= date && p.timestamp < nextDate
+      );
+      dailyViews.push({
+        date: date.toISOString().split("T")[0],
+        views: dayViews.length,
+        visitors: new Set(dayViews.map(p => p.sessionId)).size
+      });
+    }
+
+    // Hourly activity (last 24 hours)
+    const hourlyActivity: { hour: number; views: number }[] = [];
+    const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    for (let h = 0; h < 24; h++) {
+      const hourViews = siteAnalytics.pageViews.filter(p => {
+        if (p.timestamp < dayAgo) return false;
+        return p.timestamp.getHours() === h;
+      }).length;
+      hourlyActivity.push({ hour: h, views: hourViews });
+    }
+
+    // Recent activity
+    const recentPageViews = siteAnalytics.pageViews
+      .slice(-20)
+      .reverse()
+      .map(p => ({
+        timestamp: p.timestamp,
+        path: p.path,
+        referrer: p.referrer.substring(0, 50)
+      }));
+
+    // Badge stats
+    const badgeStats = await storage.getBadgeStats();
+
+    res.json({
+      overview: {
+        pageViews: { today: todayViews, week: weekViews, month: monthViews, total: totalViews },
+        visitors: { today: todayVisitors, week: weekVisitors, total: totalVisitors },
+        activeUsers,
+        totalWatchTimeHours: Math.round(totalWatchTime / 3600 * 10) / 10
+      },
+      dailyViews,
+      hourlyActivity,
+      popularPages,
+      trafficSources,
+      devices: deviceCounts,
+      browsers: browserCounts,
+      topShows,
+      topMovies,
+      recentPageViews,
+      badgeStats
+    });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to get analytics" });
+  }
+});
+
+// Admin Analytics - User Stats
+app.get("/api/admin/stats/users", requireAdmin, async (_req, res) => {
+  try {
+    // 1. Get User Counts
+    const users = await storage.getAllUsers();
+    const totalUsers = users.length;
+    const activeUsers = users.length;
+
+    // 2. Get Guest Subscribers (Emails)
+    let subscribers: string[] = [];
+    if (existsSync(SUBSCRIBERS_FILE)) {
+      const fileContent = readFileSync(SUBSCRIBERS_FILE, 'utf-8');
+      const data = JSON.parse(fileContent);
+      if (Array.isArray(data)) {
+        subscribers = data;
+      } else if (data.subscribers && Array.isArray(data.subscribers)) {
+        subscribers = data.subscribers.map((s: any) => typeof s === 'string' ? s : s.email);
+      }
+    }
+
+    res.json({
+      totalUsers,
+      activeUsers,
+      subscribers
+    });
+  } catch (error) {
+    console.error("Error fetching user stats:", error);
+    res.status(500).json({ error: "Failed to fetch user stats" });
+  }
+});
+
+// ============================================
+// BADGE MANAGEMENT ROUTES
+// ============================================
+
+// Get all badges
+app.get("/api/badges", async (_req, res) => {
+  const badges = await storage.getBadges();
+  res.json(badges);
+});
+
+// Create badge (Admin only)
+app.post("/api/admin/badges", requireAdmin, async (req, res) => {
+  try {
+    const badge = await storage.createBadge(req.body);
+    res.json(badge);
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Update badge (Admin only)
+app.patch("/api/admin/badges/:id", requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const badge = await storage.updateBadge(id, req.body);
+    if (!badge) return res.status(404).json({ error: "Badge not found" });
+    res.json(badge);
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Delete badge (Admin only)
+app.delete("/api/admin/badges/:id", requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    // Note: Ideally check for user badges constraints, but strict deletion allowed for now
+    await storage.deleteBadge(id);
+    res.sendStatus(204);
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Award badge to user (Admin only)
+app.post("/api/admin/badges/award", requireAdmin, async (req, res) => {
+  try {
+    const { userId, userIds, badgeId } = req.body;
+
+    const targets = userIds || (userId ? [userId] : []);
+    if (targets.length === 0) return res.status(400).json({ error: "No users specified" });
+
+    const badge = await storage.getBadge(badgeId);
+    if (!badge) return res.status(404).json({ error: "Badge not found" });
+
+    const results = [];
+    for (const uid of targets) {
+      const user = await storage.getUserById(uid);
+      if (!user) continue;
+
+      await storage.awardBadge(uid, badgeId);
+
+      // Notify User
+      await storage.createNotification({
+        userId: uid,
+        type: 'achievement',
+        title: 'New Badge Earned! 🏅',
+        message: `You have been awarded the "${badge.name}" badge!`,
+        data: { badgeId: badge.id, name: badge.name, icon: 'award' },
+        read: false
+      });
+      results.push(uid);
+    }
+
+    res.json({ success: true, awardedCount: results.length });
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+const httpServer = createServer(app);
+
+return httpServer;
 }
