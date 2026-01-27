@@ -5378,6 +5378,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
 
+  // ==========================================
+  // URL Health Check Routes
+  // ==========================================
+
+  // Check all video URLs for broken links
+  app.get("/api/admin/url-health", requireAdmin, async (req, res) => {
+    try {
+      const { checkAllVideoUrls } = await import("./url-health");
+
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
+      const archiveOnly = req.query.archiveOnly === 'true';
+
+      const episodes = await storage.getAllEpisodes();
+      const animeEpisodes = await storage.getAllAnimeEpisodes();
+      const movies = await storage.getAllMovies();
+      const shows = await storage.getAllShows();
+      const anime = await storage.getAllAnime();
+
+      const report = await checkAllVideoUrls(
+        episodes,
+        animeEpisodes,
+        movies,
+        shows,
+        anime,
+        { checkArchiveOnly: archiveOnly, limit }
+      );
+
+      res.json(report);
+    } catch (error: any) {
+      console.error("URL health check failed:", error);
+      res.status(500).json({ error: error.message || "Failed to check URLs" });
+    }
+  });
+
+  // Check a single URL
+  app.post("/api/admin/url-health/check-single", requireAdmin, async (req, res) => {
+    try {
+      const { checkUrl } = await import("./url-health");
+      const { url } = req.body;
+
+      if (!url) {
+        return res.status(400).json({ error: "URL is required" });
+      }
+
+      const result = await checkUrl(url);
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || "Failed to check URL" });
+    }
+  });
+
   // Sync system achievements to badges DB
   app.post("/api/admin/badges/sync", requireAdmin, async (_req, res) => {
     try {

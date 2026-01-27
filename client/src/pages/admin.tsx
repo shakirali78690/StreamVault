@@ -29,7 +29,12 @@ import {
   Upload,
   Send,
   Megaphone,
-  Bell
+  Bell,
+  Activity,
+  CheckCircle,
+  XCircle,
+  AlertTriangle,
+  RefreshCw
 } from "lucide-react";
 import type { Show, Episode, Movie, BlogPost, Anime, AnimeEpisode } from "@shared/schema";
 import { getAuthHeaders, logout as authLogout } from "@/lib/auth";
@@ -151,6 +156,7 @@ export default function AdminPage() {
             <TabsTrigger value="broadcast">📢 Broadcast</TabsTrigger>
             <TabsTrigger value="add-show">Add Show</TabsTrigger>
             <TabsTrigger value="add-episode">Add Episode</TabsTrigger>
+            <TabsTrigger value="manage-episodes">Manage Episodes</TabsTrigger>
             <TabsTrigger value="import">Import</TabsTrigger>
             <TabsTrigger value="polls" className="gap-2">
               <Vote className="w-4 h-4" />
@@ -162,6 +168,10 @@ export default function AdminPage() {
             <TabsTrigger value="badges" className="gap-2">
               <Award className="w-4 h-4" />
               Badges
+            </TabsTrigger>
+            <TabsTrigger value="url-health" className="gap-2">
+              <Activity className="w-4 h-4" />
+              URL Health
             </TabsTrigger>
           </TabsList>
 
@@ -231,6 +241,11 @@ export default function AdminPage() {
             <AddEpisodeForm shows={shows} />
           </TabsContent>
 
+          {/* Manage Episodes Tab */}
+          <TabsContent value="manage-episodes">
+            <ManageEpisodesTab shows={shows} />
+          </TabsContent>
+
           {/* Import Episodes Tab */}
           <TabsContent value="import">
             <ImportEpisodesForm />
@@ -249,6 +264,11 @@ export default function AdminPage() {
           {/* Badges Management Tab */}
           <TabsContent value="badges">
             <BadgesManager />
+          </TabsContent>
+
+          {/* URL Health Tab */}
+          <TabsContent value="url-health">
+            <UrlHealthTab />
           </TabsContent>
         </Tabs>
       </div>
@@ -344,6 +364,225 @@ function UserAnalytics() {
   );
 }
 
+
+// URL Health Tab Component
+function UrlHealthTab() {
+  const { toast } = useToast();
+  const [isChecking, setIsChecking] = useState(false);
+  const [report, setReport] = useState<any>(null);
+  const [checkType, setCheckType] = useState<'all' | 'archive'>('archive');
+  const [checkLimit, setCheckLimit] = useState<number>(0); // 0 = all
+
+  const runHealthCheck = async () => {
+    setIsChecking(true);
+    setReport(null);
+    try {
+      const queryParams = new URLSearchParams();
+      if (checkType === 'archive') queryParams.append('archiveOnly', 'true');
+      if (checkLimit > 0) queryParams.append('limit', checkLimit.toString());
+
+      const res = await fetch(`/api/admin/url-health?${queryParams.toString()}`, {
+        headers: getAuthHeaders()
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Failed to run health check");
+      }
+
+      const data = await res.json();
+      setReport(data);
+
+      if (data.broken > 0) {
+        toast({
+          title: "Health Check Complete",
+          description: `Found ${data.broken} broken URLs out of ${data.totalChecked} checked.`,
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "Health Check Complete",
+          description: `All ${data.totalChecked} URLs are accessible!`,
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive"
+      });
+    } finally {
+      setIsChecking(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Activity className="w-5 h-5 text-primary" />
+            Video URL Health Checker
+          </CardTitle>
+          <CardDescription>
+            Scan your content library for broken video links (e.g. removed Archive.org videos)
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col md:flex-row gap-4 items-end">
+            <div className="space-y-2 flex-1">
+              <Label>Check Type</Label>
+              <Select value={checkType} onValueChange={(val: any) => setCheckType(val)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="archive">Archive.org Links Only (Recommended)</SelectItem>
+                  <SelectItem value="all">All Video URLs</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2 w-full md:w-40">
+              <Label>Limit (0 = All)</Label>
+              <Input
+                type="number"
+                min="0"
+                value={checkLimit}
+                onChange={(e) => setCheckLimit(parseInt(e.target.value) || 0)}
+              />
+            </div>
+
+            <Button
+              onClick={runHealthCheck}
+              disabled={isChecking}
+              className="w-full md:w-auto"
+            >
+              {isChecking ? (
+                <>
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                  Scanning...
+                </>
+              ) : (
+                <>
+                  <Activity className="w-4 h-4 mr-2" />
+                  Run Health Check
+                </>
+              )}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {report && (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Total Checked</p>
+                    <h3 className="text-2xl font-bold">{report.totalChecked}</h3>
+                  </div>
+                  <Activity className="w-8 h-8 text-muted-foreground opacity-50" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Valid Links</p>
+                    <h3 className="text-2xl font-bold text-green-500">{report.valid}</h3>
+                  </div>
+                  <CheckCircle className="w-8 h-8 text-green-500 opacity-50" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Broken Links</p>
+                    <h3 className="text-2xl font-bold text-red-500">{report.broken}</h3>
+                  </div>
+                  <AlertTriangle className="w-8 h-8 text-red-500 opacity-50" />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Detailed Report</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {report.brokenItems.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <CheckCircle className="w-12 h-12 mx-auto mb-4 text-green-500 opacity-50" />
+                  <p>No broken links found! Great job.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <h4 className="font-semibold text-red-500">Broken Items ({report.brokenItems.length})</h4>
+                  </div>
+
+                  <div className="border rounded-lg overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead className="bg-muted/50">
+                        <tr>
+                          <th className="text-left p-3 font-medium">Type</th>
+                          <th className="text-left p-3 font-medium">Content</th>
+                          <th className="text-left p-3 font-medium">Status</th>
+                          <th className="text-left p-3 font-medium">Error</th>
+                          <th className="text-right p-3 font-medium">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {report.brokenItems.map((item: any, i: number) => (
+                          <tr key={i} className="border-t hover:bg-muted/30">
+                            <td className="p-3 capitalize">{item.type.replace(/([A-Z])/g, ' $1').trim()}</td>
+                            <td className="p-3">
+                              <div className="font-medium">{item.title}</div>
+                              <div className="text-xs text-muted-foreground">
+                                {item.parentTitle}
+                                {item.season && ` • S${item.season}E${item.episodeNumber}`}
+                              </div>
+                            </td>
+                            <td className="p-3">
+                              <Badge variant="destructive">{item.checkResult.status || 'Error'}</Badge>
+                            </td>
+                            <td className="p-3 text-destructive truncate max-w-[200px]" title={item.checkResult.error}>
+                              {item.checkResult.error || 'Unknown error'}
+                            </td>
+                            <td className="p-3 text-right">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                asChild
+                              >
+                                <a href={item.url} target="_blank" rel="noopener noreferrer">
+                                  View URL
+                                </a>
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+    </div>
+  );
+}
 
 // Manage Shows Component
 function ManageShows({ shows }: { shows: Show[] }) {
@@ -1281,6 +1520,384 @@ function AddEpisodeForm({ shows }: { shows: Show[] }) {
         </form>
       </CardContent>
     </Card>
+  );
+}
+
+// Manage Episodes Tab Component
+function ManageEpisodesTab({ shows }: { shows: Show[] }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [selectedShowId, setSelectedShowId] = useState<string>("");
+  const [selectedSeason, setSelectedSeason] = useState<number>(1);
+  const [editingEpisode, setEditingEpisode] = useState<Episode | null>(null);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+
+  // Fetch episodes for selected show
+  const { data: episodes = [], isLoading: episodesLoading } = useQuery<Episode[]>({
+    queryKey: ["/api/episodes", selectedShowId],
+    queryFn: async () => {
+      if (!selectedShowId) return [];
+      const res = await fetch(`/api/episodes/${selectedShowId}`, {
+        headers: getAuthHeaders()
+      });
+      if (!res.ok) throw new Error("Failed to fetch episodes");
+      return res.json();
+    },
+    enabled: !!selectedShowId,
+  });
+
+  // Get unique seasons from episodes
+  const seasons = [...new Set(episodes.map(ep => ep.season))].sort((a, b) => a - b);
+
+  // Filter episodes by selected season
+  const filteredEpisodes = episodes
+    .filter(ep => ep.season === selectedSeason)
+    .sort((a, b) => a.episodeNumber - b.episodeNumber);
+
+  // Update episode mutation
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<Episode> }) => {
+      const res = await fetch(`/api/admin/episodes/${id}`, {
+        method: "PUT",
+        headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify(updates),
+      });
+      if (!res.ok) throw new Error("Failed to update episode");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/episodes", selectedShowId] });
+      setIsEditDialogOpen(false);
+      setEditingEpisode(null);
+      toast({ title: "Success", description: "Episode updated successfully" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update episode", variant: "destructive" });
+    },
+  });
+
+  // Delete episode mutation
+  const deleteMutation = useMutation({
+    mutationFn: async (episodeId: string) => {
+      const res = await fetch(`/api/admin/episodes/${episodeId}`, {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      });
+      if (!res.ok) throw new Error("Failed to delete episode");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/episodes", selectedShowId] });
+      toast({ title: "Success", description: "Episode deleted successfully" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to delete episode", variant: "destructive" });
+    },
+  });
+
+  const handleEditClick = (episode: Episode) => {
+    setEditingEpisode(episode);
+    setIsEditDialogOpen(true);
+  };
+
+  const handleDeleteClick = (episode: Episode) => {
+    if (confirm(`Delete S${episode.season}E${episode.episodeNumber}: "${episode.title}"?`)) {
+      deleteMutation.mutate(episode.id);
+    }
+  };
+
+  const selectedShow = shows.find(s => s.id === selectedShowId);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Manage Episodes</CardTitle>
+        <CardDescription>Edit or delete existing episodes</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {/* Show Selector */}
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>Select Show</Label>
+            <select
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              value={selectedShowId}
+              onChange={(e) => {
+                setSelectedShowId(e.target.value);
+                setSelectedSeason(1);
+              }}
+            >
+              <option value="">Choose a show...</option>
+              {shows.map((show) => (
+                <option key={show.id} value={show.id}>
+                  {show.title}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Season Selector */}
+          <div className="space-y-2">
+            <Label>Select Season</Label>
+            <select
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              value={selectedSeason}
+              onChange={(e) => setSelectedSeason(parseInt(e.target.value))}
+              disabled={!selectedShowId || seasons.length === 0}
+            >
+              {seasons.length === 0 ? (
+                <option value="1">No seasons found</option>
+              ) : (
+                seasons.map((s) => (
+                  <option key={s} value={s}>Season {s}</option>
+                ))
+              )}
+            </select>
+          </div>
+        </div>
+
+        {/* Episodes List */}
+        {selectedShowId && (
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold">
+              {selectedShow?.title} - Season {selectedSeason}
+            </h3>
+
+            {episodesLoading ? (
+              <p className="text-muted-foreground">Loading episodes...</p>
+            ) : filteredEpisodes.length === 0 ? (
+              <p className="text-muted-foreground">No episodes found for this season.</p>
+            ) : (
+              <div className="border rounded-lg overflow-hidden">
+                <table className="w-full">
+                  <thead className="bg-muted/50">
+                    <tr>
+                      <th className="text-left p-3 font-medium">#</th>
+                      <th className="text-left p-3 font-medium">Title</th>
+                      <th className="text-left p-3 font-medium">Duration</th>
+                      <th className="text-left p-3 font-medium">Video URL</th>
+                      <th className="text-right p-3 font-medium">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredEpisodes.map((episode) => (
+                      <tr key={episode.id} className="border-t hover:bg-muted/30">
+                        <td className="p-3">E{episode.episodeNumber}</td>
+                        <td className="p-3">{episode.title}</td>
+                        <td className="p-3">{episode.duration} min</td>
+                        <td className="p-3">
+                          {episode.videoUrl ? (
+                            <Badge variant="outline" className="bg-green-500/10 text-green-500">
+                              ✓ Set
+                            </Badge>
+                          ) : episode.googleDriveUrl ? (
+                            <Badge variant="outline" className="bg-blue-500/10 text-blue-500">
+                              GDrive
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="bg-red-500/10 text-red-500">
+                              Missing
+                            </Badge>
+                          )}
+                        </td>
+                        <td className="p-3 text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleEditClick(episode)}
+                            >
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => handleDeleteClick(episode)}
+                              disabled={deleteMutation.isPending}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+      </CardContent>
+
+      {/* Edit Episode Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Episode</DialogTitle>
+            <DialogDescription>
+              Update episode information
+            </DialogDescription>
+          </DialogHeader>
+          {editingEpisode && (
+            <EditEpisodeForm
+              episode={editingEpisode}
+              onSave={(updates) => updateMutation.mutate({ id: editingEpisode.id, updates })}
+              onCancel={() => setIsEditDialogOpen(false)}
+              isLoading={updateMutation.isPending}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+    </Card>
+  );
+}
+
+// Edit Episode Form Component
+function EditEpisodeForm({ episode, onSave, onCancel, isLoading }: {
+  episode: Episode;
+  onSave: (updates: Partial<Episode>) => void;
+  onCancel: () => void;
+  isLoading: boolean;
+}) {
+  const [formData, setFormData] = useState({
+    title: episode.title,
+    description: episode.description,
+    thumbnailUrl: episode.thumbnailUrl,
+    duration: episode.duration,
+    googleDriveUrl: episode.googleDriveUrl,
+    videoUrl: episode.videoUrl || "",
+    airDate: episode.airDate || "",
+    season: episode.season,
+    episodeNumber: episode.episodeNumber,
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSave({
+      ...formData,
+      videoUrl: formData.videoUrl || null,
+      airDate: formData.airDate || null,
+    });
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="edit-season">Season</Label>
+          <Input
+            id="edit-season"
+            type="number"
+            min="1"
+            value={formData.season}
+            onChange={(e) => setFormData({ ...formData, season: parseInt(e.target.value) })}
+            required
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="edit-episodeNumber">Episode Number</Label>
+          <Input
+            id="edit-episodeNumber"
+            type="number"
+            min="1"
+            value={formData.episodeNumber}
+            onChange={(e) => setFormData({ ...formData, episodeNumber: parseInt(e.target.value) })}
+            required
+          />
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="edit-title">Episode Title</Label>
+        <Input
+          id="edit-title"
+          value={formData.title}
+          onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+          required
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="edit-description">Description</Label>
+        <Textarea
+          id="edit-description"
+          value={formData.description}
+          onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+          rows={3}
+          required
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="edit-thumbnailUrl">Thumbnail URL</Label>
+        <Input
+          id="edit-thumbnailUrl"
+          type="url"
+          value={formData.thumbnailUrl}
+          onChange={(e) => setFormData({ ...formData, thumbnailUrl: e.target.value })}
+          required
+        />
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="edit-duration">Duration (minutes)</Label>
+          <Input
+            id="edit-duration"
+            type="number"
+            min="1"
+            value={formData.duration}
+            onChange={(e) => setFormData({ ...formData, duration: parseInt(e.target.value) })}
+            required
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="edit-airDate">Air Date</Label>
+          <Input
+            id="edit-airDate"
+            type="date"
+            value={formData.airDate}
+            onChange={(e) => setFormData({ ...formData, airDate: e.target.value })}
+          />
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="edit-googleDriveUrl">Google Drive Video URL</Label>
+        <Input
+          id="edit-googleDriveUrl"
+          type="url"
+          value={formData.googleDriveUrl}
+          onChange={(e) => setFormData({ ...formData, googleDriveUrl: e.target.value })}
+          placeholder="https://drive.google.com/file/d/FILE_ID/preview"
+          required
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="edit-videoUrl">Archive.org / Alternative Video URL</Label>
+        <Input
+          id="edit-videoUrl"
+          type="url"
+          value={formData.videoUrl}
+          onChange={(e) => setFormData({ ...formData, videoUrl: e.target.value })}
+          placeholder="https://archive.org/download/..."
+        />
+        <p className="text-xs text-muted-foreground">
+          Optional: Used as an alternative video source (e.g., Archive.org)
+        </p>
+      </div>
+
+      <DialogFooter>
+        <Button type="button" variant="outline" onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button type="submit" disabled={isLoading}>
+          <Save className="w-4 h-4 mr-2" />
+          {isLoading ? "Saving..." : "Save Changes"}
+        </Button>
+      </DialogFooter>
+    </form>
   );
 }
 
